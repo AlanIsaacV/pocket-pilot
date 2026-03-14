@@ -1,0 +1,26 @@
+.claude/
+.zed/
+
+# macOS
+.DS_Store
+
+# Go
+backend/vendor/
+backend/*.test
+
+# Flutter / Dart
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/build/
+frontend/.packages
+frontend/pubspec.lock
+
+# Generated proto files (regenerate with scripts/gen_proto.sh)
+backend/internal/gen/
+frontend/lib/src/generated/
+
+# Environment / secrets
+*.env
+.env.*
+!.env.example

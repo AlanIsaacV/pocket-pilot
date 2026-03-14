@@ -1,0 +1,92 @@
+// =============================================================================
+// category_service.proto
+// CRUD for transaction categories (Income / Expense).
+// =============================================================================
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
+
+// ---------------------------------------------------------------------------
+// Enum
+// ---------------------------------------------------------------------------
+enum CategoryType {
+    CATEGORY_TYPE_UNSPECIFIED = 0;
+    CATEGORY_TYPE_INCOME      = 1;
+    CATEGORY_TYPE_EXPENSE     = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Core message
+// ---------------------------------------------------------------------------
+message Category {
+    string       id      = 1;
+    string       user_id = 2;
+    string       name    = 3;
+    CategoryType type    = 4;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
+}
+
+// ---------------------------------------------------------------------------
+// RPC messages
+// ---------------------------------------------------------------------------
+
+message CreateCategoryRequest {
+    string       user_id = 1;
+    string       name    = 2;
+    CategoryType type    = 3;
+}
+message CreateCategoryResponse {
+    Category category = 1;
+}
+
+message GetCategoryRequest {
+    string user_id      = 1;
+    string category_id  = 2;
+}
+message GetCategoryResponse {
+    Category category = 1;
+}
+
+message ListCategoriesRequest {
+    string       user_id    = 1;
+    // Optional filter: leave as UNSPECIFIED to get all categories
+    CategoryType type       = 2;
+    PageRequest  pagination = 3;
+}
+message ListCategoriesResponse {
+    repeated Category categories = 1;
+    PageResponse      pagination = 2;
+}
+
+message UpdateCategoryRequest {
+    string       user_id     = 1;
+    string       category_id = 2;
+    string       name        = 3;
+    CategoryType type        = 4;
+}
+message UpdateCategoryResponse {
+    Category category = 1;
+}
+
+message DeleteCategoryRequest {
+    string user_id     = 1;
+    string category_id = 2;
+}
+message DeleteCategoryResponse {}
+
+// ---------------------------------------------------------------------------
+// Service
+// ---------------------------------------------------------------------------
+service CategoryService {
+    rpc CreateCategory  (CreateCategoryRequest)  returns (CreateCategoryResponse);
+    rpc GetCategory     (GetCategoryRequest)     returns (GetCategoryResponse);
+    rpc ListCategories  (ListCategoriesRequest)  returns (ListCategoriesResponse);
+    rpc UpdateCategory  (UpdateCategoryRequest)  returns (UpdateCategoryResponse);
+    rpc DeleteCategory  (DeleteCategoryRequest)  returns (DeleteCategoryResponse);
+}

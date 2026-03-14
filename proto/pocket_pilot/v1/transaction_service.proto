@@ -1,0 +1,102 @@
+// =============================================================================
+// transaction_service.proto
+// CRUD for financial transactions.
+// =============================================================================
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+import "pocket_pilot/v1/common.proto";
+
+// ---------------------------------------------------------------------------
+// Core message
+// ---------------------------------------------------------------------------
+message Transaction {
+    string  id          = 1;
+    string  user_id     = 2;
+    string  account_id  = 3;
+    string  category_id = 4;
+    Money   amount      = 5;
+    string  description = 6;
+    // ISO 8601 date string (YYYY-MM-DD). We use a string here instead of
+    // google.protobuf.Timestamp because this is a logical "calendar date",
+    // not an instant in time — timezone interpretation should live in the client.
+    string  date        = 7;
+    google.protobuf.Timestamp created_at = 8;
+    google.protobuf.Timestamp updated_at = 9;
+}
+
+// ---------------------------------------------------------------------------
+// RPC messages
+// ---------------------------------------------------------------------------
+
+message CreateTransactionRequest {
+    string user_id     = 1;
+    string account_id  = 2;
+    string category_id = 3;
+    Money  amount      = 4;
+    string description = 5;
+    string date        = 6; // YYYY-MM-DD
+}
+message CreateTransactionResponse {
+    Transaction transaction = 1;
+}
+
+message GetTransactionRequest {
+    string user_id         = 1;
+    string transaction_id  = 2;
+}
+message GetTransactionResponse {
+    Transaction transaction = 1;
+}
+
+// Filters for listing transactions
+message ListTransactionsRequest {
+    string user_id    = 1;
+    // Optional filters — leave empty/zero to ignore
+    string account_id  = 2;
+    string category_id = 3;
+    // Date range filter (inclusive), format: YYYY-MM-DD
+    string date_from  = 4;
+    string date_to    = 5;
+    PageRequest pagination = 6;
+}
+message ListTransactionsResponse {
+    repeated Transaction transactions = 1;
+    PageResponse         pagination   = 2;
+}
+
+message UpdateTransactionRequest {
+    string user_id        = 1;
+    string transaction_id = 2;
+    // Only fields you want to change need to be set
+    string account_id     = 3;
+    string category_id    = 4;
+    Money  amount         = 5;
+    string description    = 6;
+    string date           = 7; // YYYY-MM-DD
+}
+message UpdateTransactionResponse {
+    Transaction transaction = 1;
+}
+
+message DeleteTransactionRequest {
+    string user_id        = 1;
+    string transaction_id = 2;
+}
+message DeleteTransactionResponse {}
+
+// ---------------------------------------------------------------------------
+// Service
+// ---------------------------------------------------------------------------
+service TransactionService {
+    rpc CreateTransaction (CreateTransactionRequest) returns (CreateTransactionResponse);
+    rpc GetTransaction    (GetTransactionRequest)    returns (GetTransactionResponse);
+    rpc ListTransactions  (ListTransactionsRequest)  returns (ListTransactionsResponse);
+    rpc UpdateTransaction (UpdateTransactionRequest) returns (UpdateTransactionResponse);
+    rpc DeleteTransaction (DeleteTransactionRequest) returns (DeleteTransactionResponse);
+}

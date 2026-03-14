@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: pocket-pilot-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pocket_pilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pocket_pilot_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-pocket_pilot}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pocket_pilot} -d ${POSTGRES_DB:-pocket_pilot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

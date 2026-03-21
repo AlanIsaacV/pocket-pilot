@@ -1,0 +1,55 @@
+name: pocket_pilot
+description: "Pocket Pilot — app de finanzas personales."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # --- Manejo de estado ---
+  # Provider es la solución oficial de Google para state management.
+  # Usamos ChangeNotifier + Consumer para notificar a la UI de cambios.
+  provider: ^6.1.2
+
+  # --- Navegación ---
+  # go_router es el router declarativo oficial de Flutter.
+  # Permite rutas nombradas, ShellRoute (tabs persistentes), deep links, etc.
+  go_router: ^14.6.2
+
+  # --- Base de datos local (SQLite) ---
+  # sqflite: cliente SQLite puro para Flutter (iOS/Android/macOS).
+  # path: utilidades para construir rutas de archivo cross-platform.
+  sqflite: ^2.4.1
+  path: ^1.9.0
+
+  # --- gRPC ---
+  # grpc: cliente gRPC para Dart. Se conecta a nuestro backend en Go.
+  # protobuf: runtime para los mensajes proto.
+  # fixnum: tipos int64 usados en los campos de dinero del proto.
+  #   Es una dependencia transitiva de protobuf, pero la declaramos
+  #   explícitamente para silenciar la advertencia del linter.
+  # Los archivos .pb.dart generados con protoc-gen-dart usan APIs de protobuf 6.x
+  # (well_known_types path, métodos aE, pPM, aInt64).
+  # grpc 5.x depende de protobuf 6.x — compatibles entre sí.
+  grpc: ^5.0.0
+  protobuf: ^6.0.0
+  fixnum: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/migrations/

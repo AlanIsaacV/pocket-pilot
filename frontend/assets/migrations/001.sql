@@ -1,20 +1,22 @@
 CREATE TABLE accounts
 (
-    id                 uuid PRIMARY KEY     DEFAULT gen_random_uuid(),
-    name               TEXT        NOT NULL,
-    type               TEXT        NOT NULL,
+    id                 TEXT PRIMARY KEY,
+    name               TEXT     NOT NULL,
+    type               TEXT     NOT NULL,
     credit_limit_cents INTEGER,
     statement_day      SMALLINT,
     payment_due_day    SMALLINT,
     interest_rate_apr  NUMERIC(5, 2),
     term_months        SMALLINT,
-    created_at         timestamptz NOT NULL DEFAULT NOW(),
-    updated_at         timestamptz NOT NULL DEFAULT NOW(),
-    deleted_at         timestamptz
+    created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at         DATETIME
 );
 CREATE TRIGGER set_updated_at_accounts
-    BEFORE UPDATE ON accounts
+    AFTER UPDATE
+    ON accounts
     FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
 BEGIN
     UPDATE accounts
     SET updated_at = CURRENT_TIMESTAMP
@@ -23,20 +25,21 @@ END;
 
 CREATE TABLE categories
 (
-    id         uuid PRIMARY KEY     DEFAULT gen_random_uuid(),
-    name       TEXT        NOT NULL,
+    id         TEXT PRIMARY KEY,
+    name       TEXT     NOT NULL,
     icon       TEXT,
     color      TEXT,
-    parent_id  uuid REFERENCES categories (id),
-    type       TEXT        NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT NOW(),
-    updated_at timestamptz NOT NULL DEFAULT NOW(),
-    deleted_at timestamptz
+    parent_id  TEXT REFERENCES categories (id),
+    type       TEXT     NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME
 );
 CREATE TRIGGER set_updated_at_categories
-    BEFORE UPDATE
+    AFTER UPDATE
     ON categories
     FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
 BEGIN
     UPDATE categories
     SET updated_at = CURRENT_TIMESTAMP
@@ -46,16 +49,17 @@ END;
 
 CREATE TABLE tags
 (
-    id         uuid PRIMARY KEY     DEFAULT gen_random_uuid(),
-    name       TEXT        NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT NOW(),
-    updated_at timestamptz NOT NULL DEFAULT NOW(),
-    deleted_at timestamptz
+    id         TEXT PRIMARY KEY,
+    name       TEXT     NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME
 );
 CREATE TRIGGER set_updated_at_tags
-    BEFORE UPDATE
+    AFTER UPDATE
     ON tags
     FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
 BEGIN
     UPDATE tags
     SET updated_at = CURRENT_TIMESTAMP
@@ -65,24 +69,25 @@ END;
 
 CREATE TABLE transactions
 (
-    id            uuid PRIMARY KEY     DEFAULT gen_random_uuid(),
-    account_id    uuid        NOT NULL REFERENCES accounts (id),
-    category_id   uuid        NOT NULL REFERENCES categories (id),
-    type          TEXT        NOT NULL,
-    amount_cents  BIGINT      NOT NULL,
-    currency_code TEXT        NOT NULL,
-    status        TEXT        NOT NULL,
-    tags          TEXT[],
-    description   TEXT        NOT NULL DEFAULT '',
-    date          DATE        NOT NULL,
-    created_at    timestamptz NOT NULL DEFAULT NOW(),
-    updated_at    timestamptz NOT NULL DEFAULT NOW(),
-    deleted_at    timestamptz
+    id            TEXT PRIMARY KEY,
+    account_id    TEXT     NOT NULL REFERENCES accounts (id),
+    category_id   TEXT     NOT NULL REFERENCES categories (id),
+    type          TEXT     NOT NULL,
+    amount_cents  BIGINT   NOT NULL,
+    currency_code TEXT     NOT NULL,
+    status        TEXT     NOT NULL,
+    tags          TEXT,
+    description   TEXT     NOT NULL DEFAULT '',
+    date          DATE     NOT NULL,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at    DATETIME
 );
 CREATE TRIGGER set_updated_at_transactions
-    BEFORE UPDATE
+    AFTER UPDATE
     ON transactions
     FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
 BEGIN
     UPDATE transactions
     SET updated_at = CURRENT_TIMESTAMP
@@ -110,7 +115,7 @@ CREATE TABLE sync_outbox
     entity_id   TEXT    NOT NULL,
     operation   TEXT    NOT NULL,
     payload     TEXT    NOT NULL,
-    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+    created_at  TEXT    NOT NULL DEFAULT (DATETIME('now')),
     retry_count INTEGER NOT NULL DEFAULT 0,
     last_error  TEXT
 );

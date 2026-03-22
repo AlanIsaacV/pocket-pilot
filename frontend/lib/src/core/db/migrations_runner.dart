@@ -1,22 +1,9 @@
-// ============================================================
-// MigrationsRunner — ejecuta scripts .sql sobre la base de datos
-// ============================================================
-//
-// Responsabilidad única: leer archivos assets/migrations/NNN.sql
-// y ejecutarlos en orden sobre la instancia de Database recibida.
-//
-// DatabaseHelper delega aquí para mantenerse limpio de lógica de I/O.
-
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:sqflite/sqflite.dart';
 
 class MigrationsRunner {
   MigrationsRunner._();
 
-  /// Ejecuta los archivos .sql desde [from]+1 hasta [to] (inclusive).
-  ///
-  /// Ejemplo: dispositivo con v1 que actualiza a v3 ejecuta 002.sql y 003.sql.
-  /// Dispositivo nuevo (from=0) ejecuta 001.sql, 002.sql, 003.sql.
   static Future<void> run(
     Database db, {
     required int from,
@@ -24,25 +11,73 @@ class MigrationsRunner {
   }) async {
     for (int v = from + 1; v <= to; v++) {
       final filename = v.toString().padLeft(3, '0');
-      final sql =
-          await rootBundle.loadString('assets/migrations/$filename.sql');
-      await _executeScript(db, sql);
+      final path = 'assets/migrations/$filename.sql';
+      final sql = await rootBundle.loadString(path);
+
+      await db.transaction((txn) async {
+        await _executeScript(txn, sql, migrationName: filename);
+      });
     }
   }
 
-  /// Divide el script SQL en sentencias individuales y las ejecuta.
-  ///
-  /// Separa por ';', descarta líneas de comentarios (--) y sentencias vacías.
-  static Future<void> _executeScript(Database db, String sql) async {
-    final statements = sql
-        .split(';')
-        .map((s) =>
-            s.split('\n').where((l) => !l.trimLeft().startsWith('--')).join('\n'))
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty);
+  static Future<void> _executeScript(
+    DatabaseExecutor db,
+    String sql, {
+    required String migrationName,
+  }) async {
+    final statements = _splitSqlStatements(sql);
 
-    for (final statement in statements) {
-      await db.execute(statement);
+    for (var i = 0; i < statements.length; i++) {
+      final statement = statements[i].trim();
+      if (statement.isEmpty) continue;
+
+      try {
+        await db.execute(statement);
+      } catch (e) {
+        rethrow;
+      }
     }
+  }
+
+  static List<String> _splitSqlStatements(String sql) {
+    final cleaned = sql
+        .split('\n')
+        .where((line) => !line.trimLeft().startsWith('--'))
+        .join('\n');
+
+    final statements = <String>[];
+    final buffer = StringBuffer();
+    var inTriggerBlock = false;
+
+    for (final rawLine in cleaned.split('\n')) {
+      final line = rawLine.trim();
+      if (line.isEmpty) continue;
+
+      if (line.toUpperCase().startsWith('CREATE TRIGGER')) {
+        inTriggerBlock = true;
+      }
+
+      buffer.writeln(rawLine);
+
+      if (inTriggerBlock) {
+        if (line.toUpperCase() == 'END;') {
+          statements.add(buffer.toString().trim());
+          buffer.clear();
+          inTriggerBlock = false;
+        }
+      } else {
+        if (line.endsWith(';')) {
+          statements.add(buffer.toString().trim());
+          buffer.clear();
+        }
+      }
+    }
+
+    final tail = buffer.toString().trim();
+    if (tail.isNotEmpty) {
+      statements.add(tail);
+    }
+
+    return statements;
   }
 }

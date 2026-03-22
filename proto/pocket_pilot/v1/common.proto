@@ -1,40 +1,19 @@
-// =============================================================================
-// common.proto
-// Shared messages reused across all services.
-// =============================================================================
 syntax = "proto3";
-
 package pocket_pilot.v1;
 
-// Go: generated files will live in backend/internal/gen/proto/pocket_pilot/v1
 option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
-
-// Dart: the generator uses the package name for the library declaration
 option java_multiple_files = true;
 
-import "google/protobuf/timestamp.proto";
-
-// ---------------------------------------------------------------------------
-// Money
-// Represents a monetary amount to avoid float precision issues.
-// All amounts are stored as minor units (e.g., cents for USD).
-//   Example: $10.50  →  Money { amount_minor: 1050, currency_code: "USD" }
-// ---------------------------------------------------------------------------
 message Money {
-    int64  amount_minor   = 1; // e.g., 1050 for $10.50
-    string currency_code  = 2; // ISO 4217, e.g., "USD", "MXN"
+  int64 amount_cents = 1; // e.g., 1050 for $10.50
+  string currency_code = 2; // ISO 4217, e.g., "USD", "MXN"
 }
 
-// ---------------------------------------------------------------------------
-// Pagination
-// Standard cursor-based pagination for List RPCs.
-// ---------------------------------------------------------------------------
 message PageRequest {
-    int32  page_size   = 1; // max items per page (server may cap this)
-    string page_token  = 2; // opaque token from previous PageResponse.next_page_token
+  int32 page_size = 1;
+  string page_token = 2;
 }
 
 message PageResponse {
-    string next_page_token = 1; // empty string means no more pages
-    int32  total_count     = 2; // total items matching the filter (without pagination)
+  string next_page_token = 1;
 }

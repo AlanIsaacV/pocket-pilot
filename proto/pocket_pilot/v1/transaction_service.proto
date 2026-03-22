@@ -1,102 +1,66 @@
-// =============================================================================
-// transaction_service.proto
-// CRUD for financial transactions.
-// =============================================================================
 syntax = "proto3";
 
 package pocket_pilot.v1;
 
+import "pocket_pilot/v1/common.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
 
-import "google/protobuf/timestamp.proto";
-import "google/protobuf/wrappers.proto";
-import "pocket_pilot/v1/common.proto";
+enum TransactionType {
+  TRANSACTION_TYPE_UNSPECIFIED = 0;
+  TRANSACTION_TYPE_INCOME = 1;
+  TRANSACTION_TYPE_EXPENSE = 2;
+  TRANSACTION_TYPE_TRANSFER = 3;
+}
 
-// ---------------------------------------------------------------------------
-// Core message
-// ---------------------------------------------------------------------------
 message Transaction {
-    string  id          = 1;
-    string  user_id     = 2;
-    string  account_id  = 3;
-    string  category_id = 4;
-    Money   amount      = 5;
-    string  description = 6;
-    // ISO 8601 date string (YYYY-MM-DD). We use a string here instead of
-    // google.protobuf.Timestamp because this is a logical "calendar date",
-    // not an instant in time — timezone interpretation should live in the client.
-    string  date        = 7;
-    google.protobuf.Timestamp created_at = 8;
-    google.protobuf.Timestamp updated_at = 9;
+  string id = 1;
+  string user_id = 2;
+  string account_id = 3;
+  string category_id = 4;
+  TransactionType type = 5;
+  int64 amount_cents = 6;
+  string currency_code = 7;
+  string status = 8;
+  repeated string tags = 9;
+  string description = 10;
+  google.protobuf.Timestamp date = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+  google.protobuf.Timestamp deleted_at = 14;
 }
 
-// ---------------------------------------------------------------------------
-// RPC messages
-// ---------------------------------------------------------------------------
-
-message CreateTransactionRequest {
-    string user_id     = 1;
-    string account_id  = 2;
-    string category_id = 3;
-    Money  amount      = 4;
-    string description = 5;
-    string date        = 6; // YYYY-MM-DD
-}
-message CreateTransactionResponse {
-    Transaction transaction = 1;
+service TransactionService {
+  rpc ListTransactions(ListTransactionsRequest) returns (ListTransactionsResponse);
+  rpc UpsertTransaction(UpsertTransactionRequest) returns (UpsertTransactionResponse);
+  rpc DeleteTransaction(DeleteTransactionRequest) returns (google.protobuf.Empty);
 }
 
-message GetTransactionRequest {
-    string user_id         = 1;
-    string transaction_id  = 2;
-}
-message GetTransactionResponse {
-    Transaction transaction = 1;
-}
-
-// Filters for listing transactions
 message ListTransactionsRequest {
-    string user_id    = 1;
-    // Optional filters — leave empty/zero to ignore
-    string account_id  = 2;
-    string category_id = 3;
-    // Date range filter (inclusive), format: YYYY-MM-DD
-    string date_from  = 4;
-    string date_to    = 5;
-    PageRequest pagination = 6;
-}
-message ListTransactionsResponse {
-    repeated Transaction transactions = 1;
-    PageResponse         pagination   = 2;
+  string user_id = 1;
+  google.protobuf.Timestamp updated_since = 2;
+  PageRequest page = 3;
 }
 
-message UpdateTransactionRequest {
-    string user_id        = 1;
-    string transaction_id = 2;
-    // Only fields you want to change need to be set
-    string account_id     = 3;
-    string category_id    = 4;
-    Money  amount         = 5;
-    string description    = 6;
-    string date           = 7; // YYYY-MM-DD
+message ListTransactionsResponse {
+  repeated Transaction transactions = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
 }
-message UpdateTransactionResponse {
-    Transaction transaction = 1;
+
+message UpsertTransactionRequest {
+  Transaction transaction = 1;
+}
+
+message UpsertTransactionResponse {
+  Transaction transaction = 1;
+  bool conflict_resolved = 2;
 }
 
 message DeleteTransactionRequest {
-    string user_id        = 1;
-    string transaction_id = 2;
-}
-message DeleteTransactionResponse {}
-
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
-service TransactionService {
-    rpc CreateTransaction (CreateTransactionRequest) returns (CreateTransactionResponse);
-    rpc GetTransaction    (GetTransactionRequest)    returns (GetTransactionResponse);
-    rpc ListTransactions  (ListTransactionsRequest)  returns (ListTransactionsResponse);
-    rpc UpdateTransaction (UpdateTransactionRequest) returns (UpdateTransactionResponse);
-    rpc DeleteTransaction (DeleteTransactionRequest) returns (DeleteTransactionResponse);
+  string id = 1;
+  string user_id = 2;
+  google.protobuf.Timestamp deleted_at = 3;
 }

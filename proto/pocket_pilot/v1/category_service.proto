@@ -1,92 +1,61 @@
-// =============================================================================
-// category_service.proto
-// CRUD for transaction categories (Income / Expense).
-// =============================================================================
 syntax = "proto3";
 
 package pocket_pilot.v1;
 
+import "pocket_pilot/v1/common.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
 
-import "google/protobuf/timestamp.proto";
-import "pocket_pilot/v1/common.proto";
-
-// ---------------------------------------------------------------------------
-// Enum
-// ---------------------------------------------------------------------------
 enum CategoryType {
-    CATEGORY_TYPE_UNSPECIFIED = 0;
-    CATEGORY_TYPE_INCOME      = 1;
-    CATEGORY_TYPE_EXPENSE     = 2;
+  CATEGORY_TYPE_UNSPECIFIED = 0;
+  CATEGORY_TYPE_INCOME = 1;
+  CATEGORY_TYPE_EXPENSE = 2;
 }
 
-// ---------------------------------------------------------------------------
-// Core message
-// ---------------------------------------------------------------------------
 message Category {
-    string       id      = 1;
-    string       user_id = 2;
-    string       name    = 3;
-    CategoryType type    = 4;
-    google.protobuf.Timestamp created_at = 5;
-    google.protobuf.Timestamp updated_at = 6;
+  string id = 1;
+  string user_id = 2;
+  string name = 3;
+  string icon = 4;
+  string color = 5;
+  string parent_id = 6;
+  CategoryType type = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  google.protobuf.Timestamp deleted_at = 10;
 }
 
-// ---------------------------------------------------------------------------
-// RPC messages
-// ---------------------------------------------------------------------------
-
-message CreateCategoryRequest {
-    string       user_id = 1;
-    string       name    = 2;
-    CategoryType type    = 3;
-}
-message CreateCategoryResponse {
-    Category category = 1;
-}
-
-message GetCategoryRequest {
-    string user_id      = 1;
-    string category_id  = 2;
-}
-message GetCategoryResponse {
-    Category category = 1;
+service CategoryService {
+  rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse);
+  rpc UpsertCategory(UpsertCategoryRequest) returns (UpsertCategoryResponse);
+  rpc DeleteCategory(DeleteCategoryRequest) returns (google.protobuf.Empty);
 }
 
 message ListCategoriesRequest {
-    string       user_id    = 1;
-    // Optional filter: leave as UNSPECIFIED to get all categories
-    CategoryType type       = 2;
-    PageRequest  pagination = 3;
-}
-message ListCategoriesResponse {
-    repeated Category categories = 1;
-    PageResponse      pagination = 2;
+  string user_id = 1;
+  google.protobuf.Timestamp updated_since = 2;
+  PageRequest page = 3;
 }
 
-message UpdateCategoryRequest {
-    string       user_id     = 1;
-    string       category_id = 2;
-    string       name        = 3;
-    CategoryType type        = 4;
+message ListCategoriesResponse {
+  repeated Category categories = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
 }
-message UpdateCategoryResponse {
-    Category category = 1;
+
+message UpsertCategoryRequest {
+  Category category = 1;
+}
+
+message UpsertCategoryResponse {
+  Category category = 1;
+  bool conflict_resolved = 2;
 }
 
 message DeleteCategoryRequest {
-    string user_id     = 1;
-    string category_id = 2;
-}
-message DeleteCategoryResponse {}
-
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
-service CategoryService {
-    rpc CreateCategory  (CreateCategoryRequest)  returns (CreateCategoryResponse);
-    rpc GetCategory     (GetCategoryRequest)     returns (GetCategoryResponse);
-    rpc ListCategories  (ListCategoriesRequest)  returns (ListCategoriesResponse);
-    rpc UpdateCategory  (UpdateCategoryRequest)  returns (UpdateCategoryResponse);
-    rpc DeleteCategory  (DeleteCategoryRequest)  returns (DeleteCategoryResponse);
+  string id = 1;
+  string user_id = 2;
+  google.protobuf.Timestamp deleted_at = 3;
 }

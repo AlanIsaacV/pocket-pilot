@@ -1,109 +1,84 @@
-// =============================================================================
-// account_service.proto
-// CRUD for financial accounts (bank accounts, cash wallets, credit cards, etc.)
-// =============================================================================
 syntax = "proto3";
 
 package pocket_pilot.v1;
 
+import "pocket_pilot/v1/common.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
 
-import "google/protobuf/timestamp.proto";
-import "pocket_pilot/v1/common.proto";
-
-// ---------------------------------------------------------------------------
-// Enum
-// ---------------------------------------------------------------------------
 enum AccountType {
-    ACCOUNT_TYPE_UNSPECIFIED = 0; // proto3 requires a zero value
-    ACCOUNT_TYPE_CHECKING    = 1;
-    ACCOUNT_TYPE_SAVINGS     = 2;
-    ACCOUNT_TYPE_CREDIT_CARD = 3;
-    ACCOUNT_TYPE_CASH        = 4;
-    ACCOUNT_TYPE_INVESTMENT  = 5;
+  ACCOUNT_TYPE_UNSPECIFIED = 0;
+  ACCOUNT_TYPE_BANK = 1;
+  ACCOUNT_TYPE_CASH = 2;
+  ACCOUNT_TYPE_CREDIT_CARD = 3;
+  ACCOUNT_TYPE_LOAN = 4;
+  ACCOUNT_TYPE_INVESTMENT = 5;
+  ACCOUNT_TYPE_CRYPYO = 6;
+  ACCOUNT_TYPE_OTHER = 7;
 }
 
-// ---------------------------------------------------------------------------
-// Core message — mirrors the DB row
-// ---------------------------------------------------------------------------
 message Account {
-    string      id              = 1; // UUID as string
-    string      user_id         = 2; // UUID as string
-    string      name            = 3;
-    AccountType type            = 4;
-    Money       initial_balance = 5;
-    // Audit timestamps — populated by the server, ignored on create/update
-    google.protobuf.Timestamp created_at = 6;
-    google.protobuf.Timestamp updated_at = 7;
+  string id = 1;
+  string user_id = 2;
+  string name = 3;
+  AccountType type = 4;
+  int64 credit_limit_cents = 5;
+  int32 statement_day = 6;
+  int32 payment_due_day = 7;
+  int32 interest_rate_apr = 8;
+  int32 term_months = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+  google.protobuf.Timestamp deleted_at = 12;
 }
 
-// ---------------------------------------------------------------------------
-// RPC Request / Response messages
-// ---------------------------------------------------------------------------
-
-// --- Create ---
-message CreateAccountRequest {
-    string      user_id         = 1;
-    string      name            = 2;
-    AccountType type            = 3;
-    Money       initial_balance = 4;
-}
-message CreateAccountResponse {
-    Account account = 1;
-}
-
-// --- Get ---
-message GetAccountRequest {
-    string user_id    = 1;
-    string account_id = 2;
-}
-message GetAccountResponse {
-    Account account = 1;
-}
-
-// --- List ---
-message ListAccountsRequest {
-    string      user_id    = 1;
-    PageRequest pagination = 2;
-}
-message ListAccountsResponse {
-    repeated Account accounts   = 1;
-    PageResponse     pagination = 2;
-}
-
-// --- Update ---
-// Partial updates: only non-zero fields are applied (server-side logic).
-// A cleaner approach for production would use google.protobuf.FieldMask,
-// but for MVP this pattern is simpler to implement.
-message UpdateAccountRequest {
-    string      user_id    = 1;
-    string      account_id = 2; // identifies which account to update
-    string      name       = 3;
-    AccountType type       = 4;
-    Money       initial_balance = 5;
-}
-message UpdateAccountResponse {
-    Account account = 1;
-}
-
-// --- Delete (soft delete) ---
-message DeleteAccountRequest {
-    string user_id    = 1;
-    string account_id = 2;
-}
-message DeleteAccountResponse {
-    // Empty — success is implied by the absence of an error status.
-    // gRPC uses status codes (OK, NOT_FOUND, etc.) for error signaling,
-    // not boolean fields.
-}
-
-// ---------------------------------------------------------------------------
-// Service definition
-// ---------------------------------------------------------------------------
 service AccountService {
-    rpc CreateAccount (CreateAccountRequest) returns (CreateAccountResponse);
-    rpc GetAccount    (GetAccountRequest)    returns (GetAccountResponse);
-    rpc ListAccounts  (ListAccountsRequest)  returns (ListAccountsResponse);
-    rpc UpdateAccount (UpdateAccountRequest) returns (UpdateAccountResponse);
-    rpc DeleteAccount (DeleteAccountRequest) returns (DeleteAccountResponse);
+  // Trae cuentas del usuario. Si updated_since está definido, solo retorna
+  // registros modificados después de ese timestamp (delta sync).
+  rpc ListAccounts(ListAccountsRequest) returns (ListAccountsResponse);
+
+  // Crea o actualiza una cuenta. Aplica Last Write Wins por updated_at:
+  // si el servidor tiene una versión más reciente, retorna esa versión
+  // con conflict_resolved = true.
+  rpc UpsertAccount(UpsertAccountRequest) returns (UpsertAccountResponse);
+
+  // Elimina lógicamente una cuenta (soft delete con LWW por deleted_at).
+  rpc DeleteAccount(DeleteAccountRequest) returns (google.protobuf.Empty);
+}
+
+message ListAccountsRequest {
+  string user_id = 1;
+  // Si es null, trae todos los registros (primer sync).
+  // Si está definido, solo registros con updated_at > updated_since.
+  google.protobuf.Timestamp updated_since = 2;
+  PageRequest page = 3;
+}
+
+message ListAccountsResponse {
+  repeated Account accounts = 1;
+  PageResponse page = 2;
+  // Timestamp del servidor al momento de ejecutar la query.
+  // El cliente debe guardar este valor como last_synced_at.
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertAccountRequest {
+  Account account = 1;
+}
+
+message UpsertAccountResponse {
+  // Versión aceptada del registro (puede ser la del cliente o la del servidor).
+  Account account = 1;
+  // true si el servidor tenía una versión más reciente y hubo conflicto LWW.
+  // En ese caso, el cliente debe actualizar su copia local con account.
+  bool conflict_resolved = 2;
+}
+
+message DeleteAccountRequest {
+  string id = 1;
+  string user_id = 2;
+  // Timestamp de la eliminación en el cliente, usado para LWW.
+  google.protobuf.Timestamp deleted_at = 3;
 }

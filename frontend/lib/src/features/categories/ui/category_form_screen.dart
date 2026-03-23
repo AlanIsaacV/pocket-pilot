@@ -99,7 +99,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: GoogleFonts.inter(
+      style: GoogleFonts.ibmPlexSans(
         fontSize: 13,
         fontWeight: FontWeight.w600,
         color: AppColors.textMutedDark,
@@ -192,7 +192,7 @@ class _ToggleOption extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 label,
-                style: GoogleFonts.inter(
+                style: GoogleFonts.ibmPlexSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: isSelected ? activeColor : AppColors.textMutedDark,

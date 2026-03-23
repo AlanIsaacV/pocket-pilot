@@ -18,8 +18,8 @@ class CategoryRepository {
   CategoryRepository({
     required CategoryLocalStore local,
     required CategoryRemoteService remote,
-  })  : _local = local,
-        _remote = remote;
+  }) : _local = local,
+       _remote = remote;
 
   // ----------------------------------------------------------
   // READ
@@ -51,14 +51,15 @@ class CategoryRepository {
   }) async {
     final now = DateTime.now().toUtc();
 
-    await _local.upsert(CategoryModel(
-      id: id,
-      userId: userId,
-      name: name,
-      type: type,
-      createdAt: now,
-      updatedAt: now,
-    ));
+    await _local.upsert(
+      CategoryModel(
+        id: id,
+        name: name,
+        type: type,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
 
     unawaited(() async {
       try {

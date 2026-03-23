@@ -1,5 +1,5 @@
 // ============================================================
-// HomeScreen — Shell con NavigationBar
+// HomeScreen — Shell con NavigationBar (4 tabs)
 // ============================================================
 
 import 'package:flutter/material.dart';
@@ -13,9 +13,10 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.child});
 
   static const _routes = [
+    '/dashboard',
     '/transactions',
     '/accounts',
-    '/categories',
+    '/settings',
   ];
 
   int _currentIndex(BuildContext context) {
@@ -31,10 +32,14 @@ class HomeScreen extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex(context),
         onDestinationSelected: (index) => context.go(_routes[index]),
-        // Borde superior sutil para separar la barra del contenido.
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.transparent,
         destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard, color: AppColors.primary),
+            label: 'Dashboard',
+          ),
           NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long, color: AppColors.primary),
@@ -46,9 +51,9 @@ class HomeScreen extends StatelessWidget {
             label: 'Cuentas',
           ),
           NavigationDestination(
-            icon: Icon(Icons.category_outlined),
-            selectedIcon: Icon(Icons.category, color: AppColors.primary),
-            label: 'Categorías',
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings, color: AppColors.primary),
+            label: 'Configuración',
           ),
         ],
       ),

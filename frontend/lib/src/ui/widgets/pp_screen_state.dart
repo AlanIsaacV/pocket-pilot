@@ -86,7 +86,7 @@ class PpScreenState extends StatelessWidget {
                 Text(
                   errorMessage!,
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
+                  style: GoogleFonts.ibmPlexSans(
                     fontSize: 14,
                     color: AppColors.textMutedDark,
                   ),
@@ -94,7 +94,7 @@ class PpScreenState extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   'Desliza hacia abajo para reintentar',
-                  style: GoogleFonts.inter(
+                  style: GoogleFonts.ibmPlexSans(
                     fontSize: 12,
                     color: AppColors.textMutedDark,
                   ),
@@ -116,7 +116,7 @@ class PpScreenState extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 emptyLabel,
-                style: GoogleFonts.inter(
+                style: GoogleFonts.ibmPlexSans(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
                   color: AppColors.textMutedDark,
@@ -126,7 +126,7 @@ class PpScreenState extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   emptySubLabel!,
-                  style: GoogleFonts.inter(
+                  style: GoogleFonts.ibmPlexSans(
                     fontSize: 13,
                     color: AppColors.textMutedDark,
                   ),
@@ -140,7 +140,7 @@ class PpScreenState extends StatelessWidget {
 
     return RefreshIndicator(
       color: AppColors.primary,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.surfaceContainerDark,
       onRefresh: onRefresh,
       child: child,
     );
@@ -151,7 +151,7 @@ class PpScreenState extends StatelessWidget {
   Widget _scrollable({required Widget child}) {
     return RefreshIndicator(
       color: AppColors.primary,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.surfaceContainerDark,
       onRefresh: onRefresh,
       child: LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(

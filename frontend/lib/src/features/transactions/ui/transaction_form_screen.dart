@@ -88,7 +88,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                 children: [
                   Text(
                     '\$$_amountInput',
-                    style: GoogleFonts.spaceGrotesk(
+                    style: GoogleFonts.ibmPlexSans(
                       fontSize: 56,
                       fontWeight: FontWeight.w600,
                       color: _typeColor,
@@ -98,7 +98,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   const SizedBox(height: 4),
                   Text(
                     'MXN',
-                    style: GoogleFonts.inter(
+                    style: GoogleFonts.ibmPlexSans(
                       fontSize: 14,
                       color: AppColors.textMutedDark,
                     ),
@@ -260,7 +260,7 @@ class _Option extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 label,
-                style: GoogleFonts.inter(
+                style: GoogleFonts.ibmPlexSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: isSelected ? activeColor : AppColors.textMutedDark,
@@ -304,13 +304,13 @@ class _DetailRow extends StatelessWidget {
             const SizedBox(width: 12),
             Text(
               label,
-              style: GoogleFonts.inter(
+              style: GoogleFonts.ibmPlexSans(
                   fontSize: 14, color: AppColors.textMutedDark),
             ),
             const Spacer(),
             Text(
               value,
-              style: GoogleFonts.inter(
+              style: GoogleFonts.ibmPlexSans(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
                 color: AppColors.textPrimaryDark,
@@ -413,7 +413,7 @@ class _NumKey extends StatelessWidget {
                   )
                 : Text(
                     keyValue,
-                    style: GoogleFonts.spaceGrotesk(
+                    style: GoogleFonts.ibmPlexSans(
                       fontSize: 20,
                       fontWeight: FontWeight.w500,
                       color: AppColors.textPrimaryDark,

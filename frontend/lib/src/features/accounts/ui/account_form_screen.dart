@@ -133,7 +133,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: GoogleFonts.inter(
+      style: GoogleFonts.ibmPlexSans(
         fontSize: 13,
         fontWeight: FontWeight.w600,
         color: AppColors.textMutedDark,
@@ -198,7 +198,7 @@ class _AccountTypeSelector extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   label,
-                  style: GoogleFonts.inter(
+                  style: GoogleFonts.ibmPlexSans(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: isSelected

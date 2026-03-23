@@ -143,7 +143,7 @@ class _SectionHeader extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               title.toUpperCase(),
-              style: GoogleFonts.inter(
+              style: GoogleFonts.ibmPlexSans(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
@@ -195,7 +195,7 @@ class _CategoryRow extends StatelessWidget {
           ),
           title: Text(
             category.name,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.ibmPlexSans(
               fontSize: 14,
               fontWeight: FontWeight.w500,
               color: AppColors.textPrimaryDark,

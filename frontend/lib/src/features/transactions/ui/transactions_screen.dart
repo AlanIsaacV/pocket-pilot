@@ -126,7 +126,7 @@ class _MonthHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
       child: Text(
         label.toUpperCase(),
-        style: GoogleFonts.inter(
+        style: GoogleFonts.ibmPlexSans(
           fontSize: 11,
           fontWeight: FontWeight.w600,
           letterSpacing: 1.2,
@@ -192,7 +192,7 @@ class _TransactionTile extends StatelessWidget {
             transaction.description.isNotEmpty
                 ? transaction.description
                 : 'Sin descripción',
-            style: GoogleFonts.inter(
+            style: GoogleFonts.ibmPlexSans(
               fontSize: 14,
               fontWeight: FontWeight.w500,
               color: AppColors.textPrimaryDark,
@@ -201,14 +201,14 @@ class _TransactionTile extends StatelessWidget {
           ),
           subtitle: Text(
             formattedDate,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.ibmPlexSans(
               fontSize: 12,
               color: AppColors.textMutedDark,
             ),
           ),
           trailing: Text(
             transaction.formattedAmount,
-            style: GoogleFonts.spaceGrotesk(
+            style: GoogleFonts.ibmPlexSans(
               fontSize: 15,
               fontWeight: FontWeight.w600,
               color: amountColor,

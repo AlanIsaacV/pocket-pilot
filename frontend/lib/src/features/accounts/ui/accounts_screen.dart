@@ -107,7 +107,7 @@ class _AccountCard extends StatelessWidget {
           ),
           title: Text(
             account.name,
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.ibmPlexSans(
               fontSize: 15,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimaryDark,
@@ -115,7 +115,7 @@ class _AccountCard extends StatelessWidget {
           ),
           subtitle: Text(
             typeLabel,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.ibmPlexSans(
               fontSize: 12,
               color: AppColors.textMutedDark,
             ),

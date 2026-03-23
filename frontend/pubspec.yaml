@@ -21,7 +21,7 @@ dependencies:
   # --- Navegación ---
   # go_router es el router declarativo oficial de Flutter.
   # Permite rutas nombradas, ShellRoute (tabs persistentes), deep links, etc.
-  go_router: ^14.6.2
+  go_router: ^17.1.0
 
   # --- Base de datos local (SQLite) ---
   # sqflite: cliente SQLite puro para Flutter (iOS/Android/macOS).
@@ -41,6 +41,11 @@ dependencies:
   grpc: ^5.0.0
   protobuf: ^6.0.0
   fixnum: ^1.1.0
+
+  # --- Conectividad ---
+  # Detecta cambios de red (WiFi, datos móviles, sin conexión).
+  # ConnectivityMonitor lo usa para lanzar sync automático al reconectar.
+  connectivity_plus: ^7.0.0
 
 dev_dependencies:
   flutter_test:

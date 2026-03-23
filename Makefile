@@ -25,7 +25,7 @@ proto:
 
 ## ── Go ────────────────────────────────────────────────────────────────────────
 tidy:
-	cd backend && go mod tidy
+	cd backend && go get -u ./cmd/server && go mod tidy
 
 run:
 	cd backend && go run ./cmd/server

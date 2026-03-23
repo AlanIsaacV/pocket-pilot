@@ -3,10 +3,15 @@
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/core/theme/app_colors.dart';
+import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 class AccountsScreen extends StatelessWidget {
   const AccountsScreen({super.key});
@@ -21,20 +26,29 @@ class AccountsScreen extends StatelessWidget {
         builder: (context, vm, _) {
           return Column(
             children: [
-              // LinearProgressIndicator sutil: visible cuando hay datos locales
-              // mostrándose Y una sync remota corre en background.
-              // isLoading == true significa que YA hay un spinner bloqueante abajo,
-              // así que no duplicamos indicadores.
               if (vm.isSyncing && !vm.isLoading)
-                const LinearProgressIndicator(),
-
+                LinearProgressIndicator(
+                  color: AppColors.primary,
+                  backgroundColor: AppColors.surfaceElevatedDark,
+                  minHeight: 2,
+                ),
               Expanded(
-                // RefreshIndicator: detecta el gesto "pull hacia abajo".
-                // onRefresh debe retornar un Future que completa cuando termina.
-                // vm.refresh() ignora el throttle de 5s y siempre va al servidor.
-                child: RefreshIndicator(
+                child: PpScreenState(
+                  isLoading: vm.isLoading,
+                  errorMessage:
+                      vm.accounts.isEmpty ? vm.errorMessage : null,
+                  isEmpty: vm.accounts.isEmpty,
+                  emptyIcon: Icons.account_balance_wallet_outlined,
+                  emptyLabel: 'No tienes cuentas aún',
+                  emptySubLabel: 'Presiona + para agregar una',
                   onRefresh: vm.refresh,
-                  child: _buildBody(context, vm),
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                    itemCount: vm.accounts.length,
+                    itemBuilder: (context, index) =>
+                        _AccountCard(account: vm.accounts[index]),
+                  ),
                 ),
               ),
             ],
@@ -42,117 +56,20 @@ class AccountsScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Creación de cuentas — Próximamente'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        },
+        onPressed: () => _onAddTap(context),
         tooltip: 'Agregar cuenta',
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context, AccountsViewModel vm) {
-    // Estado de carga inicial: no hay datos locales y la sync está corriendo.
-    // LayoutBuilder + SingleChildScrollView hace que RefreshIndicator funcione
-    // aunque no haya nada que scrollear (necesita un Scrollable).
-    if (vm.isLoading) {
-      return LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: SizedBox(
-            height: constraints.maxHeight,
-            child: const Center(child: CircularProgressIndicator()),
-          ),
-        ),
-      );
-    }
-
-    // Error bloqueante: la sync falló y no hay datos que mostrar.
-    if (vm.accounts.isEmpty && vm.errorMessage != null) {
-      return LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: SizedBox(
-            height: constraints.maxHeight,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error_outline, size: 48),
-                    const SizedBox(height: 16),
-                    Text(
-                      vm.errorMessage!,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Desliza hacia abajo para reintentar',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Estado vacío: sync completó pero no hay cuentas todavía.
-    if (vm.accounts.isEmpty) {
-      return LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: SizedBox(
-            height: constraints.maxHeight,
-            child: const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.account_balance_wallet_outlined,
-                    size: 64,
-                    color: Colors.grey,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'No tienes cuentas aún',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Presiona + para agregar una',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Estado con datos: lista scrolleable con physics explícitas para que
-    // RefreshIndicator funcione aunque la lista no llegue al borde.
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 88),
-      itemCount: vm.accounts.length,
-      itemBuilder: (context, index) =>
-          _AccountCard(account: vm.accounts[index]),
-    );
+  void _onAddTap(BuildContext context) {
+    context.go('/accounts/new');
   }
 }
 
 // ============================================================
-// Widget privado: tarjeta de una cuenta
+// Tarjeta de cuenta
 // ============================================================
 
 class _AccountCard extends StatelessWidget {
@@ -162,35 +79,52 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final icon = _iconForType(account.type);
+    final typeLabel = _labelForType(account.type);
 
-    return Card(
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 8,
-        ),
-        leading: CircleAvatar(
-          backgroundColor: colorScheme.primaryContainer,
-          child: Icon(
-            _iconForType(account.type),
-            color: colorScheme.onPrimaryContainer,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceDark,
+          borderRadius: AppTheme.radiusSmall,
+          border: Border.all(
+            color: AppColors.surfaceElevatedDark,
+            width: 1,
           ),
         ),
-        title: Text(
-          account.name,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          leading: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              borderRadius: AppTheme.radiusSmall,
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 22),
           ),
-        ),
-        subtitle: Text(
-          _labelForType(account.type),
-          style: theme.textTheme.bodySmall,
-        ),
-        trailing: Icon(
-          Icons.chevron_right,
-          color: colorScheme.onSurfaceVariant,
+          title: Text(
+            account.name,
+            style: GoogleFonts.outfit(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimaryDark,
+            ),
+          ),
+          subtitle: Text(
+            typeLabel,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppColors.textMutedDark,
+            ),
+          ),
+          trailing: Icon(
+            Icons.chevron_right_rounded,
+            color: AppColors.textMutedDark,
+            size: 20,
+          ),
         ),
       ),
     );
@@ -201,11 +135,11 @@ class _AccountCard extends StatelessWidget {
       case 'bank':
         return Icons.account_balance_outlined;
       case 'credit_card':
-        return Icons.credit_card;
+        return Icons.credit_card_outlined;
       case 'cash':
         return Icons.payments_outlined;
       case 'investment':
-        return Icons.trending_up;
+        return Icons.trending_up_rounded;
       case 'loan':
         return Icons.request_quote_outlined;
       case 'crypto':

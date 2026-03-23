@@ -1,12 +1,17 @@
 // ============================================================
-// TransactionsScreen — Lista de transacciones
+// TransactionsScreen — Lista de transacciones agrupada por mes
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/core/theme/app_colors.dart';
+import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 class TransactionsScreen extends StatelessWidget {
   const TransactionsScreen({super.key});
@@ -22,11 +27,22 @@ class TransactionsScreen extends StatelessWidget {
           return Column(
             children: [
               if (vm.isSyncing && !vm.isLoading)
-                const LinearProgressIndicator(),
+                LinearProgressIndicator(
+                  color: AppColors.primary,
+                  backgroundColor: AppColors.surfaceElevatedDark,
+                  minHeight: 2,
+                ),
               Expanded(
-                child: RefreshIndicator(
+                child: PpScreenState(
+                  isLoading: vm.isLoading,
+                  errorMessage:
+                      vm.transactions.isEmpty ? vm.errorMessage : null,
+                  isEmpty: vm.transactions.isEmpty,
+                  emptyIcon: Icons.receipt_long_outlined,
+                  emptyLabel: 'No hay transacciones aún',
+                  emptySubLabel: 'Presiona + para registrar una',
                   onRefresh: vm.refresh,
-                  child: _buildBody(context, vm),
+                  child: _TransactionList(transactions: vm.transactions),
                 ),
               ),
             ],
@@ -34,107 +50,103 @@ class TransactionsScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Registro de transacciones — Próximamente'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        },
+        onPressed: () => _onAddTap(context),
         tooltip: 'Agregar transacción',
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context, TransactionsViewModel vm) {
-    if (vm.isLoading) {
-      return LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: SizedBox(
-            height: constraints.maxHeight,
-            child: const Center(child: CircularProgressIndicator()),
-          ),
-        ),
-      );
+  void _onAddTap(BuildContext context) {
+    context.go('/transactions/new');
+  }
+}
+
+// ============================================================
+// Lista con secciones por mes
+// ============================================================
+
+class _TransactionList extends StatelessWidget {
+  final List<TransactionModel> transactions;
+
+  const _TransactionList({required this.transactions});
+
+  @override
+  Widget build(BuildContext context) {
+    // Agrupa por "YYYY-MM" manteniendo el orden.
+    final groups = <String, List<TransactionModel>>{};
+    for (final t in transactions) {
+      final key =
+          '${t.parsedDate.year}-${t.parsedDate.month.toString().padLeft(2, '0')}';
+      groups.putIfAbsent(key, () => []).add(t);
     }
 
-    if (vm.transactions.isEmpty && vm.errorMessage != null) {
-      return LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: SizedBox(
-            height: constraints.maxHeight,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error_outline, size: 48),
-                    const SizedBox(height: 16),
-                    Text(vm.errorMessage!, textAlign: TextAlign.center),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Desliza hacia abajo para reintentar',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (vm.transactions.isEmpty) {
-      return LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: SizedBox(
-            height: constraints.maxHeight,
-            child: const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.receipt_long_outlined,
-                    size: 64,
-                    color: Colors.grey,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'No hay transacciones aún',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Presiona + para registrar una',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
+    final sections = groups.entries.toList();
 
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 88),
-      itemCount: vm.transactions.length,
-      itemBuilder: (context, index) =>
-          _TransactionTile(transaction: vm.transactions[index]),
+      padding: const EdgeInsets.only(bottom: 96),
+      itemCount: sections.fold<int>(0, (sum, e) => sum + 1 + e.value.length),
+      itemBuilder: (context, index) {
+        int offset = 0;
+        for (final section in sections) {
+          if (index == offset) {
+            return _MonthHeader(monthKey: section.key);
+          }
+          offset++;
+          final itemIndex = index - offset;
+          if (itemIndex < section.value.length) {
+            return _TransactionTile(transaction: section.value[itemIndex]);
+          }
+          offset += section.value.length;
+        }
+        return const SizedBox.shrink();
+      },
     );
   }
 }
 
 // ============================================================
-// Widget privado: fila de una transacción
+// Header de sección mensual
+// ============================================================
+
+class _MonthHeader extends StatelessWidget {
+  final String monthKey; // "YYYY-MM"
+
+  const _MonthHeader({required this.monthKey});
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = monthKey.split('-');
+    final year = int.parse(parts[0]);
+    final month = int.parse(parts[1]);
+    final label = '${_monthName(month)} $year';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      child: Text(
+        label.toUpperCase(),
+        style: GoogleFonts.inter(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 1.2,
+          color: AppColors.textMutedDark,
+        ),
+      ),
+    );
+  }
+
+  String _monthName(int month) {
+    const names = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+    ];
+    return names[month - 1];
+  }
+}
+
+// ============================================================
+// Fila de transacción
 // ============================================================
 
 class _TransactionTile extends StatelessWidget {
@@ -144,45 +156,64 @@ class _TransactionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    final amountColor =
-        transaction.isIncome ? Colors.green.shade700 : colorScheme.error;
+    final isIncome = transaction.isIncome;
+    final amountColor = isIncome ? AppColors.primary : AppColors.error;
 
     final date = transaction.parsedDate;
-    final formattedDate = '${date.day} ${_monthAbbr(date.month)} ${date.year}';
+    final formattedDate =
+        '${date.day} ${_monthAbbr(date.month)} ${date.year}';
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      leading: CircleAvatar(
-        backgroundColor: transaction.isIncome
-            ? Colors.green.shade50
-            : colorScheme.errorContainer,
-        child: Icon(
-          transaction.isIncome ? Icons.arrow_downward : Icons.arrow_upward,
-          color: amountColor,
-          size: 20,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceDark,
+          borderRadius: AppTheme.radiusSmall,
         ),
-      ),
-      title: Text(
-        transaction.description.isNotEmpty
-            ? transaction.description
-            : 'Sin descripción',
-        style: theme.textTheme.bodyLarge,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        formattedDate,
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-      trailing: Text(
-        transaction.formattedAmount,
-        style: theme.textTheme.titleMedium?.copyWith(
-          color: amountColor,
-          fontWeight: FontWeight.bold,
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: isIncome
+                  ? AppColors.primary.withValues(alpha: 0.12)
+                  : AppColors.error.withValues(alpha: 0.12),
+              borderRadius: AppTheme.radiusSmall,
+            ),
+            child: Icon(
+              isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+              color: amountColor,
+              size: 18,
+            ),
+          ),
+          title: Text(
+            transaction.description.isNotEmpty
+                ? transaction.description
+                : 'Sin descripción',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimaryDark,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            formattedDate,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppColors.textMutedDark,
+            ),
+          ),
+          trailing: Text(
+            transaction.formattedAmount,
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: amountColor,
+            ),
+          ),
         ),
       ),
     );

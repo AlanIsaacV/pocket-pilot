@@ -1,12 +1,17 @@
 // ============================================================
-// CategoriesScreen — Lista de categorías con secciones
+// CategoriesScreen — Lista de categorías agrupada por tipo
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/core/theme/app_colors.dart';
+import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 class CategoriesScreen extends StatelessWidget {
   const CategoriesScreen({super.key});
@@ -22,11 +27,22 @@ class CategoriesScreen extends StatelessWidget {
           return Column(
             children: [
               if (vm.isSyncing && !vm.isLoading)
-                const LinearProgressIndicator(),
+                LinearProgressIndicator(
+                  color: AppColors.primary,
+                  backgroundColor: AppColors.surfaceElevatedDark,
+                  minHeight: 2,
+                ),
               Expanded(
-                child: RefreshIndicator(
+                child: PpScreenState(
+                  isLoading: vm.isLoading,
+                  errorMessage:
+                      vm.categories.isEmpty ? vm.errorMessage : null,
+                  isEmpty: vm.categories.isEmpty,
+                  emptyIcon: Icons.category_outlined,
+                  emptyLabel: 'No hay categorías aún',
+                  emptySubLabel: 'Presiona + para agregar una',
                   onRefresh: vm.refresh,
-                  child: _buildBody(context, vm),
+                  child: _CategoryList(vm: vm),
                 ),
               ),
             ],
@@ -34,139 +50,75 @@ class CategoriesScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Creación de categorías — Próximamente'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        },
+        onPressed: () => _onAddTap(context),
         tooltip: 'Agregar categoría',
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context, CategoriesViewModel vm) {
-    // Para los estados sin lista, usamos SliverFillRemaining dentro de un
-    // CustomScrollView. Esto es más idiomático cuando el resto de la
-    // pantalla también usa CustomScrollView con Slivers.
-    if (vm.isLoading) {
-      return CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          const SliverFillRemaining(
-            child: Center(child: CircularProgressIndicator()),
-          ),
-        ],
-      );
-    }
+  void _onAddTap(BuildContext context) {
+    context.go('/categories/new');
+  }
+}
 
-    if (vm.categories.isEmpty && vm.errorMessage != null) {
-      return CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverFillRemaining(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error_outline, size: 48),
-                    const SizedBox(height: 16),
-                    Text(vm.errorMessage!, textAlign: TextAlign.center),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Desliza hacia abajo para reintentar',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
+// ============================================================
+// Lista con secciones Ingresos / Gastos
+// ============================================================
 
-    if (vm.categories.isEmpty) {
-      return CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          const SliverFillRemaining(
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.category_outlined, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'No hay categorías aún',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-    }
+class _CategoryList extends StatelessWidget {
+  final CategoriesViewModel vm;
 
-    // CustomScrollView + SliverList permite mezclar headers fijos
-    // con listas scrolleables de manera eficiente.
+  const _CategoryList({required this.vm});
+
+  @override
+  Widget build(BuildContext context) {
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        // --- Sección Ingresos ---
         if (vm.incomeCategories.isNotEmpty) ...[
           _SectionHeader(
             title: 'Ingresos',
-            color: Colors.green.shade700,
-            icon: Icons.arrow_downward,
+            color: AppColors.primary,
+            icon: Icons.arrow_downward_rounded,
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) =>
-                    _CategoryChipRow(category: vm.incomeCategories[index]),
+                    _CategoryRow(category: vm.incomeCategories[index]),
                 childCount: vm.incomeCategories.length,
               ),
             ),
           ),
         ],
-
-        const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-        // --- Sección Gastos ---
+        const SliverToBoxAdapter(child: SizedBox(height: 8)),
         if (vm.expenseCategories.isNotEmpty) ...[
           _SectionHeader(
             title: 'Gastos',
-            color: Theme.of(context).colorScheme.error,
-            icon: Icons.arrow_upward,
+            color: AppColors.error,
+            icon: Icons.arrow_upward_rounded,
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) =>
-                    _CategoryChipRow(category: vm.expenseCategories[index]),
+                    _CategoryRow(category: vm.expenseCategories[index]),
                 childCount: vm.expenseCategories.length,
               ),
             ),
           ),
         ],
-
-        const SliverToBoxAdapter(child: SizedBox(height: 88)),
+        const SliverToBoxAdapter(child: SizedBox(height: 96)),
       ],
     );
   }
 }
 
 // ============================================================
-// Widget: header de sección (Ingresos / Gastos)
+// Header de sección
 // ============================================================
 
 class _SectionHeader extends StatelessWidget {
@@ -184,18 +136,19 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
         child: Row(
           children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 8),
+            Icon(icon, color: color, size: 14),
+            const SizedBox(width: 6),
             Text(
-              title,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
+              title.toUpperCase(),
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.2,
+                color: color,
+              ),
             ),
           ],
         ),
@@ -205,47 +158,55 @@ class _SectionHeader extends StatelessWidget {
 }
 
 // ============================================================
-// Widget: fila de categoría con chip de color
+// Fila de categoría
 // ============================================================
 
-class _CategoryChipRow extends StatelessWidget {
+class _CategoryRow extends StatelessWidget {
   final CategoryModel category;
 
-  const _CategoryChipRow({required this.category});
+  const _CategoryRow({required this.category});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    final chipColor = category.isIncome
-        ? Colors.green.shade100
-        : colorScheme.errorContainer;
-
-    final labelColor = category.isIncome
-        ? Colors.green.shade800
-        : colorScheme.onErrorContainer;
+    final dotColor =
+        category.isIncome ? AppColors.primary : AppColors.error;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Chip(
-            backgroundColor: chipColor,
-            label: Text(
-              category.name,
-              style: TextStyle(
-                color: labelColor,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            avatar: Icon(
-              category.isIncome ? Icons.trending_up : Icons.trending_down,
-              color: labelColor,
-              size: 16,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceDark,
+          borderRadius: AppTheme.radiusSmall,
+          border: Border.all(
+            color: AppColors.surfaceElevatedDark,
+            width: 1,
           ),
-        ],
+        ),
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          leading: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: dotColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          title: Text(
+            category.name,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimaryDark,
+            ),
+          ),
+          trailing: Icon(
+            Icons.chevron_right_rounded,
+            color: AppColors.textMutedDark,
+            size: 18,
+          ),
+        ),
       ),
     );
   }

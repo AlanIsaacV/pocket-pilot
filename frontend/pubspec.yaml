@@ -47,6 +47,11 @@ dependencies:
   # ConnectivityMonitor lo usa para lanzar sync automático al reconectar.
   connectivity_plus: ^7.0.0
 
+  # --- Tipografía ---
+  # google_fonts: descarga y cachea fuentes de Google Fonts en runtime.
+  # Usamos Space Grotesk (números), Outfit (títulos) e Inter (cuerpo).
+  google_fonts: ^6.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -9,16 +9,22 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Transaction mirrors the `transactions` table.
 type Transaction struct {
-	ID          uuid.UUID
-	UserID      uuid.UUID
-	AccountID   uuid.UUID
-	CategoryID  uuid.UUID
-	Amount      int64 // minor units
-	Description string
-	Date        time.Time // only date component is meaningful (from PostgreSQL DATE)
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	AccountID    uuid.UUID
+	CategoryID   uuid.UUID
+	Type         string // "income" | "expense" | "transfer"
+	AmountCents  int64
+	CurrencyCode string
+	Status       string
+	Tags         []string
+	Description  string
+	Date         time.Time  // only the date component is meaningful (PostgreSQL DATE)
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	DeletedAt    *time.Time
 }
 
 type Repository struct {
@@ -29,117 +35,135 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-func (r *Repository) Create(ctx context.Context, userID, accountID, categoryID uuid.UUID, amount int64, description string, date time.Time) (*Transaction, error) {
+const scanColumns = `id, user_id, account_id, category_id, type, amount_cents, currency_code, status, tags, description, date, created_at, updated_at, deleted_at`
+
+func (r *Repository) scan(row pgx.Row) (*Transaction, error) {
 	t := &Transaction{}
-	err := r.pool.QueryRow(ctx, `
-		INSERT INTO transactions (user_id, account_id, category_id, amount, description, date)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, user_id, account_id, category_id, amount, description, date, created_at, updated_at
-	`, userID, accountID, categoryID, amount, description, date).Scan(
-		&t.ID, &t.UserID, &t.AccountID, &t.CategoryID, &t.Amount, &t.Description, &t.Date, &t.CreatedAt, &t.UpdatedAt,
+	err := row.Scan(
+		&t.ID, &t.UserID, &t.AccountID, &t.CategoryID,
+		&t.Type, &t.AmountCents, &t.CurrencyCode, &t.Status,
+		&t.Tags, &t.Description, &t.Date,
+		&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt,
 	)
-	return t, err
-}
-
-func (r *Repository) GetByID(ctx context.Context, id, userID uuid.UUID) (*Transaction, error) {
-	t := &Transaction{}
-	err := r.pool.QueryRow(ctx, `
-		SELECT id, user_id, account_id, category_id, amount, description, date, created_at, updated_at
-		FROM transactions
-		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-	`, id, userID).Scan(
-		&t.ID, &t.UserID, &t.AccountID, &t.CategoryID, &t.Amount, &t.Description, &t.Date, &t.CreatedAt, &t.UpdatedAt,
-	)
-	return t, err
-}
-
-type ListFilter struct {
-	AccountID  string // UUID string, empty = no filter
-	CategoryID string // UUID string, empty = no filter
-	DateFrom   string // YYYY-MM-DD, empty = no filter
-	DateTo     string // YYYY-MM-DD, empty = no filter
-}
-
-func (r *Repository) List(ctx context.Context, userID uuid.UUID, f ListFilter, limit, offset int) ([]*Transaction, int, error) {
-	// Parametrized optional filters using NULL coalescing:
-	// If the filter value is empty string, the condition is skipped.
-	const baseWhere = `
-		user_id = $1 AND deleted_at IS NULL
-		AND ($2::uuid IS NULL OR account_id  = $2::uuid)
-		AND ($3::uuid IS NULL OR category_id = $3::uuid)
-		AND ($4::date IS NULL OR date >= $4::date)
-		AND ($5::date IS NULL OR date <= $5::date)
-	`
-	nullIfEmpty := func(s string) interface{} {
-		if s == "" {
-			return nil
-		}
-		return s
-	}
-
-	var total int
-	if err := r.pool.QueryRow(ctx,
-		`SELECT COUNT(*) FROM transactions WHERE `+baseWhere,
-		userID, nullIfEmpty(f.AccountID), nullIfEmpty(f.CategoryID),
-		nullIfEmpty(f.DateFrom), nullIfEmpty(f.DateTo),
-	).Scan(&total); err != nil {
-		return nil, 0, err
-	}
-
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, user_id, account_id, category_id, amount, description, date, created_at, updated_at
-		FROM transactions
-		WHERE `+baseWhere+`
-		ORDER BY date DESC, created_at DESC
-		LIMIT $6 OFFSET $7
-	`, userID, nullIfEmpty(f.AccountID), nullIfEmpty(f.CategoryID),
-		nullIfEmpty(f.DateFrom), nullIfEmpty(f.DateTo), limit, offset)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
+	}
+	return t, nil
+}
+
+// GetByID fetches a single transaction regardless of deleted_at status.
+// Used to return the server's current version after a LWW conflict.
+func (r *Repository) GetByID(ctx context.Context, id, userID uuid.UUID) (*Transaction, error) {
+	row := r.pool.QueryRow(ctx,
+		`SELECT `+scanColumns+` FROM transactions WHERE id = $1 AND user_id = $2`,
+		id, userID,
+	)
+	return r.scan(row)
+}
+
+// List returns transactions for a user.
+//
+// If updatedSince is non-nil → delta sync: returns all records (active AND deleted)
+// with updated_at > updatedSince, no LIMIT applied.
+//
+// If updatedSince is nil → full sync: returns only active records with pagination.
+func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *time.Time, limit, offset int) ([]*Transaction, time.Time, error) {
+	syncedAt := time.Now().UTC()
+
+	var (
+		rows pgx.Rows
+		err  error
+	)
+
+	if updatedSince != nil {
+		rows, err = r.pool.Query(ctx,
+			`SELECT `+scanColumns+`
+			 FROM transactions
+			 WHERE user_id = $1 AND updated_at > $2
+			 ORDER BY updated_at ASC`,
+			userID, updatedSince,
+		)
+	} else {
+		rows, err = r.pool.Query(ctx,
+			`SELECT `+scanColumns+`
+			 FROM transactions
+			 WHERE user_id = $1 AND deleted_at IS NULL
+			 ORDER BY date DESC, created_at DESC
+			 LIMIT $2 OFFSET $3`,
+			userID, limit, offset,
+		)
+	}
+	if err != nil {
+		return nil, syncedAt, err
 	}
 	defer rows.Close()
 
 	var txs []*Transaction
 	for rows.Next() {
 		t := &Transaction{}
-		if err := rows.Scan(&t.ID, &t.UserID, &t.AccountID, &t.CategoryID, &t.Amount, &t.Description, &t.Date, &t.CreatedAt, &t.UpdatedAt); err != nil {
-			return nil, 0, err
+		if err := rows.Scan(
+			&t.ID, &t.UserID, &t.AccountID, &t.CategoryID,
+			&t.Type, &t.AmountCents, &t.CurrencyCode, &t.Status,
+			&t.Tags, &t.Description, &t.Date,
+			&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt,
+		); err != nil {
+			return nil, syncedAt, err
 		}
 		txs = append(txs, t)
 	}
-	return txs, total, rows.Err()
+	return txs, syncedAt, rows.Err()
 }
 
-func (r *Repository) Update(ctx context.Context, id, userID uuid.UUID, accountID, categoryID uuid.UUID, amount int64, description, date string) (*Transaction, error) {
-	t := &Transaction{}
-	// Zero UUID (all zeros) is used as "not provided" sentinel for UUID fields.
-	// For amount, 0 means "not provided". For strings, "" means "not provided".
-	zeroUUID := uuid.UUID{}
-	err := r.pool.QueryRow(ctx, `
-		UPDATE transactions SET
-			account_id  = CASE WHEN $3 != $7 THEN $3  ELSE account_id  END,
-			category_id = CASE WHEN $4 != $7 THEN $4  ELSE category_id END,
-			amount      = CASE WHEN $5 != 0  THEN $5  ELSE amount      END,
-			description = CASE WHEN $6 != '' THEN $6  ELSE description END,
-			date        = CASE WHEN $8 != '' THEN $8::date ELSE date   END
-		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-		RETURNING id, user_id, account_id, category_id, amount, description, date, created_at, updated_at
-	`, id, userID, accountID, categoryID, amount, description, zeroUUID, date).Scan(
-		&t.ID, &t.UserID, &t.AccountID, &t.CategoryID, &t.Amount, &t.Description, &t.Date, &t.CreatedAt, &t.UpdatedAt,
+// Upsert inserts or updates a transaction applying Last Write Wins.
+//
+// Returns (transaction, conflictResolved, error):
+//   - conflictResolved=false: incoming version was accepted.
+//   - conflictResolved=true:  server had a newer version; returned transaction is the server's.
+func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		INSERT INTO transactions (id, user_id, account_id, category_id, type, amount_cents, currency_code, status, tags, description, date, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		ON CONFLICT (id) DO UPDATE SET
+			account_id    = EXCLUDED.account_id,
+			category_id   = EXCLUDED.category_id,
+			type          = EXCLUDED.type,
+			amount_cents  = EXCLUDED.amount_cents,
+			currency_code = EXCLUDED.currency_code,
+			status        = EXCLUDED.status,
+			tags          = EXCLUDED.tags,
+			description   = EXCLUDED.description,
+			date          = EXCLUDED.date,
+			updated_at    = EXCLUDED.updated_at
+		WHERE transactions.updated_at < EXCLUDED.updated_at
+		RETURNING `+scanColumns,
+		t.ID, t.UserID, t.AccountID, t.CategoryID,
+		t.Type, t.AmountCents, t.CurrencyCode, t.Status,
+		t.Tags, t.Description, t.Date,
+		t.CreatedAt, t.UpdatedAt,
 	)
-	return t, err
+
+	result, err := r.scan(row)
+	if err == nil {
+		return result, false, nil
+	}
+	if err != pgx.ErrNoRows {
+		return nil, false, err
+	}
+
+	// ErrNoRows: server has a newer version. Return it with conflict_resolved=true.
+	current, err := r.GetByID(ctx, t.ID, t.UserID)
+	if err != nil {
+		return nil, false, err
+	}
+	return current, true, nil
 }
 
-func (r *Repository) Delete(ctx context.Context, id, userID uuid.UUID) error {
-	result, err := r.pool.Exec(ctx, `
-		UPDATE transactions SET deleted_at = NOW()
-		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-	`, id, userID)
-	if err != nil {
-		return err
-	}
-	if result.RowsAffected() == 0 {
-		return pgx.ErrNoRows
-	}
-	return nil
+// SoftDelete sets deleted_at on a transaction, applying LWW by comparing timestamps.
+func (r *Repository) SoftDelete(ctx context.Context, id, userID uuid.UUID, deletedAt time.Time) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE transactions SET deleted_at = $3, updated_at = $3
+		WHERE id = $1 AND user_id = $2
+		  AND (deleted_at IS NULL OR updated_at < $3)
+	`, id, userID, deletedAt)
+	return err
 }

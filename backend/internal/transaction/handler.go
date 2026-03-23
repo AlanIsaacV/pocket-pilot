@@ -6,14 +6,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/AlanIsaacV/pocket-pilot/internal/gen/proto/pocket_pilot/v1/pocket_pilot/v1"
 )
 
+// Handler implements pb.TransactionServiceServer.
 type Handler struct {
 	pb.UnimplementedTransactionServiceServer
 	repo *Repository
@@ -23,21 +24,7 @@ func NewHandler(repo *Repository) *Handler {
 	return &Handler{repo: repo}
 }
 
-const dateLayout = "2006-01-02" // Go's reference date in YYYY-MM-DD format
-
-func toProto(t *Transaction) *pb.Transaction {
-	return &pb.Transaction{
-		Id:          t.ID.String(),
-		UserId:      t.UserID.String(),
-		AccountId:   t.AccountID.String(),
-		CategoryId:  t.CategoryID.String(),
-		Amount:      &pb.Money{AmountMinor: t.Amount, CurrencyCode: "MXN"},
-		Description: t.Description,
-		Date:        t.Date.Format(dateLayout),
-		CreatedAt:   timestamppb.New(t.CreatedAt),
-		UpdatedAt:   timestamppb.New(t.UpdatedAt),
-	}
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 func parsePage(req *pb.PageRequest) (limit, offset int) {
 	limit = 20
@@ -58,79 +45,118 @@ func parsePage(req *pb.PageRequest) (limit, offset int) {
 	return
 }
 
-func nextPageToken(offset, limit, total int) string {
-	if offset+limit >= total {
+func nextPageToken(offset, limit, count int) string {
+	if count < limit {
 		return ""
 	}
 	return strconv.Itoa(offset + limit)
 }
 
-func notFoundOrInternal(err error, resource string) error {
-	if err == pgx.ErrNoRows {
-		return status.Errorf(codes.NotFound, "%s not found", resource)
+func transactionTypeToString(t pb.TransactionType) string {
+	switch t {
+	case pb.TransactionType_TRANSACTION_TYPE_INCOME:
+		return "income"
+	case pb.TransactionType_TRANSACTION_TYPE_EXPENSE:
+		return "expense"
+	case pb.TransactionType_TRANSACTION_TYPE_TRANSFER:
+		return "transfer"
+	default:
+		return "expense"
 	}
-	return status.Errorf(codes.Internal, "database error: %v", err)
 }
 
-func (h *Handler) CreateTransaction(ctx context.Context, req *pb.CreateTransactionRequest) (*pb.CreateTransactionResponse, error) {
-	userID, err := uuid.Parse(req.UserId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
+func stringToTransactionType(s string) pb.TransactionType {
+	switch s {
+	case "income":
+		return pb.TransactionType_TRANSACTION_TYPE_INCOME
+	case "expense":
+		return pb.TransactionType_TRANSACTION_TYPE_EXPENSE
+	case "transfer":
+		return pb.TransactionType_TRANSACTION_TYPE_TRANSFER
+	default:
+		return pb.TransactionType_TRANSACTION_TYPE_UNSPECIFIED
 	}
-	accountID, err := uuid.Parse(req.AccountId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid account_id: %v", err)
-	}
-	categoryID, err := uuid.Parse(req.CategoryId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid category_id: %v", err)
-	}
-	date, err := time.Parse(dateLayout, req.Date)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid date format, expected YYYY-MM-DD: %v", err)
-	}
-
-	var amount int64
-	if req.Amount != nil {
-		amount = req.Amount.AmountMinor
-	}
-
-	tx, err := h.repo.Create(ctx, userID, accountID, categoryID, amount, req.Description, date)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "create transaction: %v", err)
-	}
-	return &pb.CreateTransactionResponse{Transaction: toProto(tx)}, nil
 }
 
-func (h *Handler) GetTransaction(ctx context.Context, req *pb.GetTransactionRequest) (*pb.GetTransactionResponse, error) {
-	userID, err := uuid.Parse(req.UserId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
+func toProto(t *Transaction) *pb.Transaction {
+	proto := &pb.Transaction{
+		Id:           t.ID.String(),
+		UserId:       t.UserID.String(),
+		AccountId:    t.AccountID.String(),
+		CategoryId:   t.CategoryID.String(),
+		Type:         stringToTransactionType(t.Type),
+		AmountCents:  t.AmountCents,
+		CurrencyCode: t.CurrencyCode,
+		Status:       t.Status,
+		Tags:         t.Tags,
+		Description:  t.Description,
+		Date:         timestamppb.New(t.Date),
+		CreatedAt:    timestamppb.New(t.CreatedAt),
+		UpdatedAt:    timestamppb.New(t.UpdatedAt),
 	}
-	id, err := uuid.Parse(req.TransactionId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction_id: %v", err)
+	if t.DeletedAt != nil {
+		proto.DeletedAt = timestamppb.New(*t.DeletedAt)
 	}
-	tx, err := h.repo.GetByID(ctx, id, userID)
-	if err != nil {
-		return nil, notFoundOrInternal(err, "transaction")
-	}
-	return &pb.GetTransactionResponse{Transaction: toProto(tx)}, nil
+	return proto
 }
 
+func fromProto(p *pb.Transaction) (*Transaction, error) {
+	id, err := uuid.Parse(p.Id)
+	if err != nil {
+		return nil, err
+	}
+	userID, err := uuid.Parse(p.UserId)
+	if err != nil {
+		return nil, err
+	}
+	accountID, err := uuid.Parse(p.AccountId)
+	if err != nil {
+		return nil, err
+	}
+	categoryID, err := uuid.Parse(p.CategoryId)
+	if err != nil {
+		return nil, err
+	}
+
+	var date time.Time
+	if p.Date != nil {
+		date = p.Date.AsTime().UTC().Truncate(24 * time.Hour)
+	}
+
+	return &Transaction{
+		ID:           id,
+		UserID:       userID,
+		AccountID:    accountID,
+		CategoryID:   categoryID,
+		Type:         transactionTypeToString(p.Type),
+		AmountCents:  p.AmountCents,
+		CurrencyCode: p.CurrencyCode,
+		Status:       p.Status,
+		Tags:         p.Tags,
+		Description:  p.Description,
+		Date:         date,
+		CreatedAt:    p.CreatedAt.AsTime(),
+		UpdatedAt:    p.UpdatedAt.AsTime(),
+	}, nil
+}
+
+// ── RPC handlers ──────────────────────────────────────────────────────────────
+
+// ListTransactions supports delta sync via updated_since.
 func (h *Handler) ListTransactions(ctx context.Context, req *pb.ListTransactionsRequest) (*pb.ListTransactionsResponse, error) {
 	userID, err := uuid.Parse(req.UserId)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
 	}
 
-	limit, offset := parsePage(req.Pagination)
-	txs, total, err := h.repo.List(ctx, userID, ListFilter{
-		AccountID:  req.AccountId,
-		CategoryID: req.CategoryId,
-		DateFrom:   req.DateFrom,
-		DateTo:     req.DateTo,
-	}, limit, offset)
+	var updatedSince *time.Time
+	if req.UpdatedSince != nil {
+		t := req.UpdatedSince.AsTime()
+		updatedSince = &t
+	}
+
+	limit, offset := parsePage(req.Page)
+	txs, syncedAt, err := h.repo.List(ctx, userID, updatedSince, limit, offset)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "list transactions: %v", err)
 	}
@@ -139,61 +165,63 @@ func (h *Handler) ListTransactions(ctx context.Context, req *pb.ListTransactions
 	for i, t := range txs {
 		pbTxs[i] = toProto(t)
 	}
+
+	nextToken := ""
+	if updatedSince == nil {
+		nextToken = nextPageToken(offset, limit, len(txs))
+	}
+
 	return &pb.ListTransactionsResponse{
 		Transactions: pbTxs,
-		Pagination: &pb.PageResponse{
-			NextPageToken: nextPageToken(offset, limit, total),
-			TotalCount:    int32(total),
+		Page: &pb.PageResponse{
+			NextPageToken: nextToken,
 		},
+		SyncedAt: timestamppb.New(syncedAt),
 	}, nil
 }
 
-func (h *Handler) UpdateTransaction(ctx context.Context, req *pb.UpdateTransactionRequest) (*pb.UpdateTransactionResponse, error) {
-	userID, err := uuid.Parse(req.UserId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
-	}
-	id, err := uuid.Parse(req.TransactionId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction_id: %v", err)
+// UpsertTransaction creates or updates a transaction using Last Write Wins.
+func (h *Handler) UpsertTransaction(ctx context.Context, req *pb.UpsertTransactionRequest) (*pb.UpsertTransactionResponse, error) {
+	if req.Transaction == nil {
+		return nil, status.Error(codes.InvalidArgument, "transaction is required")
 	}
 
-	// Parse optional UUID fields — use zero UUID as "not provided" sentinel
-	var accountID, categoryID uuid.UUID
-	if req.AccountId != "" {
-		if accountID, err = uuid.Parse(req.AccountId); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid account_id: %v", err)
-		}
-	}
-	if req.CategoryId != "" {
-		if categoryID, err = uuid.Parse(req.CategoryId); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid category_id: %v", err)
-		}
-	}
-
-	var amount int64
-	if req.Amount != nil {
-		amount = req.Amount.AmountMinor
-	}
-
-	tx, err := h.repo.Update(ctx, id, userID, accountID, categoryID, amount, req.Description, req.Date)
+	t, err := fromProto(req.Transaction)
 	if err != nil {
-		return nil, notFoundOrInternal(err, "transaction")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction: %v", err)
 	}
-	return &pb.UpdateTransactionResponse{Transaction: toProto(tx)}, nil
+
+	result, conflictResolved, err := h.repo.Upsert(ctx, t)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "upsert transaction: %v", err)
+	}
+
+	return &pb.UpsertTransactionResponse{
+		Transaction:     toProto(result),
+		ConflictResolved: conflictResolved,
+	}, nil
 }
 
-func (h *Handler) DeleteTransaction(ctx context.Context, req *pb.DeleteTransactionRequest) (*pb.DeleteTransactionResponse, error) {
+// DeleteTransaction soft-deletes a transaction using Last Write Wins on deleted_at.
+func (h *Handler) DeleteTransaction(ctx context.Context, req *pb.DeleteTransactionRequest) (*emptypb.Empty, error) {
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid id: %v", err)
+	}
 	userID, err := uuid.Parse(req.UserId)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
 	}
-	id, err := uuid.Parse(req.TransactionId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction_id: %v", err)
+
+	var deletedAt time.Time
+	if req.DeletedAt != nil {
+		deletedAt = req.DeletedAt.AsTime()
+	} else {
+		deletedAt = time.Now().UTC()
 	}
-	if err := h.repo.Delete(ctx, id, userID); err != nil {
-		return nil, notFoundOrInternal(err, "transaction")
+
+	if err := h.repo.SoftDelete(ctx, id, userID, deletedAt); err != nil {
+		return nil, status.Errorf(codes.Internal, "delete transaction: %v", err)
 	}
-	return &pb.DeleteTransactionResponse{}, nil
+	return &emptypb.Empty{}, nil
 }

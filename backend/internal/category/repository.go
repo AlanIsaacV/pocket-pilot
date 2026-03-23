@@ -9,13 +9,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Category mirrors the `categories` table.
 type Category struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
 	Name      string
-	Type      string // "income", "expense"
+	Icon      string
+	Color     string
+	ParentID  *uuid.UUID
+	Type      string // "income" | "expense"
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	DeletedAt *time.Time
 }
 
 type Repository struct {
@@ -26,88 +31,127 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-func (r *Repository) Create(ctx context.Context, userID uuid.UUID, name, typ string) (*Category, error) {
+const scanColumns = `id, user_id, name, icon, color, parent_id, type, created_at, updated_at, deleted_at`
+
+func (r *Repository) scan(row pgx.Row) (*Category, error) {
 	c := &Category{}
-	err := r.pool.QueryRow(ctx, `
-		INSERT INTO categories (user_id, name, type)
-		VALUES ($1, $2, $3)
-		RETURNING id, user_id, name, type, created_at, updated_at
-	`, userID, name, typ).Scan(
-		&c.ID, &c.UserID, &c.Name, &c.Type, &c.CreatedAt, &c.UpdatedAt,
+	err := row.Scan(
+		&c.ID, &c.UserID, &c.Name, &c.Icon, &c.Color,
+		&c.ParentID, &c.Type,
+		&c.CreatedAt, &c.UpdatedAt, &c.DeletedAt,
 	)
-	return c, err
-}
-
-func (r *Repository) GetByID(ctx context.Context, id, userID uuid.UUID) (*Category, error) {
-	c := &Category{}
-	err := r.pool.QueryRow(ctx, `
-		SELECT id, user_id, name, type, created_at, updated_at
-		FROM categories
-		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-	`, id, userID).Scan(
-		&c.ID, &c.UserID, &c.Name, &c.Type, &c.CreatedAt, &c.UpdatedAt,
-	)
-	return c, err
-}
-
-func (r *Repository) List(ctx context.Context, userID uuid.UUID, typeFilter string, limit, offset int) ([]*Category, int, error) {
-	// Build the WHERE clause dynamically based on the optional type filter.
-	// Using $3 = '' as the "no filter" sentinel avoids building query strings with fmt.Sprintf.
-	var total int
-	if err := r.pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM categories
-		WHERE user_id = $1 AND deleted_at IS NULL AND ($2 = '' OR type = $2)
-	`, userID, typeFilter).Scan(&total); err != nil {
-		return nil, 0, err
-	}
-
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, user_id, name, type, created_at, updated_at
-		FROM categories
-		WHERE user_id = $1 AND deleted_at IS NULL AND ($2 = '' OR type = $2)
-		ORDER BY name ASC
-		LIMIT $3 OFFSET $4
-	`, userID, typeFilter, limit, offset)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
+	}
+	return c, nil
+}
+
+// GetByID fetches a single category regardless of deleted_at status.
+// Used to return the server's current version after a LWW conflict.
+func (r *Repository) GetByID(ctx context.Context, id, userID uuid.UUID) (*Category, error) {
+	row := r.pool.QueryRow(ctx,
+		`SELECT `+scanColumns+` FROM categories WHERE id = $1 AND user_id = $2`,
+		id, userID,
+	)
+	return r.scan(row)
+}
+
+// List returns categories for a user.
+//
+// If updatedSince is non-nil → delta sync: returns all records (active AND deleted)
+// with updated_at > updatedSince, no LIMIT applied.
+//
+// If updatedSince is nil → full sync: returns only active records with pagination.
+func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *time.Time, limit, offset int) ([]*Category, time.Time, error) {
+	syncedAt := time.Now().UTC()
+
+	var (
+		rows pgx.Rows
+		err  error
+	)
+
+	if updatedSince != nil {
+		rows, err = r.pool.Query(ctx,
+			`SELECT `+scanColumns+`
+			 FROM categories
+			 WHERE user_id = $1 AND updated_at > $2
+			 ORDER BY updated_at ASC`,
+			userID, updatedSince,
+		)
+	} else {
+		rows, err = r.pool.Query(ctx,
+			`SELECT `+scanColumns+`
+			 FROM categories
+			 WHERE user_id = $1 AND deleted_at IS NULL
+			 ORDER BY name ASC
+			 LIMIT $2 OFFSET $3`,
+			userID, limit, offset,
+		)
+	}
+	if err != nil {
+		return nil, syncedAt, err
 	}
 	defer rows.Close()
 
 	var categories []*Category
 	for rows.Next() {
 		c := &Category{}
-		if err := rows.Scan(&c.ID, &c.UserID, &c.Name, &c.Type, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, 0, err
+		if err := rows.Scan(
+			&c.ID, &c.UserID, &c.Name, &c.Icon, &c.Color,
+			&c.ParentID, &c.Type,
+			&c.CreatedAt, &c.UpdatedAt, &c.DeletedAt,
+		); err != nil {
+			return nil, syncedAt, err
 		}
 		categories = append(categories, c)
 	}
-	return categories, total, rows.Err()
+	return categories, syncedAt, rows.Err()
 }
 
-func (r *Repository) Update(ctx context.Context, id, userID uuid.UUID, name, typ string) (*Category, error) {
-	c := &Category{}
-	err := r.pool.QueryRow(ctx, `
-		UPDATE categories SET
-			name = CASE WHEN $3 != '' THEN $3 ELSE name END,
-			type = CASE WHEN $4 != '' THEN $4 ELSE type END
-		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-		RETURNING id, user_id, name, type, created_at, updated_at
-	`, id, userID, name, typ).Scan(
-		&c.ID, &c.UserID, &c.Name, &c.Type, &c.CreatedAt, &c.UpdatedAt,
+// Upsert inserts or updates a category applying Last Write Wins.
+//
+// Returns (category, conflictResolved, error):
+//   - conflictResolved=false: incoming version was accepted.
+//   - conflictResolved=true:  server had a newer version; returned category is the server's.
+func (r *Repository) Upsert(ctx context.Context, c *Category) (*Category, bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		INSERT INTO categories (id, user_id, name, icon, color, parent_id, type, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (id) DO UPDATE SET
+			name       = EXCLUDED.name,
+			icon       = EXCLUDED.icon,
+			color      = EXCLUDED.color,
+			parent_id  = EXCLUDED.parent_id,
+			type       = EXCLUDED.type,
+			updated_at = EXCLUDED.updated_at
+		WHERE categories.updated_at < EXCLUDED.updated_at
+		RETURNING `+scanColumns,
+		c.ID, c.UserID, c.Name, c.Icon, c.Color, c.ParentID, c.Type,
+		c.CreatedAt, c.UpdatedAt,
 	)
-	return c, err
+
+	result, err := r.scan(row)
+	if err == nil {
+		return result, false, nil
+	}
+	if err != pgx.ErrNoRows {
+		return nil, false, err
+	}
+
+	// ErrNoRows: server has a newer version. Return it with conflict_resolved=true.
+	current, err := r.GetByID(ctx, c.ID, c.UserID)
+	if err != nil {
+		return nil, false, err
+	}
+	return current, true, nil
 }
 
-func (r *Repository) Delete(ctx context.Context, id, userID uuid.UUID) error {
-	result, err := r.pool.Exec(ctx, `
-		UPDATE categories SET deleted_at = NOW()
-		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-	`, id, userID)
-	if err != nil {
-		return err
-	}
-	if result.RowsAffected() == 0 {
-		return pgx.ErrNoRows
-	}
-	return nil
+// SoftDelete sets deleted_at on a category, applying LWW by comparing timestamps.
+func (r *Repository) SoftDelete(ctx context.Context, id, userID uuid.UUID, deletedAt time.Time) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE categories SET deleted_at = $3, updated_at = $3
+		WHERE id = $1 AND user_id = $2
+		  AND (deleted_at IS NULL OR updated_at < $3)
+	`, id, userID, deletedAt)
+	return err
 }

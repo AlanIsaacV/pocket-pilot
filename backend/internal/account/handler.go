@@ -3,20 +3,19 @@ package account
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/AlanIsaacV/pocket-pilot/internal/gen/proto/pocket_pilot/v1/pocket_pilot/v1"
 )
 
 // Handler implements pb.AccountServiceServer.
-// The embedded UnimplementedAccountServiceServer satisfies the interface for any
-// RPC methods we haven't implemented yet — the compiler will catch missing methods
-// only when you remove the embed. This is the standard gRPC pattern in Go.
+// UnimplementedAccountServiceServer satisfies the interface for any unimplemented RPCs.
 type Handler struct {
 	pb.UnimplementedAccountServiceServer
 	repo *Repository
@@ -29,9 +28,7 @@ func NewHandler(repo *Repository) *Handler {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 // parsePage extracts limit + offset from a PageRequest.
-// page_token is an opaque string — for this MVP it simply encodes the offset
-// as a decimal integer. That keeps it simple while staying wire-compatible with
-// a future cursor-based implementation.
+// page_token encodes the offset as a decimal integer (simple cursor for the MVP).
 func parsePage(req *pb.PageRequest) (limit, offset int) {
 	limit = 20
 	if req == nil {
@@ -51,123 +48,143 @@ func parsePage(req *pb.PageRequest) (limit, offset int) {
 	return
 }
 
-func nextPageToken(offset, limit, total int) string {
-	next := offset + limit
-	if next >= total {
+func nextPageToken(offset, limit, count int) string {
+	if count < limit {
 		return "" // no more pages
 	}
-	return strconv.Itoa(next)
+	return strconv.Itoa(offset + limit)
 }
 
-// accountTypeToString / stringToAccountType convert between the proto enum
-// and the plain string stored in PostgreSQL. Using a DB enum type would also
-// work, but plain text is easier to inspect and migrate.
 func accountTypeToString(t pb.AccountType) string {
 	switch t {
-	case pb.AccountType_ACCOUNT_TYPE_CHECKING:
-		return "checking"
-	case pb.AccountType_ACCOUNT_TYPE_SAVINGS:
-		return "savings"
-	case pb.AccountType_ACCOUNT_TYPE_CREDIT_CARD:
-		return "credit_card"
+	case pb.AccountType_ACCOUNT_TYPE_BANK:
+		return "bank"
 	case pb.AccountType_ACCOUNT_TYPE_CASH:
 		return "cash"
+	case pb.AccountType_ACCOUNT_TYPE_CREDIT_CARD:
+		return "credit_card"
+	case pb.AccountType_ACCOUNT_TYPE_LOAN:
+		return "loan"
 	case pb.AccountType_ACCOUNT_TYPE_INVESTMENT:
 		return "investment"
+	case pb.AccountType_ACCOUNT_TYPE_CRYPYO:
+		return "crypto"
+	case pb.AccountType_ACCOUNT_TYPE_OTHER:
+		return "other"
 	default:
-		return "checking"
+		return "other"
 	}
 }
 
 func stringToAccountType(s string) pb.AccountType {
 	switch s {
-	case "checking":
-		return pb.AccountType_ACCOUNT_TYPE_CHECKING
-	case "savings":
-		return pb.AccountType_ACCOUNT_TYPE_SAVINGS
-	case "credit_card":
-		return pb.AccountType_ACCOUNT_TYPE_CREDIT_CARD
+	case "bank":
+		return pb.AccountType_ACCOUNT_TYPE_BANK
 	case "cash":
 		return pb.AccountType_ACCOUNT_TYPE_CASH
+	case "credit_card":
+		return pb.AccountType_ACCOUNT_TYPE_CREDIT_CARD
+	case "loan":
+		return pb.AccountType_ACCOUNT_TYPE_LOAN
 	case "investment":
 		return pb.AccountType_ACCOUNT_TYPE_INVESTMENT
+	case "crypto":
+		return pb.AccountType_ACCOUNT_TYPE_CRYPYO
 	default:
-		return pb.AccountType_ACCOUNT_TYPE_UNSPECIFIED
+		return pb.AccountType_ACCOUNT_TYPE_OTHER
 	}
 }
 
-// toProto converts the internal domain model to the proto message.
-// Currency is hardcoded to "MXN" for the MVP — extend this by adding
-// a currency_code column to the accounts table when needed.
 func toProto(a *Account) *pb.Account {
-	return &pb.Account{
-		Id:     a.ID.String(),
-		UserId: a.UserID.String(),
-		Name:   a.Name,
-		Type:   stringToAccountType(a.Type),
-		InitialBalance: &pb.Money{
-			AmountMinor:  a.InitialBalance,
-			CurrencyCode: "MXN",
-		},
+	proto := &pb.Account{
+		Id:        a.ID.String(),
+		UserId:    a.UserID.String(),
+		Name:      a.Name,
+		Type:      stringToAccountType(a.Type),
 		CreatedAt: timestamppb.New(a.CreatedAt),
 		UpdatedAt: timestamppb.New(a.UpdatedAt),
 	}
+	if a.CreditLimitCents != nil {
+		proto.CreditLimitCents = *a.CreditLimitCents
+	}
+	if a.StatementDay != nil {
+		proto.StatementDay = *a.StatementDay
+	}
+	if a.PaymentDueDay != nil {
+		proto.PaymentDueDay = *a.PaymentDueDay
+	}
+	if a.InterestRateApr != nil {
+		proto.InterestRateApr = int32(*a.InterestRateApr)
+	}
+	if a.TermMonths != nil {
+		proto.TermMonths = *a.TermMonths
+	}
+	if a.DeletedAt != nil {
+		proto.DeletedAt = timestamppb.New(*a.DeletedAt)
+	}
+	return proto
 }
 
-// notFoundOrInternal maps pgx.ErrNoRows to codes.NotFound and everything
-// else to codes.Internal. This pattern is repeated across all handlers.
-func notFoundOrInternal(err error, resource string) error {
-	if err == pgx.ErrNoRows {
-		return status.Errorf(codes.NotFound, "%s not found", resource)
+func fromProto(p *pb.Account) (*Account, error) {
+	id, err := uuid.Parse(p.Id)
+	if err != nil {
+		return nil, err
 	}
-	return status.Errorf(codes.Internal, "database error: %v", err)
+	userID, err := uuid.Parse(p.UserId)
+	if err != nil {
+		return nil, err
+	}
+
+	a := &Account{
+		ID:        id,
+		UserID:    userID,
+		Name:      p.Name,
+		Type:      accountTypeToString(p.Type),
+		CreatedAt: p.CreatedAt.AsTime(),
+		UpdatedAt: p.UpdatedAt.AsTime(),
+	}
+	if p.CreditLimitCents != 0 {
+		v := p.CreditLimitCents
+		a.CreditLimitCents = &v
+	}
+	if p.StatementDay != 0 {
+		v := p.StatementDay
+		a.StatementDay = &v
+	}
+	if p.PaymentDueDay != 0 {
+		v := p.PaymentDueDay
+		a.PaymentDueDay = &v
+	}
+	if p.InterestRateApr != 0 {
+		v := float64(p.InterestRateApr)
+		a.InterestRateApr = &v
+	}
+	if p.TermMonths != 0 {
+		v := p.TermMonths
+		a.TermMonths = &v
+	}
+	return a, nil
 }
 
 // ── RPC handlers ──────────────────────────────────────────────────────────────
 
-func (h *Handler) CreateAccount(ctx context.Context, req *pb.CreateAccountRequest) (*pb.CreateAccountResponse, error) {
-	userID, err := uuid.Parse(req.UserId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
-	}
-
-	var balance int64
-	if req.InitialBalance != nil {
-		balance = req.InitialBalance.AmountMinor
-	}
-
-	acc, err := h.repo.Create(ctx, userID, req.Name, accountTypeToString(req.Type), balance)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "create account: %v", err)
-	}
-	return &pb.CreateAccountResponse{Account: toProto(acc)}, nil
-}
-
-func (h *Handler) GetAccount(ctx context.Context, req *pb.GetAccountRequest) (*pb.GetAccountResponse, error) {
-	userID, err := uuid.Parse(req.UserId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
-	}
-	id, err := uuid.Parse(req.AccountId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid account_id: %v", err)
-	}
-
-	acc, err := h.repo.GetByID(ctx, id, userID)
-	if err != nil {
-		return nil, notFoundOrInternal(err, "account")
-	}
-	return &pb.GetAccountResponse{Account: toProto(acc)}, nil
-}
-
+// ListAccounts supports delta sync via updated_since.
+// If updated_since is set, returns all records (active + deleted) modified after that timestamp.
+// If not set (first sync), returns only active records with pagination.
 func (h *Handler) ListAccounts(ctx context.Context, req *pb.ListAccountsRequest) (*pb.ListAccountsResponse, error) {
 	userID, err := uuid.Parse(req.UserId)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
 	}
 
-	limit, offset := parsePage(req.Pagination)
-	accounts, total, err := h.repo.List(ctx, userID, limit, offset)
+	var updatedSince *time.Time
+	if req.UpdatedSince != nil {
+		t := req.UpdatedSince.AsTime()
+		updatedSince = &t
+	}
+
+	limit, offset := parsePage(req.Page)
+	accounts, syncedAt, err := h.repo.List(ctx, userID, updatedSince, limit, offset)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "list accounts: %v", err)
 	}
@@ -176,49 +193,66 @@ func (h *Handler) ListAccounts(ctx context.Context, req *pb.ListAccountsRequest)
 	for i, a := range accounts {
 		pbAccounts[i] = toProto(a)
 	}
+
+	nextToken := ""
+	if updatedSince == nil {
+		// Only paginate on full sync.
+		nextToken = nextPageToken(offset, limit, len(accounts))
+	}
+
 	return &pb.ListAccountsResponse{
 		Accounts: pbAccounts,
-		Pagination: &pb.PageResponse{
-			NextPageToken: nextPageToken(offset, limit, total),
-			TotalCount:    int32(total),
+		Page: &pb.PageResponse{
+			NextPageToken: nextToken,
 		},
+		SyncedAt: timestamppb.New(syncedAt),
 	}, nil
 }
 
-func (h *Handler) UpdateAccount(ctx context.Context, req *pb.UpdateAccountRequest) (*pb.UpdateAccountResponse, error) {
-	userID, err := uuid.Parse(req.UserId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
-	}
-	id, err := uuid.Parse(req.AccountId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid account_id: %v", err)
+// UpsertAccount creates or updates an account using Last Write Wins.
+// If the server has a newer version, conflict_resolved=true is returned with the server's version.
+func (h *Handler) UpsertAccount(ctx context.Context, req *pb.UpsertAccountRequest) (*pb.UpsertAccountResponse, error) {
+	if req.Account == nil {
+		return nil, status.Error(codes.InvalidArgument, "account is required")
 	}
 
-	var balance int64
-	if req.InitialBalance != nil {
-		balance = req.InitialBalance.AmountMinor
+	a, err := fromProto(req.Account)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid account: %v", err)
 	}
 
-	acc, err := h.repo.Update(ctx, id, userID, req.Name, accountTypeToString(req.Type), balance)
+	result, conflictResolved, err := h.repo.Upsert(ctx, a)
 	if err != nil {
-		return nil, notFoundOrInternal(err, "account")
+		return nil, status.Errorf(codes.Internal, "upsert account: %v", err)
 	}
-	return &pb.UpdateAccountResponse{Account: toProto(acc)}, nil
+
+	return &pb.UpsertAccountResponse{
+		Account:         toProto(result),
+		ConflictResolved: conflictResolved,
+	}, nil
 }
 
-func (h *Handler) DeleteAccount(ctx context.Context, req *pb.DeleteAccountRequest) (*pb.DeleteAccountResponse, error) {
+// DeleteAccount soft-deletes an account using Last Write Wins on deleted_at.
+// If the server has a newer version, the delete is silently ignored.
+func (h *Handler) DeleteAccount(ctx context.Context, req *pb.DeleteAccountRequest) (*emptypb.Empty, error) {
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid id: %v", err)
+	}
 	userID, err := uuid.Parse(req.UserId)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
 	}
-	id, err := uuid.Parse(req.AccountId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid account_id: %v", err)
+
+	var deletedAt time.Time
+	if req.DeletedAt != nil {
+		deletedAt = req.DeletedAt.AsTime()
+	} else {
+		deletedAt = time.Now().UTC()
 	}
 
-	if err := h.repo.Delete(ctx, id, userID); err != nil {
-		return nil, notFoundOrInternal(err, "account")
+	if err := h.repo.SoftDelete(ctx, id, userID, deletedAt); err != nil {
+		return nil, status.Errorf(codes.Internal, "delete account: %v", err)
 	}
-	return &pb.DeleteAccountResponse{}, nil
+	return &emptypb.Empty{}, nil
 }

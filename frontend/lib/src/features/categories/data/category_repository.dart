@@ -32,9 +32,9 @@ class CategoryRepository {
   /// Descarga categorías del servidor y las persiste en SQLite.
   /// Propaga errores para que el ViewModel pueda mostrarlos.
   Future<void> syncRemote(String userId) async {
-    final remoteCategories = await _remote.listCategories(userId);
+    final response = await _remote.listCategories(userId);
     await _local.upsertAll(
-      remoteCategories.map(CategoryModel.fromProto).toList(),
+      response.categories.map(CategoryModel.fromProto).toList(),
     );
   }
 
@@ -62,11 +62,14 @@ class CategoryRepository {
 
     unawaited(() async {
       try {
-        await _remote.createCategory(
-          userId: userId,
-          name: name,
-          type: CategoryModel.stringToProtoType(type),
-        );
+        await _remote.upsertCategory({
+          'id': id,
+          'user_id': userId,
+          'name': name,
+          'type': type,
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        });
       } catch (_) {}
     }());
   }

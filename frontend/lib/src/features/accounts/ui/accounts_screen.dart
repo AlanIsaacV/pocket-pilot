@@ -188,12 +188,9 @@ class _AccountCard extends StatelessWidget {
           _labelForType(account.type),
           style: theme.textTheme.bodySmall,
         ),
-        trailing: Text(
-          account.formattedBalance,
-          style: theme.textTheme.titleMedium?.copyWith(
-            color: colorScheme.primary,
-            fontWeight: FontWeight.bold,
-          ),
+        trailing: Icon(
+          Icons.chevron_right,
+          color: colorScheme.onSurfaceVariant,
         ),
       ),
     );
@@ -201,31 +198,39 @@ class _AccountCard extends StatelessWidget {
 
   IconData _iconForType(String type) {
     switch (type) {
-      case 'savings':
-        return Icons.savings_outlined;
+      case 'bank':
+        return Icons.account_balance_outlined;
       case 'credit_card':
         return Icons.credit_card;
       case 'cash':
         return Icons.payments_outlined;
       case 'investment':
         return Icons.trending_up;
+      case 'loan':
+        return Icons.request_quote_outlined;
+      case 'crypto':
+        return Icons.currency_bitcoin;
       default:
-        return Icons.account_balance_outlined;
+        return Icons.account_balance_wallet_outlined;
     }
   }
 
   String _labelForType(String type) {
     switch (type) {
-      case 'savings':
-        return 'Ahorro';
+      case 'bank':
+        return 'Banco';
       case 'credit_card':
         return 'Tarjeta de crédito';
       case 'cash':
         return 'Efectivo';
       case 'investment':
         return 'Inversión';
+      case 'loan':
+        return 'Préstamo';
+      case 'crypto':
+        return 'Criptomonedas';
       default:
-        return 'Cuenta corriente';
+        return 'Otra cuenta';
     }
   }
 }

@@ -16,6 +16,7 @@ import 'package:pocket_pilot/src/features/categories/data/category_local_store.d
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_remote_service.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/generated/pocket_pilot/v1/transaction_service.pbenum.dart';
 
 class TransactionRepository {
   final TransactionLocalStore _local;
@@ -44,19 +45,17 @@ class TransactionRepository {
   /// Descarga transacciones del servidor y las persiste en SQLite.
   /// Propaga errores para que el ViewModel pueda mostrarlos.
   Future<void> syncRemote(String userId) async {
-    final remoteTransactions = await _remote.listTransactions(userId);
-    final rows = remoteTransactions
+    final response = await _remote.listTransactions(userId);
+    final rows = response.transactions
         .map((proto) => {
               'id': proto.id,
               'user_id': proto.userId,
               'account_id': proto.accountId,
               'category_id': proto.categoryId,
-              'amount':
-                  proto.hasAmount() ? proto.amount.amountMinor.toInt() : 0,
-              'currency_code':
-                  proto.hasAmount() ? proto.amount.currencyCode : 'MXN',
+              'amount': proto.amountCents.toInt(),
+              'currency_code': proto.currencyCode,
               'description': proto.description,
-              'date': proto.date,
+              'date': proto.date.toDateTime().toIso8601String().substring(0, 10),
               'created_at': proto.createdAt.toDateTime().toIso8601String(),
               'updated_at': proto.updatedAt.toDateTime().toIso8601String(),
             })
@@ -112,12 +111,15 @@ class TransactionRepository {
 
     unawaited(() async {
       try {
-        await _remote.createTransaction(
+        await _remote.upsertTransaction(
+          id: id,
           userId: userId,
           accountId: accountId,
           categoryId: categoryId,
-          amountMinor: amountMinor,
+          type: TransactionType.TRANSACTION_TYPE_UNSPECIFIED,
+          amountCents: amountMinor,
           currencyCode: currencyCode,
+          status: 'confirmed',
           description: description,
           date: date,
         );

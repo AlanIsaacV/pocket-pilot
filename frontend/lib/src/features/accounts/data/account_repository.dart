@@ -1,107 +1,102 @@
 // ============================================================
-// AccountRepository — orquestación offline-first para cuentas
+// AccountRepository — capa de orquestación de la feature Accounts
 // ============================================================
 //
-// Patrón "offline-first":
-//   getAccounts()        → lee local (instantáneo)
-//   syncAndGetAccounts() → sincroniza con el servidor, persiste local, devuelve resultado
+// Patrón offline-first con Outbox:
+//   getAccounts()    → lee SQLite local (instantáneo, siempre funciona)
+//   createAccount()  → escribe en SQLite + encola en sync_outbox
+//   deleteAccount()  → soft-delete en SQLite + encola en sync_outbox
 //
-// Este repositorio no contiene SQL: delega toda persistencia en
-// AccountLocalStore y toda comunicación remota en AccountRemoteService.
+// El repositorio NO llama directamente al servidor.
+// SyncService es el responsable de flushear el outbox cuando hay conexión.
 
-import 'dart:async';
+import 'dart:convert';
 
+import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
-import 'package:pocket_pilot/src/features/accounts/data/account_remote_service.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
-import 'package:pocket_pilot/src/generated/pocket_pilot/v1/account_service.pbenum.dart';
 
 class AccountRepository {
   final AccountLocalStore _local;
-  final AccountRemoteService _remote;
+  final SyncOutbox _outbox;
 
   AccountRepository({
     required AccountLocalStore local,
-    required AccountRemoteService remote,
+    required SyncOutbox outbox,
   })  : _local = local,
-        _remote = remote;
+        _outbox = outbox;
 
   // ----------------------------------------------------------
-  // READ
+  // READ — siempre desde SQLite local
   // ----------------------------------------------------------
 
-  /// Lee las cuentas almacenadas localmente (sin contactar al servidor).
-  Future<List<AccountModel>> getAccounts(String userId) =>
-      _local.getAccounts(userId);
+  /// Lee las cuentas almacenadas localmente.
+  /// Nunca contacta al servidor; la sync es responsabilidad de SyncService.
+  Future<List<AccountModel>> getAccounts() => _local.getAccounts();
 
-  /// Descarga cuentas del servidor y las persiste en SQLite.
+  // ----------------------------------------------------------
+  // WRITE — local primero, luego outbox para sync posterior
+  // ----------------------------------------------------------
+
+  /// Crea una cuenta localmente y la encola para sync remoto.
   ///
-  /// A diferencia de [syncAndGetAccounts], este método propaga los errores
-  /// para que el ViewModel pueda mostrarlos al usuario.
-  Future<void> syncRemote(String userId) async {
-    final remoteAccounts = await _remote.listAccounts(userId);
-    await _local.upsertAll(
-      remoteAccounts.map(AccountModel.fromProto).toList(),
-    );
-  }
-
-  // ----------------------------------------------------------
-  // WRITE
-  // ----------------------------------------------------------
-
-  /// Crea una cuenta local primero (respuesta inmediata en UI),
-  /// luego intenta sincronizar con el servidor en background.
+  /// La UI responde inmediatamente (escribe en SQLite).
+  /// SyncService enviará la cuenta al servidor cuando haya conexión.
   Future<void> createAccount({
     required String id, // UUID generado en el cliente
     required String userId,
     required String name,
     required String type,
-    required int initialBalanceMinor,
-    required String currencyCode,
+    int? creditLimitCents,
+    int? statementDay,
+    int? paymentDueDay,
+    int? interestRateApr,
+    int? termMonths,
   }) async {
     final now = DateTime.now().toUtc();
-
-    // Construimos el modelo y lo persistimos localmente de inmediato.
-    await _local.upsert(AccountModel(
+    final model = AccountModel(
       id: id,
       userId: userId,
       name: name,
       type: type,
-      initialBalance: initialBalanceMinor,
-      currencyCode: currencyCode,
+      creditLimitCents: creditLimitCents,
+      statementDay: statementDay,
+      paymentDueDay: paymentDueDay,
+      interestRateApr: interestRateApr,
+      termMonths: termMonths,
       createdAt: now,
       updatedAt: now,
-    ));
+    );
 
-    // Sincroniza con el servidor en background.
-    unawaited(() async {
-      try {
-        await _remote.createAccount(
-          userId: userId,
-          name: name,
-          type: _stringToAccountType(type),
-          initialBalanceMinor: initialBalanceMinor,
-          currencyCode: currencyCode,
-        );
-      } catch (_) {
-        // TODO: en producción marcar como "pendiente de sync" y reintentar.
-      }
-    }());
+    // 1. Persistir localmente: UI actualizada inmediatamente.
+    await _local.upsert(model);
+
+    // 2. Encolar para sync: SyncService flushea cuando haya conexión.
+    // toServerMap() incluye user_id para el servidor.
+    await _outbox.enqueue(
+      entityType: 'account',
+      entityId: id,
+      operation: 'upsert',
+      payload: jsonEncode(model.toServerMap()),
+    );
   }
 
-  /// Convierte nuestro string de tipo al enum proto para enviarlo al servidor.
-  static AccountType _stringToAccountType(String type) {
-    switch (type) {
-      case 'savings':
-        return AccountType.ACCOUNT_TYPE_SAVINGS;
-      case 'credit_card':
-        return AccountType.ACCOUNT_TYPE_CREDIT_CARD;
-      case 'cash':
-        return AccountType.ACCOUNT_TYPE_CASH;
-      case 'investment':
-        return AccountType.ACCOUNT_TYPE_INVESTMENT;
-      default:
-        return AccountType.ACCOUNT_TYPE_CHECKING;
-    }
+  /// Elimina lógicamente una cuenta y encola el delete para sync remoto.
+  Future<void> deleteAccount(String id, String userId) async {
+    final now = DateTime.now().toUtc();
+
+    // 1. Soft delete local.
+    await _local.softDelete(id, now);
+
+    // 2. Encolar delete para el servidor.
+    await _outbox.enqueue(
+      entityType: 'account',
+      entityId: id,
+      operation: 'delete',
+      payload: jsonEncode({
+        'user_id': userId,
+        'deleted_at': now.toIso8601String(),
+      }),
+    );
   }
 }

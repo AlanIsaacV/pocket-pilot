@@ -24,12 +24,7 @@ class CategoryLocalStore {
   /// creación ascendente (las más antiguas primero).
   Future<List<CategoryModel>> getCategories(String userId) async {
     final db = await _db.database;
-    final rows = await db.query(
-      'categories',
-      where: 'user_id = ?',
-      whereArgs: [userId],
-      orderBy: 'created_at ASC',
-    );
+    final rows = await db.query('categories', orderBy: 'created_at ASC');
     return rows.map(CategoryModel.fromMap).toList();
   }
 

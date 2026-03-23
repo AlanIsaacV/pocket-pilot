@@ -30,12 +30,7 @@ class TransactionLocalStore {
   /// consultando la tabla de categorías.
   Future<List<Map<String, dynamic>>> queryRows(String userId) async {
     final db = await _db.database;
-    return db.query(
-      'transactions',
-      where: 'user_id = ?',
-      whereArgs: [userId],
-      orderBy: 'date DESC',
-    );
+    return db.query('transactions', orderBy: 'date DESC');
   }
 
   // ----------------------------------------------------------

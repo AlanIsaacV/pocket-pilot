@@ -3,10 +3,11 @@
 // ============================================================
 //
 // Responsabilidad única: ejecutar operaciones de base de datos
-// sobre la tabla `accounts`. No contiene lógica de negocio ni
-// llama a servicios remotos.
+// sobre la tabla `accounts`. No contiene lógica de negocio.
 //
-// El Repository llama a este store; el store NO conoce al Repository.
+// La tabla local es single-user (sin columna user_id).
+// El filtro por usuario vive en el servidor; localmente se asume
+// que toda la DB pertenece al usuario activo del dispositivo.
 
 import 'package:sqflite/sqflite.dart';
 
@@ -22,14 +23,13 @@ class AccountLocalStore {
   // READ
   // ----------------------------------------------------------
 
-  /// Retorna todas las cuentas no eliminadas del usuario, ordenadas
-  /// por fecha de creación descendente (más recientes primero).
-  Future<List<AccountModel>> getAccounts(String userId) async {
+  /// Retorna todas las cuentas activas (no eliminadas), ordenadas
+  /// por fecha de creación descendente.
+  Future<List<AccountModel>> getAccounts() async {
     final db = await _db.database;
     final rows = await db.query(
       'accounts',
-      where: 'user_id = ? AND deleted_at IS NULL',
-      whereArgs: [userId],
+      where: 'deleted_at IS NULL',
       orderBy: 'created_at DESC',
     );
     return rows.map(AccountModel.fromMap).toList();
@@ -40,7 +40,6 @@ class AccountLocalStore {
   // ----------------------------------------------------------
 
   /// Inserta o reemplaza una lista de cuentas en un solo batch.
-  /// Usado para sincronizar la respuesta del servidor.
   Future<void> upsertAll(List<AccountModel> accounts) async {
     final db = await _db.database;
     final batch = db.batch();
@@ -55,13 +54,23 @@ class AccountLocalStore {
   }
 
   /// Inserta o reemplaza una cuenta individual.
-  /// Usado para la escritura local inmediata al crear una cuenta.
   Future<void> upsert(AccountModel model) async {
     final db = await _db.database;
     await db.insert(
       'accounts',
       model.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Marca una cuenta como eliminada (soft delete) actualizando deleted_at.
+  Future<void> softDelete(String id, DateTime deletedAt) async {
+    final db = await _db.database;
+    await db.update(
+      'accounts',
+      {'deleted_at': deletedAt.toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 }

@@ -3,9 +3,8 @@
 // ============================================================
 
 import 'package:grpc/grpc.dart';
-// pbgrpc re-exporta pb.dart y pbenum.dart — un solo import cubre todo.
+import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/category_service.pbgrpc.dart';
-
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
 
 class CategoryRemoteService {
@@ -15,52 +14,78 @@ class CategoryRemoteService {
     _client = CategoryServiceClient(GrpcClient.channel);
   }
 
-  /// Lista todas las categorías del usuario.
-  /// Pasa [type] para filtrar por tipo, o usa CATEGORY_TYPE_UNSPECIFIED
-  /// para obtener todas.
-  Future<List<Category>> listCategories(String userId) async {
+  /// Lista categorías del usuario. Si [updatedSince] está definido,
+  /// solo retorna las modificadas después de ese timestamp.
+  Future<ListCategoriesResponse> listCategories(
+    String userId, {
+    DateTime? updatedSince,
+  }) async {
     try {
-      final response = await _client.listCategories(
-        // Sin filtro de tipo → el servidor retorna todas.
-        ListCategoriesRequest(userId: userId),
-      );
-      return response.categories;
+      final request = ListCategoriesRequest(userId: userId);
+      if (updatedSince != null) {
+        request.updatedSince = Timestamp.fromDateTime(updatedSince.toUtc());
+      }
+      return await _client.listCategories(request);
     } on GrpcError catch (e) {
       throw Exception('gRPC listCategories error: ${e.message}');
     }
   }
 
-  /// Crea una nueva categoría en el servidor.
-  Future<Category> createCategory({
-    required String userId,
-    required String name,
-    required CategoryType type,
-  }) async {
+  /// Crea o actualiza una categoría en el servidor.
+  Future<UpsertCategoryResponse> upsertCategory(Map<String, dynamic> map) async {
     try {
-      final response = await _client.createCategory(
-        CreateCategoryRequest(
-          userId: userId,
-          name: name,
-          type: type,
-        ),
+      final now = DateTime.now().toUtc();
+      final category = Category(
+        id: map['id'] as String,
+        userId: map['user_id'] as String,
+        name: map['name'] as String,
+        type: _stringToCategoryType(map['type'] as String),
+        icon: map['icon'] as String? ?? '',
+        color: map['color'] as String? ?? '',
+        parentId: map['parent_id'] as String? ?? '',
+        createdAt: Timestamp.fromDateTime(
+            map['created_at'] != null
+                ? DateTime.parse(map['created_at'] as String).toUtc()
+                : now),
+        updatedAt: Timestamp.fromDateTime(
+            map['updated_at'] != null
+                ? DateTime.parse(map['updated_at'] as String).toUtc()
+                : now),
       );
-      return response.category;
+      return await _client.upsertCategory(UpsertCategoryRequest(category: category));
     } on GrpcError catch (e) {
-      throw Exception('gRPC createCategory error: ${e.message}');
+      throw Exception('gRPC upsertCategory error: ${e.message}');
     }
   }
 
-  /// Elimina una categoría.
+  /// Elimina lógicamente una categoría.
   Future<void> deleteCategory({
+    required String id,
     required String userId,
-    required String categoryId,
+    DateTime? deletedAt,
   }) async {
     try {
       await _client.deleteCategory(
-        DeleteCategoryRequest(userId: userId, categoryId: categoryId),
+        DeleteCategoryRequest(
+          id: id,
+          userId: userId,
+          deletedAt: Timestamp.fromDateTime(
+              (deletedAt ?? DateTime.now()).toUtc()),
+        ),
       );
     } on GrpcError catch (e) {
       throw Exception('gRPC deleteCategory error: ${e.message}');
+    }
+  }
+
+  static CategoryType _stringToCategoryType(String type) {
+    switch (type) {
+      case 'income':
+        return CategoryType.CATEGORY_TYPE_INCOME;
+      case 'expense':
+        return CategoryType.CATEGORY_TYPE_EXPENSE;
+      default:
+        return CategoryType.CATEGORY_TYPE_UNSPECIFIED;
     }
   }
 }

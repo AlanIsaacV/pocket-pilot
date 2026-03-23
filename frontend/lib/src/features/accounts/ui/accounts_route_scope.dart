@@ -5,24 +5,24 @@
 // Responsabilidad única: armar el grafo de dependencias de la feature
 // Accounts y proveer el ViewModel al subárbol de widgets.
 //
-// Al entrar a la ruta /accounts, go_router construye este widget.
-// El ChangeNotifierProvider llama a `create` una sola vez (lazy).
-// Al salir de la ruta, Provider llama a dispose() en el ViewModel
-// automáticamente — sin memory leaks.
-//
 // Árbol de dependencias que monta este scope:
 //   context.read<DatabaseHelper>()
-//     └─ AccountLocalStore(db)         ← DAO, solo SQL
-//   AccountRemoteService()             ← usa GrpcClient.channel internamente
-//   AccountRepository(local, remote)   ← orquestación offline-first
-//   AccountsViewModel(repository)      ← estado de la UI
+//     └─ AccountLocalStore(db)          ← DAO, solo SQL
+//   context.read<SyncOutbox>()          ← compartido con SyncService
+//   AccountRepository(local, outbox)    ← local-first + encola en outbox
+//   context.read<SyncService>()         ← singleton global de sync
+//   AccountsViewModel(repository, sync) ← estado de la UI
+//
+// Nota: AccountRepository ya no habla directamente con el servidor.
+// SyncService (provisto desde main.dart) gestiona todas las operaciones remotas.
 
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
+import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
+import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
-import 'package:pocket_pilot/src/features/accounts/data/account_remote_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_repository.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
 
@@ -36,13 +36,19 @@ class AccountsRouteScope extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (ctx) {
         final db = ctx.read<DatabaseHelper>();
+        final outbox = ctx.read<SyncOutbox>();
+        final syncService = ctx.read<SyncService>();
+
         final localStore = AccountLocalStore(db: db);
-        final remoteService = AccountRemoteService();
         final repository = AccountRepository(
           local: localStore,
-          remote: remoteService,
+          outbox: outbox,
         );
-        return AccountsViewModel(repository: repository)..loadOnAppear();
+
+        return AccountsViewModel(
+          repository: repository,
+          syncService: syncService,
+        )..loadOnAppear();
       },
       child: child,
     );

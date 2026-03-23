@@ -37,10 +37,17 @@ class DatabaseHelper {
     return openDatabase(
       dbPath,
       version: _version,
-      onCreate: (db, version) =>
-          MigrationsRunner.run(db, from: 0, to: version),
+      onCreate: (db, version) => MigrationsRunner.run(db, from: 0, to: version),
       onUpgrade: (db, oldVersion, newVersion) =>
           MigrationsRunner.run(db, from: oldVersion, to: newVersion),
     );
+  }
+
+  /// Cierra y borra la base de datos local. Llamar al cerrar sesión.
+  static Future<void> deleteAndReset() async {
+    await _instance._db?.close();
+    _instance._db = null;
+    final dbPath = join(await getDatabasesPath(), 'pocket_pilot.db');
+    await databaseFactory.deleteDatabase(dbPath);
   }
 }

@@ -25,6 +25,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/account_form_screen.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_route_scope.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_screen.dart';
+import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_route_scope.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_screen.dart';
 import 'package:pocket_pilot/src/features/categories/ui/category_form_screen.dart';
@@ -93,7 +94,9 @@ GoRouter buildRouter() {
         routes: [
           GoRoute(
             path: 'new',
-            builder: (context, state) => const CategoryFormScreen(),
+            builder: (context, state) => CategoryFormScreen(
+              parent: state.extra as CategoryModel?,
+            ),
           ),
         ],
       ),

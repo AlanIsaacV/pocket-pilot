@@ -1,40 +1,16 @@
-// ============================================================
-// Modelo de dominio: Cuenta
-// ============================================================
-//
-// Los modelos de dominio son objetos Dart puros (PODOs) que
-// no dependen de Flutter ni de librerías externas.
-//
-// Dos constructores factory:
-//   fromProto() → convierte la respuesta gRPC al modelo
-//   fromMap()   → convierte una fila SQLite al modelo
-//
-// Dos serializadores:
-//   toMap()       → para SQLite local (sin user_id, no existe esa columna)
-//   toServerMap() → para el outbox payload (incluye user_id para el server)
-
 import 'package:fixnum/fixnum.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/account_service.pbgrpc.dart';
 
 class AccountModel {
   final String id;
-
-  /// ID del usuario al que pertenece esta cuenta.
-  /// No se almacena localmente (la DB local es single-user).
-  /// Solo se usa al construir protos para enviar al servidor.
-  final String userId;
-
   final String name;
 
-  /// Tipo de cuenta como string: 'bank', 'cash', 'credit_card',
-  /// 'loan', 'investment', 'crypto', 'other'.
+  /// Tipo de cuenta: 'bank', 'cash', 'credit_card', 'loan', 'investment', 'crypto', 'other'.
   final String type;
 
   final int? creditLimitCents;
   final int? statementDay;
   final int? paymentDueDay;
-
-  /// Tasa de interés APR como entero (representación interna del servidor).
   final int? interestRateApr;
   final int? termMonths;
   final DateTime createdAt;
@@ -43,7 +19,6 @@ class AccountModel {
 
   const AccountModel({
     required this.id,
-    required this.userId,
     required this.name,
     required this.type,
     this.creditLimitCents,
@@ -56,13 +31,9 @@ class AccountModel {
     this.deletedAt,
   });
 
-  // ----------------------------------------------------------
-  // Factory: desde proto gRPC
-  // ----------------------------------------------------------
   factory AccountModel.fromProto(Account proto) {
     return AccountModel(
       id: proto.id,
-      userId: proto.userId,
       name: proto.name,
       type: _accountTypeToString(proto.type),
       creditLimitCents: proto.creditLimitCents != Int64.ZERO
@@ -75,18 +46,14 @@ class AccountModel {
       termMonths: proto.termMonths != 0 ? proto.termMonths : null,
       createdAt: proto.createdAt.toDateTime().toUtc(),
       updatedAt: proto.updatedAt.toDateTime().toUtc(),
-      deletedAt: proto.hasDeletedAt() ? proto.deletedAt.toDateTime().toUtc() : null,
+      deletedAt:
+          proto.hasDeletedAt() ? proto.deletedAt.toDateTime().toUtc() : null,
     );
   }
 
-  // ----------------------------------------------------------
-  // Factory: desde fila SQLite
-  // ----------------------------------------------------------
   factory AccountModel.fromMap(Map<String, dynamic> map) {
     return AccountModel(
       id: map['id'] as String,
-      // user_id no se almacena en SQLite local; se usa '' como fallback.
-      userId: map['user_id'] as String? ?? '',
       name: map['name'] as String,
       type: map['type'] as String,
       creditLimitCents: map['credit_limit_cents'] as int?,
@@ -102,9 +69,7 @@ class AccountModel {
     );
   }
 
-  // ----------------------------------------------------------
-  // Serialización: hacia SQLite local (sin user_id)
-  // ----------------------------------------------------------
+  /// Serialización hacia SQLite local.
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -121,18 +86,10 @@ class AccountModel {
     };
   }
 
-  /// Map completo para el payload del outbox.
-  /// Incluye user_id porque el servidor lo necesita al recibir el push.
-  Map<String, dynamic> toServerMap() {
-    return {
-      ...toMap(),
-      'user_id': userId,
-    };
-  }
+  /// Payload para el outbox (lo que se envía al servidor).
+  /// No incluye user_id: el servidor lo lee del token de auth.
+  Map<String, dynamic> toServerMap() => toMap();
 
-  // ----------------------------------------------------------
-  // Conversión entre string y enum proto (bidireccional)
-  // ----------------------------------------------------------
   static String _accountTypeToString(AccountType type) {
     switch (type) {
       case AccountType.ACCOUNT_TYPE_BANK:

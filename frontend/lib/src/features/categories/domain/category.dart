@@ -1,80 +1,83 @@
-// ============================================================
-// Modelo de dominio: Categoría
-// ============================================================
-
-// pbgrpc re-exporta category_service.pb.dart (Category) y pbenum.dart (CategoryType).
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/category_service.pbgrpc.dart';
 
 class CategoryModel {
   final String id;
   final String name;
+  final String icon;
+  final String color;
+  final String? parentId;
 
   /// Tipo de categoría: 'income' (ingreso) o 'expense' (gasto).
   final String type;
 
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? deletedAt;
 
   const CategoryModel({
     required this.id,
     required this.name,
+    this.icon = '',
+    this.color = '',
+    this.parentId,
     required this.type,
     required this.createdAt,
     required this.updatedAt,
+    this.deletedAt,
   });
 
-  // ----------------------------------------------------------
-  // Factory: desde proto gRPC
-  // ----------------------------------------------------------
   factory CategoryModel.fromProto(Category proto) {
     return CategoryModel(
       id: proto.id,
       name: proto.name,
+      icon: proto.icon,
+      color: proto.color,
+      parentId: proto.parentId.isNotEmpty ? proto.parentId : null,
       type: _categoryTypeToString(proto.type),
-      createdAt: proto.createdAt.toDateTime(),
-      updatedAt: proto.updatedAt.toDateTime(),
+      createdAt: proto.createdAt.toDateTime().toUtc(),
+      updatedAt: proto.updatedAt.toDateTime().toUtc(),
+      deletedAt:
+          proto.hasDeletedAt() ? proto.deletedAt.toDateTime().toUtc() : null,
     );
   }
 
-  // ----------------------------------------------------------
-  // Factory: desde fila SQLite (Map<String, dynamic>)
-  // ----------------------------------------------------------
   factory CategoryModel.fromMap(Map<String, dynamic> map) {
     return CategoryModel(
       id: map['id'] as String,
       name: map['name'] as String,
+      icon: map['icon'] as String? ?? '',
+      color: map['color'] as String? ?? '',
+      parentId: map['parent_id'] as String?,
       type: map['type'] as String,
-      createdAt: DateTime.parse(map['created_at'] as String),
-      updatedAt: DateTime.parse(map['updated_at'] as String),
+      createdAt: DateTime.parse(map['created_at'] as String).toUtc(),
+      updatedAt: DateTime.parse(map['updated_at'] as String).toUtc(),
+      deletedAt: map['deleted_at'] != null
+          ? DateTime.parse(map['deleted_at'] as String).toUtc()
+          : null,
     );
   }
 
-  // ----------------------------------------------------------
-  // Serialización: hacia SQLite
-  // ----------------------------------------------------------
+  /// Serialización hacia SQLite local.
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'name': name,
+      'icon': icon,
+      'color': color,
+      'parent_id': parentId,
       'type': type,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'deleted_at': deletedAt?.toIso8601String(),
     };
   }
 
-  // ----------------------------------------------------------
-  // Helpers
-  // ----------------------------------------------------------
+  /// Payload para el outbox. No incluye user_id: el servidor lo lee del token.
+  Map<String, dynamic> toServerMap() => toMap();
 
-  /// true si esta categoría es de tipo gasto.
   bool get isExpense => type == 'expense';
-
-  /// true si esta categoría es de tipo ingreso.
   bool get isIncome => type == 'income';
 
-  // ----------------------------------------------------------
-  // Conversión interna
-  // ----------------------------------------------------------
   static String _categoryTypeToString(CategoryType type) {
     switch (type) {
       case CategoryType.CATEGORY_TYPE_INCOME:
@@ -86,7 +89,6 @@ class CategoryModel {
     }
   }
 
-  /// Convierte nuestro string de tipo al enum proto para enviar al servidor.
   static CategoryType stringToProtoType(String type) {
     return type == 'income'
         ? CategoryType.CATEGORY_TYPE_INCOME

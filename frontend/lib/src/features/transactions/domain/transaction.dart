@@ -13,7 +13,6 @@ import 'package:pocket_pilot/src/generated/pocket_pilot/v1/transaction_service.p
 
 class TransactionModel {
   final String id;
-  final String userId;
   final String accountId;
   final String categoryId;
 
@@ -25,8 +24,6 @@ class TransactionModel {
 
   /// Fecha de la transacción como string ISO 8601 (YYYY-MM-DD).
   /// Ej: "2026-03-14"
-  /// El proto lo define como String porque es una fecha de calendario,
-  /// no un instante con zona horaria.
   final String date;
 
   final DateTime createdAt;
@@ -39,7 +36,6 @@ class TransactionModel {
 
   const TransactionModel({
     required this.id,
-    required this.userId,
     required this.accountId,
     required this.categoryId,
     required this.amount,
@@ -62,7 +58,6 @@ class TransactionModel {
   }) {
     return TransactionModel(
       id: proto.id,
-      userId: proto.userId,
       accountId: proto.accountId,
       categoryId: proto.categoryId,
       amount: proto.amountCents.toInt(),
@@ -84,7 +79,6 @@ class TransactionModel {
   }) {
     return TransactionModel(
       id: map['id'] as String,
-      userId: map['user_id'] as String,
       accountId: map['account_id'] as String,
       categoryId: map['category_id'] as String,
       amount: map['amount'] as int,
@@ -103,11 +97,28 @@ class TransactionModel {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'user_id': userId,
       'account_id': accountId,
       'category_id': categoryId,
       'amount': amount,
       'currency_code': currencyCode,
+      'description': description,
+      'date': date,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
+  /// Payload para el outbox. Incluye type y status que el servidor necesita.
+  /// No incluye user_id: el servidor lo lee del token.
+  Map<String, dynamic> toServerMap() {
+    return {
+      'id': id,
+      'account_id': accountId,
+      'category_id': categoryId,
+      'type': 'unspecified',
+      'amount': amount,
+      'currency_code': currencyCode,
+      'status': 'confirmed',
       'description': description,
       'date': date,
       'created_at': createdAt.toIso8601String(),

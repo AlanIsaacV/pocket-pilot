@@ -16,15 +16,14 @@ enum CategoryType {
 
 message Category {
   string id = 1;
-  string user_id = 2;
-  string name = 3;
-  string icon = 4;
-  string color = 5;
-  string parent_id = 6;
-  CategoryType type = 7;
-  google.protobuf.Timestamp created_at = 8;
-  google.protobuf.Timestamp updated_at = 9;
-  google.protobuf.Timestamp deleted_at = 10;
+  string name = 2;
+  string icon = 3;
+  string color = 4;
+  string parent_id = 5;
+  CategoryType type = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  google.protobuf.Timestamp deleted_at = 9;
 }
 
 service CategoryService {
@@ -34,9 +33,8 @@ service CategoryService {
 }
 
 message ListCategoriesRequest {
-  string user_id = 1;
-  google.protobuf.Timestamp updated_since = 2;
-  PageRequest page = 3;
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
 }
 
 message ListCategoriesResponse {
@@ -56,6 +54,5 @@ message UpsertCategoryResponse {
 
 message DeleteCategoryRequest {
   string id = 1;
-  string user_id = 2;
-  google.protobuf.Timestamp deleted_at = 3;
+  google.protobuf.Timestamp deleted_at = 2;
 }

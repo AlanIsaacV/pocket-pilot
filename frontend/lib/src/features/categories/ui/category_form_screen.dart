@@ -2,8 +2,9 @@
 // CategoryFormScreen — Formulario de categoría (placeholder UI)
 // ============================================================
 //
-// Pantalla de creación/edición de categoría. Solo UI por ahora.
-// El botón Guardar está deshabilitado hasta implementar el ViewModel.
+// Pantalla de creación de categoría.
+// Si se pasa [parent], los campos tipo y color se pre-llenan con
+// los valores del padre (el usuario puede cambiarlos libremente).
 //
 // TODO: conectar a un CategoryFormViewModel para persistir via SyncOutbox.
 
@@ -12,9 +13,14 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
+import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 
 class CategoryFormScreen extends StatefulWidget {
-  const CategoryFormScreen({super.key});
+  /// Categoría padre. Cuando se proporciona, tipo y color se pre-llenan
+  /// con los valores del padre.
+  final CategoryModel? parent;
+
+  const CategoryFormScreen({this.parent, super.key});
 
   @override
   State<CategoryFormScreen> createState() => _CategoryFormScreenState();
@@ -23,8 +29,18 @@ class CategoryFormScreen extends StatefulWidget {
 class _CategoryFormScreenState extends State<CategoryFormScreen> {
   final _nameController = TextEditingController();
 
-  String _type = 'expense'; // 'income' | 'expense'
-  Color _selectedColor = AppColors.categoryGreen;
+  late String _type;
+  late Color _selectedColor;
+
+  @override
+  void initState() {
+    super.initState();
+    final parent = widget.parent;
+    _type = parent?.type ?? 'expense';
+    _selectedColor = parent != null
+        ? _hexToColor(parent.color)
+        : AppColors.categoryPresets.first;
+  }
 
   @override
   void dispose() {
@@ -34,9 +50,11 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final parent = widget.parent;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nueva categoría'),
+        title: Text(parent != null ? 'Nueva subcategoría' : 'Nueva categoría'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: () => Navigator.of(context).maybePop(),
@@ -47,12 +65,16 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (parent != null) ...[
+              _ParentBadge(parent: parent),
+              const SizedBox(height: 24),
+            ],
             _SectionLabel('Nombre'),
             const SizedBox(height: 8),
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(
-                hintText: 'Ej. Alimentación, Salario...',
+                hintText: 'Ej. Supermercado, Freelance...',
               ),
               textCapitalization: TextCapitalization.sentences,
             ),
@@ -81,6 +103,67 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Convierte un string hexadecimal (#RRGGBB) a Color.
+  /// Devuelve el primer preset si el string es inválido.
+  static Color _hexToColor(String hex) {
+    try {
+      final sanitized = hex.replaceFirst('#', '');
+      if (sanitized.length != 6) return AppColors.categoryPresets.first;
+      return Color(int.parse('FF$sanitized', radix: 16));
+    } catch (_) {
+      return AppColors.categoryPresets.first;
+    }
+  }
+}
+
+// ============================================================
+// Badge que muestra la categoría padre
+// ============================================================
+
+class _ParentBadge extends StatelessWidget {
+  final CategoryModel parent;
+
+  const _ParentBadge({required this.parent});
+
+  @override
+  Widget build(BuildContext context) {
+    final dotColor = parent.isIncome ? AppColors.primary : AppColors.error;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevatedDark,
+        borderRadius: AppTheme.radiusSmall,
+        border: Border.all(color: AppColors.surfaceElevatedDark),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            'Subcategoría de ',
+            style: GoogleFonts.ibmPlexSans(
+              fontSize: 13,
+              color: AppColors.textMutedDark,
+            ),
+          ),
+          Text(
+            parent.name,
+            style: GoogleFonts.ibmPlexSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimaryDark,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -207,7 +290,7 @@ class _ToggleOption extends StatelessWidget {
 }
 
 // ============================================================
-// Color picker (12 presets en scroll horizontal)
+// Color picker (presets en scroll horizontal)
 // ============================================================
 
 class _ColorPicker extends StatelessWidget {

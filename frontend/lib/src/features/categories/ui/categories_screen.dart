@@ -86,8 +86,11 @@ class _CategoryList extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
-                (context, index) =>
-                    _CategoryRow(category: vm.incomeCategories[index]),
+                (context, index) => _CategoryRow(
+                  category: vm.incomeCategories[index],
+                  onAddChild: (cat) =>
+                      context.go('/categories/new', extra: cat),
+                ),
                 childCount: vm.incomeCategories.length,
               ),
             ),
@@ -104,8 +107,11 @@ class _CategoryList extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
-                (context, index) =>
-                    _CategoryRow(category: vm.expenseCategories[index]),
+                (context, index) => _CategoryRow(
+                  category: vm.expenseCategories[index],
+                  onAddChild: (cat) =>
+                      context.go('/categories/new', extra: cat),
+                ),
                 childCount: vm.expenseCategories.length,
               ),
             ),
@@ -163,13 +169,16 @@ class _SectionHeader extends StatelessWidget {
 
 class _CategoryRow extends StatelessWidget {
   final CategoryModel category;
+  final ValueChanged<CategoryModel> onAddChild;
 
-  const _CategoryRow({required this.category});
+  const _CategoryRow({
+    required this.category,
+    required this.onAddChild,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final dotColor =
-        category.isIncome ? AppColors.primary : AppColors.error;
+    final dotColor = category.isIncome ? AppColors.primary : AppColors.error;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -201,10 +210,24 @@ class _CategoryRow extends StatelessWidget {
               color: AppColors.textPrimaryDark,
             ),
           ),
-          trailing: Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.textMutedDark,
-            size: 18,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.add, size: 18),
+                color: AppColors.textMutedDark,
+                tooltip: 'Agregar subcategoría',
+                onPressed: () => onAddChild(category),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textMutedDark,
+                size: 18,
+              ),
+            ],
           ),
         ),
       ),

@@ -17,19 +17,18 @@ enum TransactionType {
 
 message Transaction {
   string id = 1;
-  string user_id = 2;
-  string account_id = 3;
-  string category_id = 4;
-  TransactionType type = 5;
-  int64 amount_cents = 6;
-  string currency_code = 7;
-  string status = 8;
-  repeated string tags = 9;
-  string description = 10;
-  google.protobuf.Timestamp date = 11;
-  google.protobuf.Timestamp created_at = 12;
-  google.protobuf.Timestamp updated_at = 13;
-  google.protobuf.Timestamp deleted_at = 14;
+  string account_id = 2;
+  string category_id = 3;
+  TransactionType type = 4;
+  int64 amount_cents = 5;
+  string currency_code = 6;
+  string status = 7;
+  repeated string tags = 8;
+  string description = 9;
+  google.protobuf.Timestamp date = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  google.protobuf.Timestamp deleted_at = 13;
 }
 
 service TransactionService {
@@ -39,9 +38,8 @@ service TransactionService {
 }
 
 message ListTransactionsRequest {
-  string user_id = 1;
-  google.protobuf.Timestamp updated_since = 2;
-  PageRequest page = 3;
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
 }
 
 message ListTransactionsResponse {
@@ -61,6 +59,5 @@ message UpsertTransactionResponse {
 
 message DeleteTransactionRequest {
   string id = 1;
-  string user_id = 2;
-  google.protobuf.Timestamp deleted_at = 3;
+  google.protobuf.Timestamp deleted_at = 2;
 }

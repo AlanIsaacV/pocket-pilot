@@ -10,11 +10,10 @@ option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/pro
 
 message Tag {
   string id = 1;
-  string user_id = 2;
-  string name = 3;
-  google.protobuf.Timestamp created_at = 4;
-  google.protobuf.Timestamp updated_at = 5;
-  google.protobuf.Timestamp deleted_at = 6;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp updated_at = 4;
+  google.protobuf.Timestamp deleted_at = 5;
 }
 
 service TagService {
@@ -24,9 +23,8 @@ service TagService {
 }
 
 message ListTagsRequest {
-  string user_id = 1;
-  google.protobuf.Timestamp updated_since = 2;
-  PageRequest page = 3;
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
 }
 
 message ListTagsResponse {
@@ -46,6 +44,5 @@ message UpsertTagResponse {
 
 message DeleteTagRequest {
   string id = 1;
-  string user_id = 2;
-  google.protobuf.Timestamp deleted_at = 3;
+  google.protobuf.Timestamp deleted_at = 2;
 }

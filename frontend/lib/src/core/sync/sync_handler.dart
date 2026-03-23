@@ -1,15 +1,3 @@
-// ============================================================
-// SyncHandler — interfaz que cada entidad debe implementar
-// ============================================================
-//
-// SyncService no conoce los detalles de cada entidad. En su lugar,
-// trabaja con una lista de SyncHandler, uno por tipo de entidad.
-// Cada handler sabe cómo:
-//   - Hacer un pull delta desde el servidor.
-//   - Guardar un item del servidor en SQLite local.
-//   - Hacer push de una entrada pendiente del outbox al servidor.
-//   - Enviar un soft-delete al servidor.
-
 /// Resultado del pull: lista de items del servidor + timestamp del servidor.
 class SyncPullResult {
   final List<SyncItem> items;
@@ -28,7 +16,7 @@ class SyncItem {
   /// updated_at del servidor, usado para la resolución de conflictos LWW.
   final DateTime updatedAt;
 
-  /// Datos del item en formato Map (sin user_id, para guardar en SQLite local).
+  /// Datos del item en formato Map (para guardar en SQLite local).
   final Map<String, dynamic> data;
 
   const SyncItem({
@@ -51,6 +39,7 @@ class SyncPushResult {
 }
 
 /// Contrato que cada entidad implementa para participar en el ciclo de sync.
+/// El user_id ya NO se pasa aquí: el servidor lo extrae del token de auth.
 abstract class SyncHandler {
   /// Identificador del tipo de entidad: 'account', 'category', 'tag', 'transaction'.
   String get entityType;
@@ -59,18 +48,14 @@ abstract class SyncHandler {
   ///
   /// Si [updatedSince] es null → primer sync (trae todos los registros activos).
   /// Si [updatedSince] está definido → delta sync (solo registros más recientes).
-  Future<SyncPullResult> pull(String userId, DateTime? updatedSince);
+  Future<SyncPullResult> pull(DateTime? updatedSince);
 
   /// Guarda un item del servidor en SQLite local.
-  /// [data] es el Map retornado por [SyncItem.data] o [SyncPushResult.serverData].
   Future<void> saveLocally(Map<String, dynamic> data);
 
   /// Push de un upsert pendiente al servidor.
-  ///
-  /// [payloadJson] es el JSON guardado en sync_outbox (incluye user_id).
-  /// Retorna el resultado con conflict_resolved y, si aplica, la versión del servidor.
   Future<SyncPushResult> pushUpsert(String payloadJson);
 
   /// Push de un soft-delete pendiente al servidor.
-  Future<void> pushDelete(String entityId, String userId, DateTime deletedAt);
+  Future<void> pushDelete(String entityId, DateTime deletedAt);
 }

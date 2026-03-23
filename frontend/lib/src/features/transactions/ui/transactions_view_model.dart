@@ -8,22 +8,26 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:pocket_pilot/src/core/constants/constants.dart';
+import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 
 class TransactionsViewModel extends ChangeNotifier {
   final TransactionRepository _repository;
+  final SyncService _syncService;
 
   List<TransactionModel> transactions = [];
   bool isLoading = false;
   bool isSyncing = false;
   String? errorMessage;
 
-  DateTime? _lastRemoteSyncAt;
+  DateTime? _lastSyncAt;
 
-  TransactionsViewModel({required TransactionRepository repository})
-      : _repository = repository;
+  TransactionsViewModel({
+    required TransactionRepository repository,
+    required SyncService syncService,
+  })  : _repository = repository,
+        _syncService = syncService;
 
   // ----------------------------------------------------------
   // API pública
@@ -33,36 +37,36 @@ class TransactionsViewModel extends ChangeNotifier {
     unawaited(_loadLocalThenMaybeSync());
   }
 
-  Future<void> refresh() => _syncRemote();
+  Future<void> refresh() => _runSync();
 
   // ----------------------------------------------------------
   // Implementación interna
   // ----------------------------------------------------------
 
   Future<void> _loadLocalThenMaybeSync() async {
-    transactions = await _repository.getTransactions(kHardcodedUserId);
+    transactions = await _repository.getTransactions();
     notifyListeners();
     await _maybeSyncRemote();
   }
 
   Future<void> _maybeSyncRemote() async {
-    final last = _lastRemoteSyncAt;
+    final last = _lastSyncAt;
     if (last != null &&
         DateTime.now().difference(last) < const Duration(seconds: 5)) {
       return;
     }
-    await _syncRemote();
+    await _runSync();
   }
 
-  Future<void> _syncRemote() async {
+  Future<void> _runSync() async {
     isLoading = transactions.isEmpty;
     isSyncing = true;
     notifyListeners();
 
     try {
-      await _repository.syncRemote(kHardcodedUserId);
-      transactions = await _repository.getTransactions(kHardcodedUserId);
-      _lastRemoteSyncAt = DateTime.now();
+      await _syncService.sync();
+      transactions = await _repository.getTransactions();
+      _lastSyncAt = DateTime.now();
       errorMessage = null;
     } catch (e) {
       errorMessage = e.toString();

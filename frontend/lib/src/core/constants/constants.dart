@@ -2,10 +2,6 @@
 // Constantes globales de la aplicación
 // ============================================================
 
-/// ID de usuario hardcodeado para el MVP (sin autenticación real).
-/// En una app de producción esto vendría de un sistema de auth (Firebase, Auth0, etc.)
-const kHardcodedUserId = '00000000-0000-0000-0000-000000000001';
-
 /// Host del servidor gRPC.
 ///
 /// Se puede sobreescribir en tiempo de compilación:

@@ -11,10 +11,10 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
 	pb "github.com/AlanIsaacV/pocket-pilot/internal/gen/proto/pocket_pilot/v1/pocket_pilot/v1"
 )
 
-// Handler implements pb.TransactionServiceServer.
 type Handler struct {
 	pb.UnimplementedTransactionServiceServer
 	repo *Repository
@@ -25,6 +25,14 @@ func NewHandler(repo *Repository) *Handler {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+func parseUUID(s, field string) (uuid.UUID, error) {
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.UUID{}, status.Errorf(codes.InvalidArgument, "invalid %s: %v", field, err)
+	}
+	return id, nil
+}
 
 func parsePage(req *pb.PageRequest) (limit, offset int) {
 	limit = 20
@@ -81,7 +89,6 @@ func stringToTransactionType(s string) pb.TransactionType {
 func toProto(t *Transaction) *pb.Transaction {
 	proto := &pb.Transaction{
 		Id:           t.ID.String(),
-		UserId:       t.UserID.String(),
 		AccountId:    t.AccountID.String(),
 		CategoryId:   t.CategoryID.String(),
 		Type:         stringToTransactionType(t.Type),
@@ -100,20 +107,16 @@ func toProto(t *Transaction) *pb.Transaction {
 	return proto
 }
 
-func fromProto(p *pb.Transaction) (*Transaction, error) {
-	id, err := uuid.Parse(p.Id)
+func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
+	id, err := parseUUID(p.Id, "transaction.id")
 	if err != nil {
 		return nil, err
 	}
-	userID, err := uuid.Parse(p.UserId)
+	accountID, err := parseUUID(p.AccountId, "transaction.account_id")
 	if err != nil {
 		return nil, err
 	}
-	accountID, err := uuid.Parse(p.AccountId)
-	if err != nil {
-		return nil, err
-	}
-	categoryID, err := uuid.Parse(p.CategoryId)
+	categoryID, err := parseUUID(p.CategoryId, "transaction.category_id")
 	if err != nil {
 		return nil, err
 	}
@@ -142,11 +145,10 @@ func fromProto(p *pb.Transaction) (*Transaction, error) {
 
 // ── RPC handlers ──────────────────────────────────────────────────────────────
 
-// ListTransactions supports delta sync via updated_since.
 func (h *Handler) ListTransactions(ctx context.Context, req *pb.ListTransactionsRequest) (*pb.ListTransactionsResponse, error) {
-	userID, err := uuid.Parse(req.UserId)
+	userID, err := middleware.UserIDFromCtx(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
+		return nil, err
 	}
 
 	var updatedSince *time.Time
@@ -173,22 +175,24 @@ func (h *Handler) ListTransactions(ctx context.Context, req *pb.ListTransactions
 
 	return &pb.ListTransactionsResponse{
 		Transactions: pbTxs,
-		Page: &pb.PageResponse{
-			NextPageToken: nextToken,
-		},
-		SyncedAt: timestamppb.New(syncedAt),
+		Page:         &pb.PageResponse{NextPageToken: nextToken},
+		SyncedAt:     timestamppb.New(syncedAt),
 	}, nil
 }
 
-// UpsertTransaction creates or updates a transaction using Last Write Wins.
 func (h *Handler) UpsertTransaction(ctx context.Context, req *pb.UpsertTransactionRequest) (*pb.UpsertTransactionResponse, error) {
 	if req.Transaction == nil {
 		return nil, status.Error(codes.InvalidArgument, "transaction is required")
 	}
 
-	t, err := fromProto(req.Transaction)
+	userID, err := middleware.UserIDFromCtx(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction: %v", err)
+		return nil, err
+	}
+
+	t, err := fromProto(req.Transaction, userID)
+	if err != nil {
+		return nil, err
 	}
 
 	result, conflictResolved, err := h.repo.Upsert(ctx, t)
@@ -197,20 +201,20 @@ func (h *Handler) UpsertTransaction(ctx context.Context, req *pb.UpsertTransacti
 	}
 
 	return &pb.UpsertTransactionResponse{
-		Transaction:     toProto(result),
+		Transaction:      toProto(result),
 		ConflictResolved: conflictResolved,
 	}, nil
 }
 
-// DeleteTransaction soft-deletes a transaction using Last Write Wins on deleted_at.
 func (h *Handler) DeleteTransaction(ctx context.Context, req *pb.DeleteTransactionRequest) (*emptypb.Empty, error) {
-	id, err := uuid.Parse(req.Id)
+	userID, err := middleware.UserIDFromCtx(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid id: %v", err)
+		return nil, err
 	}
-	userID, err := uuid.Parse(req.UserId)
+
+	id, err := parseUUID(req.Id, "id")
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
+		return nil, err
 	}
 
 	var deletedAt time.Time

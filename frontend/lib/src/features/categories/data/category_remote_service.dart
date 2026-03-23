@@ -1,27 +1,22 @@
-// ============================================================
-// CategoryRemoteService — wrapper delgado de gRPC para categorías
-// ============================================================
-
 import 'package:grpc/grpc.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/category_service.pbgrpc.dart';
+import 'package:pocket_pilot/src/core/grpc/auth_interceptor.dart';
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
 
 class CategoryRemoteService {
   late final CategoryServiceClient _client;
 
   CategoryRemoteService() {
-    _client = CategoryServiceClient(GrpcClient.channel);
+    _client = CategoryServiceClient(
+      GrpcClient.channel,
+      interceptors: [const AuthInterceptor()],
+    );
   }
 
-  /// Lista categorías del usuario. Si [updatedSince] está definido,
-  /// solo retorna las modificadas después de ese timestamp.
-  Future<ListCategoriesResponse> listCategories(
-    String userId, {
-    DateTime? updatedSince,
-  }) async {
+  Future<ListCategoriesResponse> listCategories({DateTime? updatedSince}) async {
     try {
-      final request = ListCategoriesRequest(userId: userId);
+      final request = ListCategoriesRequest();
       if (updatedSince != null) {
         request.updatedSince = Timestamp.fromDateTime(updatedSince.toUtc());
       }
@@ -31,13 +26,11 @@ class CategoryRemoteService {
     }
   }
 
-  /// Crea o actualiza una categoría en el servidor.
   Future<UpsertCategoryResponse> upsertCategory(Map<String, dynamic> map) async {
     try {
       final now = DateTime.now().toUtc();
       final category = Category(
         id: map['id'] as String,
-        userId: map['user_id'] as String,
         name: map['name'] as String,
         type: _stringToCategoryType(map['type'] as String),
         icon: map['icon'] as String? ?? '',
@@ -58,17 +51,14 @@ class CategoryRemoteService {
     }
   }
 
-  /// Elimina lógicamente una categoría.
   Future<void> deleteCategory({
     required String id,
-    required String userId,
     DateTime? deletedAt,
   }) async {
     try {
       await _client.deleteCategory(
         DeleteCategoryRequest(
           id: id,
-          userId: userId,
           deletedAt: Timestamp.fromDateTime(
               (deletedAt ?? DateTime.now()).toUtc()),
         ),

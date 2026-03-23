@@ -20,11 +20,15 @@ class CategoryLocalStore {
   // READ
   // ----------------------------------------------------------
 
-  /// Retorna todas las categorías del usuario, ordenadas por fecha de
+  /// Retorna todas las categorías activas, ordenadas por fecha de
   /// creación ascendente (las más antiguas primero).
-  Future<List<CategoryModel>> getCategories(String userId) async {
+  Future<List<CategoryModel>> getCategories() async {
     final db = await _db.database;
-    final rows = await db.query('categories', orderBy: 'created_at ASC');
+    final rows = await db.query(
+      'categories',
+      where: 'deleted_at IS NULL',
+      orderBy: 'created_at ASC',
+    );
     return rows.map(CategoryModel.fromMap).toList();
   }
 
@@ -71,6 +75,20 @@ class CategoryLocalStore {
       'categories',
       model.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Marca una categoría como eliminada (soft delete con LWW).
+  Future<void> softDelete(String id, DateTime deletedAt) async {
+    final db = await _db.database;
+    await db.update(
+      'categories',
+      {
+        'deleted_at': deletedAt.toIso8601String(),
+        'updated_at': deletedAt.toIso8601String(),
+      },
+      where: 'id = ? AND (deleted_at IS NULL OR deleted_at < ?)',
+      whereArgs: [id, deletedAt.toIso8601String()],
     );
   }
 }

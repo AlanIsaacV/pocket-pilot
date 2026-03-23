@@ -19,7 +19,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:pocket_pilot/src/core/constants/constants.dart';
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/sync/connectivity_monitor.dart';
 import 'package:pocket_pilot/src/core/sync/sync_metadata_store.dart';
@@ -28,6 +27,16 @@ import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_remote_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_sync_handler.dart';
+import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
+import 'package:pocket_pilot/src/features/categories/data/category_remote_service.dart';
+import 'package:pocket_pilot/src/features/categories/data/category_seeder.dart';
+import 'package:pocket_pilot/src/features/categories/data/category_sync_handler.dart';
+import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
+import 'package:pocket_pilot/src/features/tags/data/tag_remote_service.dart';
+import 'package:pocket_pilot/src/features/tags/data/tag_sync_handler.dart';
+import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
+import 'package:pocket_pilot/src/features/transactions/data/transaction_remote_service.dart';
+import 'package:pocket_pilot/src/features/transactions/data/transaction_sync_handler.dart';
 import 'package:pocket_pilot/src/ui/app.dart';
 import 'package:pocket_pilot/src/ui/router.dart';
 
@@ -47,17 +56,41 @@ Future<void> main() async {
     remote: AccountRemoteService(),
   );
 
+  final categorySyncHandler = CategorySyncHandler(
+    local: CategoryLocalStore(db: dbHelper),
+    remote: CategoryRemoteService(),
+  );
+
+  final tagSyncHandler = TagSyncHandler(
+    local: TagLocalStore(db: dbHelper),
+    remote: TagRemoteService(),
+  );
+
+  final transactionSyncHandler = TransactionSyncHandler(
+    local: TransactionLocalStore(db: dbHelper),
+    remote: TransactionRemoteService(),
+  );
+
   final syncService = SyncService(
     outbox: syncOutbox,
     metadataStore: syncMetadataStore,
-    handlers: [accountSyncHandler],
+    handlers: [
+      accountSyncHandler,
+      categorySyncHandler,
+      tagSyncHandler,
+      transactionSyncHandler,
+    ],
   );
 
-  // ConnectivityMonitor: lanza sync automático al recuperar conexión.
-  final connectivityMonitor = ConnectivityMonitor(
-    syncService: syncService,
-    userId: kHardcodedUserId,
+  // Insertar categorías por defecto si es la primera ejecución.
+  final categorySeeder = CategorySeeder(
+    local: CategoryLocalStore(db: dbHelper),
+    db: dbHelper,
   );
+  await categorySeeder.seedIfNeeded();
+
+  // ConnectivityMonitor: lanza sync automático al recuperar conexión.
+  final connectivityMonitor = ConnectivityMonitor(syncService: syncService);
 
   runApp(
     MultiProvider(

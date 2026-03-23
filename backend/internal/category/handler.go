@@ -11,10 +11,10 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
 	pb "github.com/AlanIsaacV/pocket-pilot/internal/gen/proto/pocket_pilot/v1/pocket_pilot/v1"
 )
 
-// Handler implements pb.CategoryServiceServer.
 type Handler struct {
 	pb.UnimplementedCategoryServiceServer
 	repo *Repository
@@ -25,6 +25,14 @@ func NewHandler(repo *Repository) *Handler {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+func parseUUID(s, field string) (uuid.UUID, error) {
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.UUID{}, status.Errorf(codes.InvalidArgument, "invalid %s: %v", field, err)
+	}
+	return id, nil
+}
 
 func parsePage(req *pb.PageRequest) (limit, offset int) {
 	limit = 20
@@ -77,7 +85,6 @@ func stringToCategoryType(s string) pb.CategoryType {
 func toProto(c *Category) *pb.Category {
 	proto := &pb.Category{
 		Id:        c.ID.String(),
-		UserId:    c.UserID.String(),
 		Name:      c.Name,
 		Icon:      c.Icon,
 		Color:     c.Color,
@@ -94,12 +101,8 @@ func toProto(c *Category) *pb.Category {
 	return proto
 }
 
-func fromProto(p *pb.Category) (*Category, error) {
-	id, err := uuid.Parse(p.Id)
-	if err != nil {
-		return nil, err
-	}
-	userID, err := uuid.Parse(p.UserId)
+func fromProto(p *pb.Category, userID uuid.UUID) (*Category, error) {
+	id, err := parseUUID(p.Id, "category.id")
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +118,7 @@ func fromProto(p *pb.Category) (*Category, error) {
 		UpdatedAt: p.UpdatedAt.AsTime(),
 	}
 	if p.ParentId != "" {
-		pid, err := uuid.Parse(p.ParentId)
+		pid, err := parseUUID(p.ParentId, "category.parent_id")
 		if err != nil {
 			return nil, err
 		}
@@ -126,11 +129,10 @@ func fromProto(p *pb.Category) (*Category, error) {
 
 // ── RPC handlers ──────────────────────────────────────────────────────────────
 
-// ListCategories supports delta sync via updated_since.
 func (h *Handler) ListCategories(ctx context.Context, req *pb.ListCategoriesRequest) (*pb.ListCategoriesResponse, error) {
-	userID, err := uuid.Parse(req.UserId)
+	userID, err := middleware.UserIDFromCtx(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
+		return nil, err
 	}
 
 	var updatedSince *time.Time
@@ -157,22 +159,24 @@ func (h *Handler) ListCategories(ctx context.Context, req *pb.ListCategoriesRequ
 
 	return &pb.ListCategoriesResponse{
 		Categories: pbCats,
-		Page: &pb.PageResponse{
-			NextPageToken: nextToken,
-		},
-		SyncedAt: timestamppb.New(syncedAt),
+		Page:       &pb.PageResponse{NextPageToken: nextToken},
+		SyncedAt:   timestamppb.New(syncedAt),
 	}, nil
 }
 
-// UpsertCategory creates or updates a category using Last Write Wins.
 func (h *Handler) UpsertCategory(ctx context.Context, req *pb.UpsertCategoryRequest) (*pb.UpsertCategoryResponse, error) {
 	if req.Category == nil {
 		return nil, status.Error(codes.InvalidArgument, "category is required")
 	}
 
-	c, err := fromProto(req.Category)
+	userID, err := middleware.UserIDFromCtx(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid category: %v", err)
+		return nil, err
+	}
+
+	c, err := fromProto(req.Category, userID)
+	if err != nil {
+		return nil, err
 	}
 
 	result, conflictResolved, err := h.repo.Upsert(ctx, c)
@@ -181,20 +185,20 @@ func (h *Handler) UpsertCategory(ctx context.Context, req *pb.UpsertCategoryRequ
 	}
 
 	return &pb.UpsertCategoryResponse{
-		Category:        toProto(result),
+		Category:         toProto(result),
 		ConflictResolved: conflictResolved,
 	}, nil
 }
 
-// DeleteCategory soft-deletes a category using Last Write Wins on deleted_at.
 func (h *Handler) DeleteCategory(ctx context.Context, req *pb.DeleteCategoryRequest) (*emptypb.Empty, error) {
-	id, err := uuid.Parse(req.Id)
+	userID, err := middleware.UserIDFromCtx(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid id: %v", err)
+		return nil, err
 	}
-	userID, err := uuid.Parse(req.UserId)
+
+	id, err := parseUUID(req.Id, "id")
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
+		return nil, err
 	}
 
 	var deletedAt time.Time

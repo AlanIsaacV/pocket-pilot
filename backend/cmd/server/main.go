@@ -16,6 +16,8 @@ import (
 	"github.com/AlanIsaacV/pocket-pilot/internal/category"
 	"github.com/AlanIsaacV/pocket-pilot/internal/config"
 	"github.com/AlanIsaacV/pocket-pilot/internal/database"
+	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
+	"github.com/AlanIsaacV/pocket-pilot/internal/tag"
 	"github.com/AlanIsaacV/pocket-pilot/internal/transaction"
 	pb "github.com/AlanIsaacV/pocket-pilot/internal/gen/proto/pocket_pilot/v1/pocket_pilot/v1"
 )
@@ -39,13 +41,17 @@ func main() {
 	accountHandler := account.NewHandler(account.NewRepository(pool))
 	categoryHandler := category.NewHandler(category.NewRepository(pool))
 	transactionHandler := transaction.NewHandler(transaction.NewRepository(pool))
+	tagHandler := tag.NewHandler(tag.NewRepository(pool))
 
-	// gRPC server
-	// In production you'd add interceptors here (logging, auth, recovery, etc.)
-	srv := grpc.NewServer()
+	// gRPC server with auth interceptor.
+	// The interceptor validates the Bearer token and injects user_id into every request context.
+	srv := grpc.NewServer(
+		grpc.UnaryInterceptor(middleware.UnaryAuthInterceptor),
+	)
 	pb.RegisterAccountServiceServer(srv, accountHandler)
 	pb.RegisterCategoryServiceServer(srv, categoryHandler)
 	pb.RegisterTransactionServiceServer(srv, transactionHandler)
+	pb.RegisterTagServiceServer(srv, tagHandler)
 
 	// Server Reflection lets grpcurl discover services without a .proto file:
 	//   grpcurl -plaintext localhost:50051 list

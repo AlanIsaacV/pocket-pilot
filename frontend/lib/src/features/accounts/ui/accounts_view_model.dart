@@ -16,7 +16,6 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:pocket_pilot/src/core/constants/constants.dart';
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_repository.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
@@ -73,7 +72,7 @@ class AccountsViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _syncService.sync(kHardcodedUserId);
+      await _syncService.sync();
       accounts = await _repository.getAccounts();
       _lastSyncAt = DateTime.now();
       errorMessage = null;

@@ -127,3 +127,9 @@ CREATE TABLE sync_metadata
     entity_type    TEXT PRIMARY KEY,
     last_synced_at TEXT
 );
+
+
+CREATE TABLE app_metadata (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);

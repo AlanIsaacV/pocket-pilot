@@ -1,15 +1,3 @@
-// ============================================================
-// AccountSyncHandler — puente entre SyncService y la feature Accounts
-// ============================================================
-//
-// Implementa SyncHandler para el tipo de entidad 'account'.
-// SyncService no sabe nada de cuentas; solo llama los métodos de esta interfaz.
-//
-// pull()       → llama al servidor con delta filter, convierte protos a Maps.
-// saveLocally()→ convierte el Map a AccountModel y lo persiste en SQLite.
-// pushUpsert() → deserializa el payload JSON, construye el proto y llama al servidor.
-// pushDelete() → llama al servidor con el soft-delete.
-
 import 'dart:convert';
 
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
@@ -31,15 +19,15 @@ class AccountSyncHandler implements SyncHandler {
   String get entityType => 'account';
 
   @override
-  Future<SyncPullResult> pull(String userId, DateTime? updatedSince) async {
-    final response = await _remote.listAccounts(userId, updatedSince: updatedSince);
+  Future<SyncPullResult> pull(DateTime? updatedSince) async {
+    final response = await _remote.listAccounts(updatedSince: updatedSince);
 
     final items = response.accounts.map((proto) {
       final model = AccountModel.fromProto(proto);
       return SyncItem(
         id: model.id,
         updatedAt: model.updatedAt,
-        data: model.toMap(), // toMap() excluye user_id (no existe en SQLite local)
+        data: model.toMap(),
       );
     }).toList();
 
@@ -70,12 +58,7 @@ class AccountSyncHandler implements SyncHandler {
   }
 
   @override
-  Future<void> pushDelete(
-      String entityId, String userId, DateTime deletedAt) async {
-    await _remote.deleteAccount(
-      id: entityId,
-      userId: userId,
-      deletedAt: deletedAt,
-    );
+  Future<void> pushDelete(String entityId, DateTime deletedAt) async {
+    await _remote.deleteAccount(id: entityId, deletedAt: deletedAt);
   }
 }

@@ -2,76 +2,72 @@
 // CategoryRepository — orquestación offline-first para categorías
 // ============================================================
 //
-// Este repositorio no contiene SQL: delega toda persistencia en
-// CategoryLocalStore y toda comunicación remota en CategoryRemoteService.
+// Patrón outbox: escribe en SQLite local de forma inmediata y encola
+// la operación en sync_outbox para que SyncService la envíe al servidor.
 
-import 'dart:async';
+import 'dart:convert';
 
+import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
-import 'package:pocket_pilot/src/features/categories/data/category_remote_service.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 
 class CategoryRepository {
   final CategoryLocalStore _local;
-  final CategoryRemoteService _remote;
+  final SyncOutbox _outbox;
 
   CategoryRepository({
     required CategoryLocalStore local,
-    required CategoryRemoteService remote,
-  }) : _local = local,
-       _remote = remote;
+    required SyncOutbox outbox,
+  })  : _local = local,
+        _outbox = outbox;
 
   // ----------------------------------------------------------
   // READ
   // ----------------------------------------------------------
 
-  /// Lee las categorías almacenadas localmente.
-  Future<List<CategoryModel>> getCategories(String userId) =>
-      _local.getCategories(userId);
-
-  /// Descarga categorías del servidor y las persiste en SQLite.
-  /// Propaga errores para que el ViewModel pueda mostrarlos.
-  Future<void> syncRemote(String userId) async {
-    final response = await _remote.listCategories(userId);
-    await _local.upsertAll(
-      response.categories.map(CategoryModel.fromProto).toList(),
-    );
-  }
+  Future<List<CategoryModel>> getCategories() => _local.getCategories();
 
   // ----------------------------------------------------------
   // WRITE
   // ----------------------------------------------------------
 
-  /// Crea una categoría local y luego sincroniza con el servidor.
   Future<void> createCategory({
     required String id,
-    required String userId,
     required String name,
-    required String type, // 'income' | 'expense'
+    required String type,
+    String? icon,
+    String? color,
+    String? parentId,
   }) async {
     final now = DateTime.now().toUtc();
-
-    await _local.upsert(
-      CategoryModel(
-        id: id,
-        name: name,
-        type: type,
-        createdAt: now,
-        updatedAt: now,
-      ),
+    final model = CategoryModel(
+      id: id,
+      name: name,
+      type: type,
+      icon: icon ?? '',
+      color: color ?? '',
+      parentId: parentId,
+      createdAt: now,
+      updatedAt: now,
     );
 
-    unawaited(() async {
-      try {
-        await _remote.upsertCategory({
-          'id': id,
-          'user_id': userId,
-          'name': name,
-          'type': type,
-          'created_at': now.toIso8601String(),
-          'updated_at': now.toIso8601String(),
-        });
-      } catch (_) {}
-    }());
+    await _local.upsert(model);
+    await _outbox.enqueue(
+      entityType: 'category',
+      entityId: id,
+      operation: 'upsert',
+      payload: jsonEncode(model.toServerMap()),
+    );
+  }
+
+  Future<void> deleteCategory(String id) async {
+    final now = DateTime.now().toUtc();
+    await _local.softDelete(id, now);
+    await _outbox.enqueue(
+      entityType: 'category',
+      entityId: id,
+      operation: 'delete',
+      payload: jsonEncode({'deleted_at': now.toIso8601String()}),
+    );
   }
 }

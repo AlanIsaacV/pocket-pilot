@@ -11,11 +11,19 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
 	pb "github.com/AlanIsaacV/pocket-pilot/internal/gen/proto/pocket_pilot/v1/pocket_pilot/v1"
 )
 
+func parseUUID(s, field string) (uuid.UUID, error) {
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.UUID{}, status.Errorf(codes.InvalidArgument, "invalid %s: %v", field, err)
+	}
+	return id, nil
+}
+
 // Handler implements pb.AccountServiceServer.
-// UnimplementedAccountServiceServer satisfies the interface for any unimplemented RPCs.
 type Handler struct {
 	pb.UnimplementedAccountServiceServer
 	repo *Repository
@@ -27,8 +35,6 @@ func NewHandler(repo *Repository) *Handler {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// parsePage extracts limit + offset from a PageRequest.
-// page_token encodes the offset as a decimal integer (simple cursor for the MVP).
 func parsePage(req *pb.PageRequest) (limit, offset int) {
 	limit = 20
 	if req == nil {
@@ -50,7 +56,7 @@ func parsePage(req *pb.PageRequest) (limit, offset int) {
 
 func nextPageToken(offset, limit, count int) string {
 	if count < limit {
-		return "" // no more pages
+		return ""
 	}
 	return strconv.Itoa(offset + limit)
 }
@@ -98,7 +104,6 @@ func stringToAccountType(s string) pb.AccountType {
 func toProto(a *Account) *pb.Account {
 	proto := &pb.Account{
 		Id:        a.ID.String(),
-		UserId:    a.UserID.String(),
 		Name:      a.Name,
 		Type:      stringToAccountType(a.Type),
 		CreatedAt: timestamppb.New(a.CreatedAt),
@@ -125,24 +130,13 @@ func toProto(a *Account) *pb.Account {
 	return proto
 }
 
-func fromProto(p *pb.Account) (*Account, error) {
-	id, err := uuid.Parse(p.Id)
-	if err != nil {
-		return nil, err
-	}
-	userID, err := uuid.Parse(p.UserId)
-	if err != nil {
-		return nil, err
-	}
-
-	a := &Account{
-		ID:        id,
-		UserID:    userID,
-		Name:      p.Name,
-		Type:      accountTypeToString(p.Type),
-		CreatedAt: p.CreatedAt.AsTime(),
-		UpdatedAt: p.UpdatedAt.AsTime(),
-	}
+// fromProto converts a proto Account into the domain struct.
+// userID is passed separately since it is no longer present in the proto message.
+func fromProto(p *pb.Account, a *Account) error {
+	a.Name = p.Name
+	a.Type = accountTypeToString(p.Type)
+	a.CreatedAt = p.CreatedAt.AsTime()
+	a.UpdatedAt = p.UpdatedAt.AsTime()
 	if p.CreditLimitCents != 0 {
 		v := p.CreditLimitCents
 		a.CreditLimitCents = &v
@@ -163,18 +157,15 @@ func fromProto(p *pb.Account) (*Account, error) {
 		v := p.TermMonths
 		a.TermMonths = &v
 	}
-	return a, nil
+	return nil
 }
 
 // ── RPC handlers ──────────────────────────────────────────────────────────────
 
-// ListAccounts supports delta sync via updated_since.
-// If updated_since is set, returns all records (active + deleted) modified after that timestamp.
-// If not set (first sync), returns only active records with pagination.
 func (h *Handler) ListAccounts(ctx context.Context, req *pb.ListAccountsRequest) (*pb.ListAccountsResponse, error) {
-	userID, err := uuid.Parse(req.UserId)
+	userID, err := middleware.UserIDFromCtx(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
+		return nil, err
 	}
 
 	var updatedSince *time.Time
@@ -196,28 +187,33 @@ func (h *Handler) ListAccounts(ctx context.Context, req *pb.ListAccountsRequest)
 
 	nextToken := ""
 	if updatedSince == nil {
-		// Only paginate on full sync.
 		nextToken = nextPageToken(offset, limit, len(accounts))
 	}
 
 	return &pb.ListAccountsResponse{
 		Accounts: pbAccounts,
-		Page: &pb.PageResponse{
-			NextPageToken: nextToken,
-		},
+		Page:     &pb.PageResponse{NextPageToken: nextToken},
 		SyncedAt: timestamppb.New(syncedAt),
 	}, nil
 }
 
-// UpsertAccount creates or updates an account using Last Write Wins.
-// If the server has a newer version, conflict_resolved=true is returned with the server's version.
 func (h *Handler) UpsertAccount(ctx context.Context, req *pb.UpsertAccountRequest) (*pb.UpsertAccountResponse, error) {
 	if req.Account == nil {
 		return nil, status.Error(codes.InvalidArgument, "account is required")
 	}
 
-	a, err := fromProto(req.Account)
+	userID, err := middleware.UserIDFromCtx(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	id, err := parseUUID(req.Account.Id, "account.id")
+	if err != nil {
+		return nil, err
+	}
+
+	a := &Account{ID: id, UserID: userID}
+	if err := fromProto(req.Account, a); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid account: %v", err)
 	}
 
@@ -227,21 +223,20 @@ func (h *Handler) UpsertAccount(ctx context.Context, req *pb.UpsertAccountReques
 	}
 
 	return &pb.UpsertAccountResponse{
-		Account:         toProto(result),
+		Account:          toProto(result),
 		ConflictResolved: conflictResolved,
 	}, nil
 }
 
-// DeleteAccount soft-deletes an account using Last Write Wins on deleted_at.
-// If the server has a newer version, the delete is silently ignored.
 func (h *Handler) DeleteAccount(ctx context.Context, req *pb.DeleteAccountRequest) (*emptypb.Empty, error) {
-	id, err := uuid.Parse(req.Id)
+	userID, err := middleware.UserIDFromCtx(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid id: %v", err)
+		return nil, err
 	}
-	userID, err := uuid.Parse(req.UserId)
+
+	id, err := parseUUID(req.Id, "id")
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: %v", err)
+		return nil, err
 	}
 
 	var deletedAt time.Time

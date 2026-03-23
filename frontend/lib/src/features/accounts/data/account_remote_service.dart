@@ -1,23 +1,9 @@
-// ============================================================
-// AccountRemoteService — wrapper delgado de gRPC para cuentas
-// ============================================================
-//
-// Responsabilidades:
-//   1. Construir el request proto correcto.
-//   2. Llamar al servidor.
-//   3. Retornar la respuesta proto (sin convertir — eso lo hace el handler).
-//   4. Re-lanzar GrpcError como excepción estándar.
-//
-// Los métodos soportan el nuevo contrato de sync:
-//   listAccounts  → acepta updated_since para delta pull
-//   upsertAccount → create + update unificados, retorna conflict_resolved (LWW)
-//   deleteAccount → soft delete con timestamp LWW
-
 import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/account_service.pbgrpc.dart';
+import 'package:pocket_pilot/src/core/grpc/auth_interceptor.dart';
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 
@@ -25,26 +11,15 @@ class AccountRemoteService {
   late final AccountServiceClient _client;
 
   AccountRemoteService() {
-    _client = AccountServiceClient(GrpcClient.channel);
+    _client = AccountServiceClient(
+      GrpcClient.channel,
+      interceptors: [const AuthInterceptor()],
+    );
   }
 
-  // ----------------------------------------------------------
-  // PULL
-  // ----------------------------------------------------------
-
-  /// Lista cuentas del usuario.
-  ///
-  /// Si [updatedSince] es null → primer sync (trae todas las cuentas activas).
-  /// Si [updatedSince] está definido → delta sync (solo cuentas modificadas
-  /// después de ese timestamp).
-  ///
-  /// Retorna la respuesta completa (incluye synced_at para actualizar el cursor).
-  Future<ListAccountsResponse> listAccounts(
-    String userId, {
-    DateTime? updatedSince,
-  }) async {
+  Future<ListAccountsResponse> listAccounts({DateTime? updatedSince}) async {
     try {
-      final request = ListAccountsRequest(userId: userId);
+      final request = ListAccountsRequest();
       if (updatedSince != null) {
         request.updatedSince = Timestamp.fromDateTime(updatedSince.toUtc());
       }
@@ -54,16 +29,6 @@ class AccountRemoteService {
     }
   }
 
-  // ----------------------------------------------------------
-  // PUSH
-  // ----------------------------------------------------------
-
-  /// Crea o actualiza una cuenta en el servidor (upsert).
-  ///
-  /// [map] es el payload del outbox (incluye user_id y todos los campos).
-  /// Retorna UpsertAccountResponse con:
-  ///   - account: versión aceptada (cliente o servidor según LWW).
-  ///   - conflict_resolved: true si el servidor tenía versión más reciente.
   Future<UpsertAccountResponse> upsertAccount(Map<String, dynamic> map) async {
     try {
       final account = _buildProto(map);
@@ -73,18 +38,14 @@ class AccountRemoteService {
     }
   }
 
-  /// Elimina lógicamente una cuenta. Aplica LWW: solo hace el delete
-  /// si el servidor no tiene una versión más reciente.
   Future<void> deleteAccount({
     required String id,
-    required String userId,
     required DateTime deletedAt,
   }) async {
     try {
       await _client.deleteAccount(
         DeleteAccountRequest(
           id: id,
-          userId: userId,
           deletedAt: Timestamp.fromDateTime(deletedAt.toUtc()),
         ),
       );
@@ -93,11 +54,6 @@ class AccountRemoteService {
     }
   }
 
-  // ----------------------------------------------------------
-  // Helpers
-  // ----------------------------------------------------------
-
-  /// Construye un proto Account desde el payload Map del outbox.
   Account _buildProto(Map<String, dynamic> map) {
     final creditLimitCents = map['credit_limit_cents'] as int?;
     final statementDay = map['statement_day'] as int?;
@@ -107,7 +63,6 @@ class AccountRemoteService {
 
     return Account(
       id: map['id'] as String,
-      userId: map['user_id'] as String? ?? '',
       name: map['name'] as String,
       type: AccountModel.stringToAccountType(map['type'] as String),
       creditLimitCents:

@@ -22,15 +22,19 @@ class TransactionLocalStore {
   // READ
   // ----------------------------------------------------------
 
-  /// Retorna las filas crudas de transacciones del usuario, ordenadas
+  /// Retorna las filas crudas de transacciones activas, ordenadas
   /// por fecha descendente (más recientes primero).
   ///
   /// Devuelve Map en lugar de TransactionModel porque el modelo requiere
   /// `categoryType`, un campo derivado que el repositorio debe enriquecer
   /// consultando la tabla de categorías.
-  Future<List<Map<String, dynamic>>> queryRows(String userId) async {
+  Future<List<Map<String, dynamic>>> queryRows() async {
     final db = await _db.database;
-    return db.query('transactions', orderBy: 'date DESC');
+    return db.query(
+      'transactions',
+      where: 'deleted_at IS NULL',
+      orderBy: 'date DESC',
+    );
   }
 
   // ----------------------------------------------------------
@@ -60,6 +64,20 @@ class TransactionLocalStore {
       'transactions',
       row,
       conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Marca una transacción como eliminada (soft delete con LWW).
+  Future<void> softDelete(String id, DateTime deletedAt) async {
+    final db = await _db.database;
+    await db.update(
+      'transactions',
+      {
+        'deleted_at': deletedAt.toIso8601String(),
+        'updated_at': deletedAt.toIso8601String(),
+      },
+      where: 'id = ? AND (deleted_at IS NULL OR deleted_at < ?)',
+      whereArgs: [id, deletedAt.toIso8601String()],
     );
   }
 }

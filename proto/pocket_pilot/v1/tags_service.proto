@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "pocket_pilot/v1/common.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+message Tag {
+  string id = 1;
+  string user_id = 2;
+  string name = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+  google.protobuf.Timestamp deleted_at = 6;
+}
+
+service TagService {
+  rpc ListTags(ListTagsRequest) returns (ListTagsResponse);
+  rpc UpsertTag(UpsertTagRequest) returns (UpsertTagResponse);
+  rpc DeleteTag(DeleteTagRequest) returns (google.protobuf.Empty);
+}
+
+message ListTagsRequest {
+  string user_id = 1;
+  google.protobuf.Timestamp updated_since = 2;
+  PageRequest page = 3;
+}
+
+message ListTagsResponse {
+  repeated Tag tags = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertTagRequest {
+  Tag tag = 1;
+}
+
+message UpsertTagResponse {
+  Tag tag = 1;
+  bool conflict_resolved = 2;
+}
+
+message DeleteTagRequest {
+  string id = 1;
+  string user_id = 2;
+  google.protobuf.Timestamp deleted_at = 3;
+}

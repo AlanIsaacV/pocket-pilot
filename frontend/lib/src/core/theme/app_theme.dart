@@ -22,9 +22,13 @@ class AppTheme {
   // Radios reutilizables
   // ----------------------------------------------------------
   static const BorderRadius radiusSmall = BorderRadius.all(Radius.circular(8));
-  static const BorderRadius radiusMedium = BorderRadius.all(Radius.circular(16));
+  static const BorderRadius radiusMedium = BorderRadius.all(
+    Radius.circular(16),
+  );
   static const BorderRadius radiusLarge = BorderRadius.all(Radius.circular(32));
-  static const BorderRadius radiusFull = BorderRadius.all(Radius.circular(9999));
+  static const BorderRadius radiusFull = BorderRadius.all(
+    Radius.circular(9999),
+  );
 
   // ----------------------------------------------------------
   // Tema oscuro
@@ -140,21 +144,84 @@ class AppTheme {
   }) {
     // IBM Plex Sans en todos los roles tipográficos.
     final t = GoogleFonts.ibmPlexSansTextTheme().copyWith(
-      displayLarge: GoogleFonts.ibmPlexSans(fontSize: 40, fontWeight: FontWeight.w600, letterSpacing: -1, color: textPrimary),
-      displayMedium: GoogleFonts.ibmPlexSans(fontSize: 32, fontWeight: FontWeight.w600, letterSpacing: -0.5, color: textPrimary),
-      displaySmall: GoogleFonts.ibmPlexSans(fontSize: 24, fontWeight: FontWeight.w600, color: textPrimary),
-      headlineLarge: GoogleFonts.ibmPlexSans(fontSize: 22, fontWeight: FontWeight.w600, color: textPrimary),
-      headlineMedium: GoogleFonts.ibmPlexSans(fontSize: 18, fontWeight: FontWeight.w600, color: textPrimary),
-      headlineSmall: GoogleFonts.ibmPlexSans(fontSize: 16, fontWeight: FontWeight.w600, color: textPrimary),
-      titleLarge: GoogleFonts.ibmPlexSans(fontSize: 16, fontWeight: FontWeight.w600, color: textPrimary),
-      titleMedium: GoogleFonts.ibmPlexSans(fontSize: 15, fontWeight: FontWeight.w600, color: textPrimary),
-      titleSmall: GoogleFonts.ibmPlexSans(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.4, color: textMuted),
-      bodyLarge: GoogleFonts.ibmPlexSans(fontSize: 16, fontWeight: FontWeight.w400, color: textPrimary),
-      bodyMedium: GoogleFonts.ibmPlexSans(fontSize: 14, fontWeight: FontWeight.w400, color: textPrimary),
-      bodySmall: GoogleFonts.ibmPlexSans(fontSize: 12, fontWeight: FontWeight.w400, color: textMuted),
-      labelLarge: GoogleFonts.ibmPlexSans(fontSize: 15, fontWeight: FontWeight.w600, color: textPrimary),
-      labelMedium: GoogleFonts.ibmPlexSans(fontSize: 13, fontWeight: FontWeight.w500, color: textMuted),
-      labelSmall: GoogleFonts.ibmPlexSans(fontSize: 11, fontWeight: FontWeight.w500, color: textMuted),
+      displayLarge: GoogleFonts.ibmPlexSans(
+        fontSize: 40,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -1,
+        color: textPrimary,
+      ),
+      displayMedium: GoogleFonts.ibmPlexSans(
+        fontSize: 32,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.5,
+        color: textPrimary,
+      ),
+      displaySmall: GoogleFonts.ibmPlexSans(
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
+        color: textPrimary,
+      ),
+      headlineLarge: GoogleFonts.ibmPlexSans(
+        fontSize: 22,
+        fontWeight: FontWeight.w600,
+        color: textPrimary,
+      ),
+      headlineMedium: GoogleFonts.ibmPlexSans(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: textPrimary,
+      ),
+      headlineSmall: GoogleFonts.ibmPlexSans(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: textPrimary,
+      ),
+      titleLarge: GoogleFonts.ibmPlexSans(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: textPrimary,
+      ),
+      titleMedium: GoogleFonts.ibmPlexSans(
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        color: textPrimary,
+      ),
+      titleSmall: GoogleFonts.ibmPlexSans(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.4,
+        color: textMuted,
+      ),
+      bodyLarge: GoogleFonts.ibmPlexSans(
+        fontSize: 16,
+        fontWeight: FontWeight.w400,
+        color: textPrimary,
+      ),
+      bodyMedium: GoogleFonts.ibmPlexSans(
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        color: textPrimary,
+      ),
+      bodySmall: GoogleFonts.ibmPlexSans(
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        color: textMuted,
+      ),
+      labelLarge: GoogleFonts.ibmPlexSans(
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        color: textPrimary,
+      ),
+      labelMedium: GoogleFonts.ibmPlexSans(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: textMuted,
+      ),
+      labelSmall: GoogleFonts.ibmPlexSans(
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        color: textMuted,
+      ),
     );
 
     return ThemeData(
@@ -213,37 +280,44 @@ class AppTheme {
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.onPrimary,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: radiusMedium),
+        shape: RoundedRectangleBorder(borderRadius: radiusFull),
       ),
 
       chipTheme: ChipThemeData(
-        shape: const RoundedRectangleBorder(borderRadius: radiusSmall),
+        shape: const RoundedRectangleBorder(borderRadius: radiusFull),
         backgroundColor: surfaceElevated,
-        labelStyle: GoogleFonts.ibmPlexSans(fontSize: 13, fontWeight: FontWeight.w500, color: textPrimary),
+        labelStyle: GoogleFonts.ibmPlexSans(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: textPrimary,
+        ),
       ),
 
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surfaceElevated,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: const OutlineInputBorder(
-          borderRadius: radiusMedium,
+          borderRadius: radiusFull,
           borderSide: BorderSide.none,
         ),
         enabledBorder: const OutlineInputBorder(
-          borderRadius: radiusMedium,
+          borderRadius: radiusFull,
           borderSide: BorderSide.none,
         ),
         focusedBorder: const OutlineInputBorder(
-          borderRadius: radiusMedium,
+          borderRadius: radiusFull,
           borderSide: BorderSide(color: AppColors.primary, width: 1.5),
         ),
         errorBorder: const OutlineInputBorder(
-          borderRadius: radiusMedium,
+          borderRadius: radiusFull,
           borderSide: BorderSide(color: AppColors.error, width: 1),
         ),
         focusedErrorBorder: const OutlineInputBorder(
-          borderRadius: radiusMedium,
+          borderRadius: radiusFull,
           borderSide: BorderSide(color: AppColors.error, width: 1.5),
         ),
         hintStyle: GoogleFonts.ibmPlexSans(fontSize: 14, color: textMuted),
@@ -268,8 +342,11 @@ class AppTheme {
           disabledBackgroundColor: surfaceElevated,
           disabledForegroundColor: textMuted,
           elevation: 0,
-          shape: const RoundedRectangleBorder(borderRadius: radiusMedium),
-          textStyle: GoogleFonts.ibmPlexSans(fontSize: 15, fontWeight: FontWeight.w600),
+          shape: const RoundedRectangleBorder(borderRadius: radiusFull),
+          textStyle: GoogleFonts.ibmPlexSans(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
           minimumSize: const Size.fromHeight(52),
         ),
       ),
@@ -277,14 +354,20 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,
-          textStyle: GoogleFonts.ibmPlexSans(fontSize: 14, fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.ibmPlexSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
           shape: const RoundedRectangleBorder(borderRadius: radiusMedium),
         ),
       ),
 
       snackBarTheme: SnackBarThemeData(
         backgroundColor: surfaceElevated,
-        contentTextStyle: GoogleFonts.ibmPlexSans(fontSize: 14, color: textPrimary),
+        contentTextStyle: GoogleFonts.ibmPlexSans(
+          fontSize: 14,
+          color: textPrimary,
+        ),
         shape: const RoundedRectangleBorder(borderRadius: radiusMedium),
         behavior: SnackBarBehavior.floating,
       ),

@@ -19,9 +19,7 @@ class AccountsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cuentas'),
-      ),
+      appBar: AppBar(title: const Text('Cuentas')),
       body: Consumer<AccountsViewModel>(
         builder: (context, vm, _) {
           return Column(
@@ -35,8 +33,7 @@ class AccountsScreen extends StatelessWidget {
               Expanded(
                 child: PpScreenState(
                   isLoading: vm.isLoading,
-                  errorMessage:
-                      vm.accounts.isEmpty ? vm.errorMessage : null,
+                  errorMessage: vm.accounts.isEmpty ? vm.errorMessage : null,
                   isEmpty: vm.accounts.isEmpty,
                   emptyIcon: Icons.account_balance_wallet_outlined,
                   emptyLabel: 'No tienes cuentas aún',
@@ -46,8 +43,42 @@ class AccountsScreen extends StatelessWidget {
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                     itemCount: vm.accounts.length,
-                    itemBuilder: (context, index) =>
-                        _AccountCard(account: vm.accounts[index]),
+                    itemBuilder: (context, index) {
+                      final account = vm.accounts[index];
+                      return Dismissible(
+                        key: ValueKey(account.id),
+                        direction: DismissDirection.endToStart,
+                        background: _DeleteBackground(),
+                        confirmDismiss: (_) =>
+                            _confirmDelete(context, account.name),
+                        onDismissed: (_) async {
+                          try {
+                            await vm.deleteAccount(account.id);
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Cuenta "${account.name}" eliminada',
+                                ),
+                              ),
+                            );
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'No se pudo eliminar la cuenta: $e',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        child: _AccountCard(
+                          account: account,
+                          onTap: () => _onAccountTap(context, account),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -64,7 +95,40 @@ class AccountsScreen extends StatelessWidget {
   }
 
   void _onAddTap(BuildContext context) {
-    context.go('/accounts/new');
+    context.push('/accounts/new').then((result) {
+      if (result == true && context.mounted) {
+        context.read<AccountsViewModel>().loadOnAppear();
+      }
+    });
+  }
+
+  void _onAccountTap(BuildContext context, AccountModel account) {
+    context.push('/accounts/${account.id}/edit', extra: account).then((result) {
+      if (result == true && context.mounted) {
+        context.read<AccountsViewModel>().loadOnAppear();
+      }
+    });
+  }
+
+  Future<bool?> _confirmDelete(BuildContext context, String accountName) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar cuenta'),
+        content: Text('Se eliminará la cuenta "$accountName".'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -74,8 +138,9 @@ class AccountsScreen extends StatelessWidget {
 
 class _AccountCard extends StatelessWidget {
   final AccountModel account;
+  final VoidCallback onTap;
 
-  const _AccountCard({required this.account});
+  const _AccountCard({required this.account, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -87,21 +152,21 @@ class _AccountCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surfaceDark,
-          borderRadius: AppTheme.radiusSmall,
-          border: Border.all(
-            color: AppColors.surfaceElevatedDark,
-            width: 1,
-          ),
+          borderRadius: AppTheme.radiusLarge,
+          border: Border.all(color: AppColors.surfaceElevatedDark, width: 1),
         ),
         child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          onTap: onTap,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 10,
+          ),
           leading: Container(
             width: 44,
             height: 44,
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.12),
-              borderRadius: AppTheme.radiusSmall,
+              borderRadius: AppTheme.radiusLarge,
             ),
             child: Icon(icon, color: AppColors.primary, size: 22),
           ),
@@ -166,5 +231,22 @@ class _AccountCard extends StatelessWidget {
       default:
         return 'Otra cuenta';
     }
+  }
+}
+
+class _DeleteBackground extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.18),
+        borderRadius: AppTheme.radiusMedium,
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
+      ),
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+    );
   }
 }

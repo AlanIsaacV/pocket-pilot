@@ -22,6 +22,7 @@
 
 import 'package:go_router/go_router.dart';
 
+import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/account_form_screen.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_route_scope.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_screen.dart';
@@ -53,9 +54,8 @@ GoRouter buildRouter() {
           ),
           GoRoute(
             path: '/transactions',
-            builder: (context, state) => const TransactionsRouteScope(
-              child: TransactionsScreen(),
-            ),
+            builder: (context, state) =>
+                const TransactionsRouteScope(child: TransactionsScreen()),
             routes: [
               GoRoute(
                 path: 'new',
@@ -65,13 +65,21 @@ GoRouter buildRouter() {
           ),
           GoRoute(
             path: '/accounts',
-            builder: (context, state) => const AccountsRouteScope(
-              child: AccountsScreen(),
-            ),
+            builder: (context, state) =>
+                const AccountsRouteScope(child: AccountsScreen()),
             routes: [
               GoRoute(
                 path: 'new',
-                builder: (context, state) => const AccountFormScreen(),
+                builder: (context, state) =>
+                    const AccountsRouteScope(child: AccountFormScreen()),
+              ),
+              GoRoute(
+                path: ':accountId/edit',
+                builder: (context, state) => AccountsRouteScope(
+                  child: AccountFormScreen(
+                    account: state.extra as AccountModel?,
+                  ),
+                ),
               ),
             ],
           ),
@@ -88,15 +96,13 @@ GoRouter buildRouter() {
       // ----------------------------------------------------------
       GoRoute(
         path: '/categories',
-        builder: (context, state) => const CategoriesRouteScope(
-          child: CategoriesScreen(),
-        ),
+        builder: (context, state) =>
+            const CategoriesRouteScope(child: CategoriesScreen()),
         routes: [
           GoRoute(
             path: 'new',
-            builder: (context, state) => CategoryFormScreen(
-              parent: state.extra as CategoryModel?,
-            ),
+            builder: (context, state) =>
+                CategoryFormScreen(parent: state.extra as CategoryModel?),
           ),
         ],
       ),

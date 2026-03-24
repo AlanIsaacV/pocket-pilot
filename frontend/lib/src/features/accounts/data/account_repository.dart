@@ -11,8 +11,8 @@ class AccountRepository {
   AccountRepository({
     required AccountLocalStore local,
     required SyncOutbox outbox,
-  })  : _local = local,
-        _outbox = outbox;
+  }) : _local = local,
+       _outbox = outbox;
 
   Future<List<AccountModel>> getAccounts() => _local.getAccounts();
 
@@ -44,6 +44,38 @@ class AccountRepository {
     await _outbox.enqueue(
       entityType: 'account',
       entityId: id,
+      operation: 'upsert',
+      payload: jsonEncode(model.toServerMap()),
+    );
+  }
+
+  Future<void> updateAccount({
+    required AccountModel current,
+    required String name,
+    int? creditLimitCents,
+    int? statementDay,
+    int? paymentDueDay,
+    int? interestRateApr,
+    int? termMonths,
+  }) async {
+    final now = DateTime.now().toUtc();
+    final model = AccountModel(
+      id: current.id,
+      name: name,
+      type: current.type,
+      creditLimitCents: creditLimitCents,
+      statementDay: statementDay,
+      paymentDueDay: paymentDueDay,
+      interestRateApr: interestRateApr,
+      termMonths: termMonths,
+      createdAt: current.createdAt,
+      updatedAt: now,
+    );
+
+    await _local.upsert(model);
+    await _outbox.enqueue(
+      entityType: 'account',
+      entityId: current.id,
       operation: 'upsert',
       payload: jsonEncode(model.toServerMap()),
     );

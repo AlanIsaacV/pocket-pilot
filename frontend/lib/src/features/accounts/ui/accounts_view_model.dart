@@ -19,8 +19,11 @@ import 'package:flutter/foundation.dart';
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_repository.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
+import 'package:uuid/uuid.dart';
 
 class AccountsViewModel extends ChangeNotifier {
+  static const _uuid = Uuid();
+
   final AccountRepository _repository;
   final SyncService _syncService;
 
@@ -34,8 +37,8 @@ class AccountsViewModel extends ChangeNotifier {
   AccountsViewModel({
     required AccountRepository repository,
     required SyncService syncService,
-  })  : _repository = repository,
-        _syncService = syncService;
+  }) : _repository = repository,
+       _syncService = syncService;
 
   // ----------------------------------------------------------
   // API pública
@@ -46,6 +49,60 @@ class AccountsViewModel extends ChangeNotifier {
   }
 
   Future<void> refresh() => _runSync();
+
+  Future<void> createAccount({
+    required String name,
+    required String type,
+    int? creditLimitCents,
+    int? statementDay,
+    int? paymentDueDay,
+    int? interestRateApr,
+    int? termMonths,
+  }) async {
+    final id = _uuid.v4();
+
+    await _repository.createAccount(
+      id: id,
+      name: name,
+      type: type,
+      creditLimitCents: creditLimitCents,
+      statementDay: statementDay,
+      paymentDueDay: paymentDueDay,
+      interestRateApr: interestRateApr,
+      termMonths: termMonths,
+    );
+
+    accounts = await _repository.getAccounts();
+    notifyListeners();
+  }
+
+  Future<void> updateAccount({
+    required AccountModel current,
+    required String name,
+    int? creditLimitCents,
+    int? statementDay,
+    int? paymentDueDay,
+    int? interestRateApr,
+    int? termMonths,
+  }) async {
+    await _repository.updateAccount(
+      current: current,
+      name: name,
+      creditLimitCents: creditLimitCents,
+      statementDay: statementDay,
+      paymentDueDay: paymentDueDay,
+      interestRateApr: interestRateApr,
+      termMonths: termMonths,
+    );
+    accounts = await _repository.getAccounts();
+    notifyListeners();
+  }
+
+  Future<void> deleteAccount(String id) async {
+    await _repository.deleteAccount(id);
+    accounts = await _repository.getAccounts();
+    notifyListeners();
+  }
 
   // ----------------------------------------------------------
   // Implementación interna

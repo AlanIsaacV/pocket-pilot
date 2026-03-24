@@ -2,92 +2,117 @@
   {
     "name": "Alimentación",
     "type": "expense",
-    "icon": "🛒",
     "color": "#FF5722",
+    "children": [{ "name": "Despensa" }, { "name": "Restaurante" }]
+  },
+  {
+    "name": "Hogar",
+    "type": "expense",
+    "color": "#9C27B0",
     "children": [
-      { "name": "Supermercado", "icon": "🏪", "color": "#FF7043" },
-      { "name": "Restaurantes", "icon": "🍽️", "color": "#FF8A65" },
-      { "name": "Café", "icon": "☕", "color": "#A1887F" }
+      { "name": "Renta / Hipoteca" },
+      { "name": "Mantenimiento" },
+      { "name": "Decoracion" },
+      { "name": "Muebles" },
+      { "name": "Herramientas" },
+      { "name": "Jardin" },
+      {
+        "name": "Servicios",
+        "children": [
+          { "name": "Electricidad" },
+          { "name": "Agua" },
+          { "name": "Gas" },
+          { "name": "Internet" }
+        ]
+      }
     ]
   },
   {
     "name": "Transporte",
     "type": "expense",
-    "icon": "🚗",
-    "color": "#2196F3",
+    "color": "#3F51B5",
     "children": [
-      { "name": "Gasolina", "icon": "⛽", "color": "#42A5F5" },
-      { "name": "Taxi / Uber", "icon": "🚕", "color": "#64B5F6" },
-      { "name": "Transporte público", "icon": "🚌", "color": "#90CAF9" }
+      { "name": "Taxi / Uber" },
+      { "name": "Transporte público" },
+      { "name": "Larga distancia" },
+      {
+        "name": "vehículo",
+        "children": [
+          { "name": "Seguro de vehículo" },
+          { "name": "Estacionamiento" },
+          { "name": "Mantenimiento" },
+          { "name": "Combustible" }
+        ]
+      }
     ]
   },
   {
-    "name": "Hogar",
+    "name": "Compras",
     "type": "expense",
-    "icon": "🏠",
-    "color": "#9C27B0",
+    "color": "#2196F3",
     "children": [
-      { "name": "Renta / Hipoteca", "icon": "🔑", "color": "#AB47BC" },
-      { "name": "Servicios", "icon": "💡", "color": "#BA68C8" },
-      { "name": "Mantenimiento", "icon": "🔧", "color": "#CE93D8" }
+      { "name": "Gasolina" },
+      { "name": "Taxi / Uber" },
+      { "name": "Transporte público" }
     ]
   },
   {
     "name": "Salud",
     "type": "expense",
-    "icon": "❤️",
     "color": "#F44336",
     "children": [
-      { "name": "Médico", "icon": "🩺", "color": "#EF5350" },
-      { "name": "Farmacia", "icon": "💊", "color": "#E57373" },
-      { "name": "Gimnasio", "icon": "🏋️", "color": "#EF9A9A" }
+      { "name": "Médico" },
+      { "name": "Farmacia" },
+      { "name": "Gimnasio" },
+      { "name": "Seguros" },
+      { "name": "Belleza" }
     ]
   },
   {
     "name": "Entretenimiento",
     "type": "expense",
-    "icon": "🎉",
     "color": "#FF9800",
     "children": [
-      { "name": "Streaming", "icon": "📺", "color": "#FFA726" },
-      { "name": "Cine / Teatro", "icon": "🎬", "color": "#FFB74D" },
-      { "name": "Eventos", "icon": "🎤", "color": "#FFCC80" }
+      { "name": "Streaming" },
+      { "name": "Cine / Teatro" },
+      { "name": "Eventos" }
+    ]
+  },
+  {
+    "name": "Technología",
+    "type": "expense",
+    "color": "#9E9E9E",
+    "children": [
+      { "name": "Software / Apps" },
+      { "name": "Phone" },
+      { "name": "Electronicos" }
     ]
   },
   {
     "name": "Ropa y accesorios",
     "type": "expense",
-    "icon": "👕",
-    "color": "#00BCD4"
+    "color": "#00BCD4",
+    "children": [
+      { "name": "Ropa" },
+      { "name": "Zapatos" },
+      { "name": "Accesorios" }
+    ]
   },
   {
     "name": "Educación",
     "type": "expense",
-    "icon": "📚",
-    "color": "#3F51B5"
+    "color": "#3F51B5",
+    "children": [
+      { "name": "Libros" },
+      { "name": "Cursos" },
+      { "name": "Material escolar" },
+      { "name": "Colegiatura" },
+      { "name": "Eventos" }
+    ]
   },
-  {
-    "name": "Viajes",
-    "type": "expense",
-    "icon": "✈️",
-    "color": "#009688"
-  },
-  {
-    "name": "Salario",
-    "type": "income",
-    "icon": "💼",
-    "color": "#4CAF50"
-  },
-  {
-    "name": "Freelance",
-    "type": "income",
-    "icon": "💻",
-    "color": "#66BB6A"
-  },
-  {
-    "name": "Inversiones",
-    "type": "income",
-    "icon": "📈",
-    "color": "#81C784"
-  }
+  { "name": "Viajes", "type": "expense", "color": "#009688" },
+  { "name": "Ventas", "type": "income", "color": "#4CAF50" },
+  { "name": "Regalos", "type": "income", "color": "#81C784" },
+  { "name": "Salario", "type": "income", "color": "#4CAF50" },
+  { "name": "Inversiones", "type": "income", "color": "#81C784" }
 ]

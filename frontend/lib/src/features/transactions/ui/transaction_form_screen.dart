@@ -141,9 +141,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                       lastDate: DateTime.now(),
                       builder: (context, child) => Theme(
                         data: Theme.of(context).copyWith(
-                          colorScheme: Theme.of(context)
-                              .colorScheme
-                              .copyWith(primary: AppColors.primary),
+                          colorScheme: Theme.of(
+                            context,
+                          ).colorScheme.copyWith(primary: AppColors.primary),
                         ),
                         child: child!,
                       ),
@@ -195,7 +195,7 @@ class _TypeToggle extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceElevatedDark,
-        borderRadius: AppTheme.radiusSmall,
+        borderRadius: AppTheme.radiusFull,
       ),
       child: Row(
         children: [
@@ -246,7 +246,7 @@ class _Option extends StatelessWidget {
             color: isSelected
                 ? activeColor.withValues(alpha: 0.15)
                 : Colors.transparent,
-            borderRadius: AppTheme.radiusSmall,
+            borderRadius: AppTheme.radiusFull,
             border: Border.all(
               color: isSelected ? activeColor : Colors.transparent,
               width: 1,
@@ -255,8 +255,11 @@ class _Option extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16,
-                  color: isSelected ? activeColor : AppColors.textMutedDark),
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? activeColor : AppColors.textMutedDark,
+              ),
               const SizedBox(width: 6),
               Text(
                 label,
@@ -305,7 +308,9 @@ class _DetailRow extends StatelessWidget {
             Text(
               label,
               style: GoogleFonts.ibmPlexSans(
-                  fontSize: 14, color: AppColors.textMutedDark),
+                fontSize: 14,
+                color: AppColors.textMutedDark,
+              ),
             ),
             const Spacer(),
             Text(
@@ -317,8 +322,11 @@ class _DetailRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            const Icon(Icons.chevron_right_rounded,
-                size: 16, color: AppColors.textMutedDark),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 16,
+              color: AppColors.textMutedDark,
+            ),
           ],
         ),
       ),
@@ -398,10 +406,10 @@ class _NumKey extends StatelessWidget {
 
     return Material(
       color: AppColors.surfaceElevatedDark,
-      borderRadius: AppTheme.radiusSmall,
+      borderRadius: AppTheme.radiusFull,
       child: InkWell(
         onTap: onTap,
-        borderRadius: AppTheme.radiusSmall,
+        borderRadius: AppTheme.radiusFull,
         child: SizedBox(
           height: 52,
           child: Center(

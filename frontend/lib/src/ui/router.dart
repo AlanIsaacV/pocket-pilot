@@ -101,8 +101,18 @@ GoRouter buildRouter() {
         routes: [
           GoRoute(
             path: 'new',
-            builder: (context, state) =>
-                CategoryFormScreen(parent: state.extra as CategoryModel?),
+            builder: (context, state) => CategoriesRouteScope(
+              child:
+                  CategoryFormScreen(parent: state.extra as CategoryModel?),
+            ),
+          ),
+          GoRoute(
+            path: ':categoryId/edit',
+            builder: (context, state) => CategoriesRouteScope(
+              child: CategoryFormScreen(
+                category: state.extra as CategoryModel?,
+              ),
+            ),
           ),
         ],
       ),

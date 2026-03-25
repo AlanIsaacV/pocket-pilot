@@ -9,6 +9,7 @@
 // TODO: conectar cada opción a su respectivo caso de uso.
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_colors.dart';
@@ -45,6 +46,11 @@ class SettingsScreen extends StatelessWidget {
           _SettingsSection(
             title: 'Preferencias',
             items: [
+              _SettingsItem(
+                icon: Icons.category_outlined,
+                label: 'Categorías',
+                onTap: () => context.push('/categories'),
+              ),
               _SettingsItem(
                 icon: Icons.currency_exchange_rounded,
                 label: 'Moneda',

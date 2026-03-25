@@ -78,6 +78,27 @@ class CategoryModel {
   bool get isExpense => type == 'expense';
   bool get isIncome => type == 'income';
 
+  CategoryModel copyWith({
+    String? name,
+    String? icon,
+    String? color,
+    String? type,
+    DateTime? updatedAt,
+    DateTime? deletedAt,
+  }) {
+    return CategoryModel(
+      id: id,
+      name: name ?? this.name,
+      icon: icon ?? this.icon,
+      color: color ?? this.color,
+      parentId: parentId,
+      type: type ?? this.type,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+    );
+  }
+
   static String _categoryTypeToString(CategoryType type) {
     switch (type) {
       case CategoryType.CATEGORY_TYPE_INCOME:

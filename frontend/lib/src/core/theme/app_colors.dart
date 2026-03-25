@@ -90,35 +90,39 @@ abstract final class AppColors {
   static const Color onError = Color(0xFFFFFFFF);
 
   // ----------------------------------------------------------
-  // Colores de categorías (usados en pickers y chips)
+  // Colores de categorías — Catpuccin Latte
   // ----------------------------------------------------------
 
-  static const Color categoryGold = Color(0xFFFFD700);
-  static const Color categoryPurple = Color(0xFFB026FF);
-  static const Color categoryOrange = Color(0xFFFF8C00);
-  static const Color categoryYellow = Color(0xFFFFD600);
-  static const Color categoryCyan = Color(0xFF00E5FF);
-  static const Color categoryGreen = Color(0xFF4CAF82);
-  static const Color categoryRed = Color(0xFFFA746F);
-  static const Color categoryPink = Color(0xFFFF69B4);
-  static const Color categoryBlue = Color(0xFF6676A5);
-  static const Color categoryTeal = Color(0xFF00CCC8);
-  static const Color categoryLime = Color(0xFFB8FF00);
-  static const Color categoryAmber = Color(0xFFFFC107);
+  static const Color catRosewater = Color(0xFFDC8A78);
+  static const Color catFlamingo = Color(0xFFDD7878);
+  static const Color catPink = Color(0xFFEA76CB);
+  static const Color catMauve = Color(0xFF8839EF);
+  static const Color catRed = Color(0xFFD20F39);
+  static const Color catMaroon = Color(0xFFE64553);
+  static const Color catPeach = Color(0xFFFE640B);
+  static const Color catYellow = Color(0xFFDF8E1D);
+  static const Color catGreen = Color(0xFF40A02B);
+  static const Color catTeal = Color(0xFF179299);
+  static const Color catSky = Color(0xFF04A5E5);
+  static const Color catSapphire = Color(0xFF209FB5);
+  static const Color catBlue = Color(0xFF1E66F5);
+  static const Color catLavender = Color(0xFF7287FD);
 
-  /// Lista ordenada de los 12 colores para el color picker.
+  /// Lista ordenada de los 14 colores Catpuccin Latte para el color picker.
   static const List<Color> categoryPresets = [
-    categoryGreen,
-    categoryBlue,
-    categoryCyan,
-    categoryPurple,
-    categoryPink,
-    categoryRed,
-    categoryOrange,
-    categoryAmber,
-    categoryYellow,
-    categoryLime,
-    categoryTeal,
-    categoryGold,
+    catBlue,
+    catSapphire,
+    catSky,
+    catTeal,
+    catGreen,
+    catYellow,
+    catPeach,
+    catMaroon,
+    catRed,
+    catPink,
+    catMauve,
+    catLavender,
+    catFlamingo,
+    catRosewater,
   ];
 }

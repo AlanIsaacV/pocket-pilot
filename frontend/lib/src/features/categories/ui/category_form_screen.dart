@@ -1,45 +1,78 @@
 // ============================================================
-// CategoryFormScreen — Formulario de categoría (placeholder UI)
+// CategoryFormScreen — Formulario de categoría (crear / editar)
 // ============================================================
 //
-// Pantalla de creación de categoría.
-// Si se pasa [parent], los campos tipo y color se pre-llenan con
-// los valores del padre (el usuario puede cambiarlos libremente).
-//
-// TODO: conectar a un CategoryFormViewModel para persistir via SyncOutbox.
+// Modo crear: category == null, parent opcional.
+// Modo editar: category != null, parent se deduce de parentId.
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
+import 'package:pocket_pilot/src/features/categories/ui/categories_view_model.dart';
+import 'package:pocket_pilot/src/features/categories/ui/category_icon_data.dart';
 
 class CategoryFormScreen extends StatefulWidget {
-  /// Categoría padre. Cuando se proporciona, tipo y color se pre-llenan
-  /// con los valores del padre.
+  /// Categoría a editar. null = modo creación.
+  final CategoryModel? category;
+
+  /// Categoría padre (solo en creación).
   final CategoryModel? parent;
 
-  const CategoryFormScreen({this.parent, super.key});
+  const CategoryFormScreen({this.category, this.parent, super.key});
 
   @override
   State<CategoryFormScreen> createState() => _CategoryFormScreenState();
 }
 
 class _CategoryFormScreenState extends State<CategoryFormScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
 
   late String _type;
   late Color _selectedColor;
+  late IconData _selectedIcon;
+  bool _isSaving = false;
+  bool _showExtendedIcons = false;
+
+  bool get _isEditMode => widget.category != null;
+
+  CategoryModel? get _parent => widget.parent ?? _editParentModel;
+  CategoryModel? _editParentModel;
 
   @override
   void initState() {
     super.initState();
+    final cat = widget.category;
     final parent = widget.parent;
-    _type = parent?.type ?? 'expense';
-    _selectedColor = parent != null
-        ? _hexToColor(parent.color)
-        : AppColors.categoryPresets.first;
+
+    if (cat != null) {
+      _nameController.text = cat.name;
+      _type = cat.type;
+      _selectedColor = _hexToColor(cat.color);
+      _selectedIcon = CategoryIconData.iconFromHex(cat.icon);
+    } else {
+      _type = parent?.type ?? 'expense';
+      _selectedColor = parent != null
+          ? _hexToColor(parent.color)
+          : AppColors.categoryPresets.first;
+      _selectedIcon = CategoryIconData.commonIcons.first;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isEditMode && widget.category!.parentId != null) {
+      final vm = context.read<CategoriesViewModel>();
+      _editParentModel = vm.categories
+          .where((c) => c.id == widget.category!.parentId)
+          .firstOrNull;
+    }
   }
 
   @override
@@ -48,13 +81,82 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
     super.dispose();
   }
 
+  Future<void> _onSave() async {
+    if (_isSaving) return;
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) return;
+
+    final vm = context.read<CategoriesViewModel>();
+    final name = _nameController.text.trim();
+    final colorHex = _colorToHex(_selectedColor);
+    final iconHex = CategoryIconData.iconToHex(_selectedIcon);
+
+    setState(() => _isSaving = true);
+    try {
+      if (_isEditMode) {
+        await vm.updateCategory(
+          current: widget.category!,
+          name: name,
+          type: _type,
+          icon: iconHex,
+          color: colorHex,
+        );
+      } else {
+        await vm.createCategory(
+          name: name,
+          type: _type,
+          icon: iconHex,
+          color: colorHex,
+          parentId: widget.parent?.id,
+        );
+      }
+      if (!mounted) return;
+      context.pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('No se pudo guardar: $e')));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _onHide() async {
+    if (!_isEditMode) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ocultar categoría'),
+        content: Text('Se ocultará la categoría "${widget.category!.name}".'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Ocultar'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    final vm = context.read<CategoriesViewModel>();
+    await vm.hideCategory(widget.category!.id);
+    if (!mounted) return;
+    context.pop(true);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final parent = widget.parent;
+    final parent = _parent;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(parent != null ? 'Nueva subcategoría' : 'Nueva categoría'),
+        title: Text(_isEditMode ? 'Editar categoría' : 'Nueva categoría'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: () => Navigator.of(context).maybePop(),
@@ -62,54 +164,107 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (parent != null) ...[
-              _ParentBadge(parent: parent),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (parent != null) ...[
+                _ParentBadge(parent: parent),
+                const SizedBox(height: 24),
+              ],
+
+              // --- Nombre ---
+              _SectionLabel('Nombre'),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  hintText: 'Ej. Supermercado, Freelance...',
+                ),
+                textCapitalization: TextCapitalization.sentences,
+                maxLength: 50,
+                validator: (value) {
+                  final text = value?.trim() ?? '';
+                  if (text.isEmpty) return 'El nombre es obligatorio';
+                  return null;
+                },
+              ),
+
               const SizedBox(height: 24),
+
+              // --- Tipo ---
+              _SectionLabel('Tipo'),
+              const SizedBox(height: 12),
+              _TypeToggle(
+                value: _type,
+                onChanged: (t) => setState(() => _type = t),
+              ),
+
+              const SizedBox(height: 24),
+
+              // --- Color ---
+              _SectionLabel('Color'),
+              const SizedBox(height: 12),
+              _ColorPicker(
+                selected: _selectedColor,
+                onSelected: (c) => setState(() => _selectedColor = c),
+              ),
+
+              const SizedBox(height: 24),
+
+              // --- Icono ---
+              _SectionLabel('Icono'),
+              const SizedBox(height: 12),
+              _IconPicker(
+                selected: _selectedIcon,
+                showExtended: _showExtendedIcons,
+                onSelected: (icon) => setState(() => _selectedIcon = icon),
+                onToggleExtended: () =>
+                    setState(() => _showExtendedIcons = !_showExtendedIcons),
+              ),
+
+              const SizedBox(height: 40),
+
+              // --- Guardar ---
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _onSave,
+                  child: Text(
+                    _isSaving
+                        ? 'Guardando...'
+                        : _isEditMode
+                        ? 'Guardar cambios'
+                        : 'Guardar categoría',
+                  ),
+                ),
+              ),
+
+              // --- Ocultar (solo en edición) ---
+              if (_isEditMode) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: _onHide,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      side: const BorderSide(color: AppColors.error),
+                    ),
+                    child: const Text('Ocultar categoría'),
+                  ),
+                ),
+              ],
             ],
-            _SectionLabel('Nombre'),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                hintText: 'Ej. Supermercado, Freelance...',
-              ),
-              textCapitalization: TextCapitalization.sentences,
-            ),
-            const SizedBox(height: 24),
-            _SectionLabel('Tipo'),
-            const SizedBox(height: 12),
-            _TypeToggle(
-              value: _type,
-              onChanged: (t) => setState(() => _type = t),
-            ),
-            const SizedBox(height: 24),
-            _SectionLabel('Color'),
-            const SizedBox(height: 12),
-            _ColorPicker(
-              selected: _selectedColor,
-              onSelected: (c) => setState(() => _selectedColor = c),
-            ),
-            const SizedBox(height: 40),
-            // TODO: habilitar cuando se implemente el ViewModel
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: null,
-                child: const Text('Guardar categoría'),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  /// Convierte un string hexadecimal (#RRGGBB) a Color.
-  /// Devuelve el primer preset si el string es inválido.
   static Color _hexToColor(String hex) {
+    if (hex.isEmpty) return AppColors.categoryPresets.first;
     try {
       final sanitized = hex.replaceFirst('#', '');
       if (sanitized.length != 6) return AppColors.categoryPresets.first;
@@ -117,6 +272,10 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
     } catch (_) {
       return AppColors.categoryPresets.first;
     }
+  }
+
+  static String _colorToHex(Color color) {
+    return color.toARGB32().toRadixString(16).substring(2).toUpperCase();
   }
 }
 
@@ -131,13 +290,13 @@ class _ParentBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dotColor = parent.isIncome ? AppColors.primary : AppColors.error;
+    final dotColor = parent.isIncome ? AppColors.income : AppColors.error;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.surfaceElevatedDark,
-        borderRadius: AppTheme.radiusSmall,
+        borderRadius: AppTheme.radiusFull,
         border: Border.all(color: AppColors.surfaceElevatedDark),
       ),
       child: Row(
@@ -207,7 +366,7 @@ class _TypeToggle extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceElevatedDark,
-        borderRadius: AppTheme.radiusSmall,
+        borderRadius: AppTheme.radiusFull,
       ),
       child: Row(
         children: [
@@ -222,7 +381,7 @@ class _TypeToggle extends StatelessWidget {
             label: 'Ingreso',
             icon: Icons.arrow_downward_rounded,
             isSelected: value == 'income',
-            activeColor: AppColors.primary,
+            activeColor: AppColors.income,
             onTap: () => onChanged('income'),
           ),
         ],
@@ -258,7 +417,7 @@ class _ToggleOption extends StatelessWidget {
             color: isSelected
                 ? activeColor.withValues(alpha: 0.15)
                 : Colors.transparent,
-            borderRadius: AppTheme.radiusSmall,
+            borderRadius: AppTheme.radiusFull,
             border: Border.all(
               color: isSelected ? activeColor : Colors.transparent,
               width: 1,
@@ -290,7 +449,7 @@ class _ToggleOption extends StatelessWidget {
 }
 
 // ============================================================
-// Color picker (presets en scroll horizontal)
+// Color picker (Catpuccin Latte — scroll horizontal)
 // ============================================================
 
 class _ColorPicker extends StatelessWidget {
@@ -324,7 +483,12 @@ class _ColorPicker extends StatelessWidget {
                     ? Border.all(color: Colors.white, width: 2)
                     : null,
                 boxShadow: isSelected
-                    ? [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 8)]
+                    ? [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.5),
+                          blurRadius: 8,
+                        ),
+                      ]
                     : null,
               ),
               child: isSelected
@@ -334,6 +498,103 @@ class _ColorPicker extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+// ============================================================
+// Icon picker (grid con "Ver más")
+// ============================================================
+
+class _IconPicker extends StatelessWidget {
+  final IconData selected;
+  final bool showExtended;
+  final ValueChanged<IconData> onSelected;
+  final VoidCallback onToggleExtended;
+
+  const _IconPicker({
+    required this.selected,
+    required this.showExtended,
+    required this.onSelected,
+    required this.onToggleExtended,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final icons = [
+      ...CategoryIconData.commonIcons,
+      if (showExtended) ...CategoryIconData.extendedIcons,
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 5,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+          ),
+          itemCount: icons.length,
+          itemBuilder: (context, index) {
+            final icon = icons[index];
+            final isSelected = selected.codePoint == icon.codePoint;
+
+            return GestureDetector(
+              onTap: () => onSelected(icon),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.primary.withValues(alpha: 0.15)
+                      : AppColors.surfaceElevatedDark,
+                  borderRadius: AppTheme.radiusFull,
+                  border: Border.all(
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.surfaceElevatedDark,
+                    width: 1,
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  size: 22,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.textMutedDark,
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        GestureDetector(
+          onTap: onToggleExtended,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                showExtended
+                    ? Icons.keyboard_arrow_up_rounded
+                    : Icons.keyboard_arrow_down_rounded,
+                size: 16,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                showExtended ? 'Ver menos' : 'Ver más',
+                style: GoogleFonts.ibmPlexSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

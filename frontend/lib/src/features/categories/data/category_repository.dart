@@ -26,6 +26,8 @@ class CategoryRepository {
   // ----------------------------------------------------------
 
   Future<List<CategoryModel>> getCategories() => _local.getCategories();
+  Future<List<CategoryModel>> getDeletedCategories() =>
+      _local.getDeletedCategories();
 
   // ----------------------------------------------------------
   // WRITE
@@ -60,6 +62,34 @@ class CategoryRepository {
     );
   }
 
+  Future<void> updateCategory({
+    required CategoryModel current,
+    required String name,
+    required String type,
+    String? icon,
+    String? color,
+  }) async {
+    final now = DateTime.now().toUtc();
+    final model = CategoryModel(
+      id: current.id,
+      name: name,
+      type: type,
+      icon: icon ?? current.icon,
+      color: color ?? current.color,
+      parentId: current.parentId,
+      createdAt: current.createdAt,
+      updatedAt: now,
+    );
+
+    await _local.upsert(model);
+    await _outbox.enqueue(
+      entityType: 'category',
+      entityId: current.id,
+      operation: 'upsert',
+      payload: jsonEncode(model.toServerMap()),
+    );
+  }
+
   Future<void> deleteCategory(String id) async {
     final now = DateTime.now().toUtc();
     await _local.softDelete(id, now);
@@ -68,6 +98,25 @@ class CategoryRepository {
       entityId: id,
       operation: 'delete',
       payload: jsonEncode({'deleted_at': now.toIso8601String()}),
+    );
+  }
+
+  Future<void> deleteCategories(List<String> ids) async {
+    for (final id in ids) {
+      await deleteCategory(id);
+    }
+  }
+
+  Future<void> restoreCategory(String id) async {
+    final now = DateTime.now().toUtc();
+    await _local.restore(id, now);
+    final model = await _local.getCategoryById(id);
+    if (model == null) return;
+    await _outbox.enqueue(
+      entityType: 'category',
+      entityId: id,
+      operation: 'upsert',
+      payload: jsonEncode(model.toServerMap()),
     );
   }
 }

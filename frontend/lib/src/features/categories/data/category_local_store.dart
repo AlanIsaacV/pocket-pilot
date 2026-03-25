@@ -48,6 +48,30 @@ class CategoryLocalStore {
     return rows.isNotEmpty ? rows.first['type'] as String : 'expense';
   }
 
+  /// Retorna todas las categorías ocultas (soft-deleted).
+  Future<List<CategoryModel>> getDeletedCategories() async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'categories',
+      where: 'deleted_at IS NOT NULL',
+      orderBy: 'created_at ASC',
+    );
+    return rows.map(CategoryModel.fromMap).toList();
+  }
+
+  /// Obtiene una categoría por su ID (activa o eliminada).
+  Future<CategoryModel?> getCategoryById(String id) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'categories',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return CategoryModel.fromMap(rows.first);
+  }
+
   // ----------------------------------------------------------
   // WRITE
   // ----------------------------------------------------------
@@ -89,6 +113,20 @@ class CategoryLocalStore {
       },
       where: 'id = ? AND (deleted_at IS NULL OR deleted_at < ?)',
       whereArgs: [id, deletedAt.toIso8601String()],
+    );
+  }
+
+  /// Restaura una categoría oculta (quita soft-delete).
+  Future<void> restore(String id, DateTime updatedAt) async {
+    final db = await _db.database;
+    await db.update(
+      'categories',
+      {
+        'deleted_at': null,
+        'updated_at': updatedAt.toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 }

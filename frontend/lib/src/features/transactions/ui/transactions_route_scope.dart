@@ -23,7 +23,6 @@ import 'package:provider/provider.dart';
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
-import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_view_model.dart';
@@ -42,13 +41,9 @@ class TransactionsRouteScope extends StatelessWidget {
         final syncService = ctx.read<SyncService>();
 
         final transactionLocalStore = TransactionLocalStore(db: db);
-        // CategoryLocalStore propio de este scope: DAO sin estado,
-        // seguro tener múltiples instancias sobre el mismo SQLite.
-        final categoryLocalStore = CategoryLocalStore(db: db);
         final repository = TransactionRepository(
           local: transactionLocalStore,
           outbox: outbox,
-          categoryStore: categoryLocalStore,
         );
 
         return TransactionsViewModel(

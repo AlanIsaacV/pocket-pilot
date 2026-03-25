@@ -25,14 +25,11 @@ class TransactionModel {
   /// Fecha de la transacción como string ISO 8601 (YYYY-MM-DD).
   /// Ej: "2026-03-14"
   final String date;
+  final String type;
+  final String status;
 
   final DateTime createdAt;
   final DateTime updatedAt;
-
-  /// Tipo derivado de la categoría: 'income' o 'expense'.
-  /// Se debe pasar al construir el modelo desde el repositorio
-  /// (el repositorio une transaction + category).
-  final String categoryType;
 
   const TransactionModel({
     required this.id,
@@ -42,20 +39,18 @@ class TransactionModel {
     required this.currencyCode,
     required this.description,
     required this.date,
+    required this.type,
+    required this.status,
     required this.createdAt,
     required this.updatedAt,
-    required this.categoryType,
   });
 
   // ----------------------------------------------------------
   // Factory: desde proto gRPC
   // ----------------------------------------------------------
-  /// [categoryType] debe ser pasado desde afuera porque el proto
+  /// [type] debe ser pasado desde afuera porque el proto
   /// de Transaction no incluye el tipo de su categoría.
-  factory TransactionModel.fromProto(
-    Transaction proto, {
-    required String categoryType,
-  }) {
+  factory TransactionModel.fromProto(Transaction proto) {
     return TransactionModel(
       id: proto.id,
       accountId: proto.accountId,
@@ -64,30 +59,29 @@ class TransactionModel {
       currencyCode: proto.currencyCode,
       description: proto.description,
       date: proto.date.toDateTime().toIso8601String().substring(0, 10),
+      type: _transactionTypeToString(proto.type),
+      status: proto.status,
       createdAt: proto.createdAt.toDateTime(),
       updatedAt: proto.updatedAt.toDateTime(),
-      categoryType: categoryType,
     );
   }
 
   // ----------------------------------------------------------
   // Factory: desde fila SQLite (Map<String, dynamic>)
   // ----------------------------------------------------------
-  factory TransactionModel.fromMap(
-    Map<String, dynamic> map, {
-    required String categoryType,
-  }) {
+  factory TransactionModel.fromMap(Map<String, dynamic> map) {
     return TransactionModel(
       id: map['id'] as String,
       accountId: map['account_id'] as String,
       categoryId: map['category_id'] as String,
-      amount: map['amount'] as int,
+      amount: map['amount_cents'] as int,
       currencyCode: map['currency_code'] as String,
       description: map['description'] as String,
       date: map['date'] as String,
+      type: map['type'] as String,
+      status: map['status'] as String,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
-      categoryType: categoryType,
     );
   }
 
@@ -99,10 +93,12 @@ class TransactionModel {
       'id': id,
       'account_id': accountId,
       'category_id': categoryId,
-      'amount': amount,
+      'amount_cents': amount,
       'currency_code': currencyCode,
       'description': description,
       'date': date,
+      "type": type,
+      'status': status,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -110,31 +106,20 @@ class TransactionModel {
 
   /// Payload para el outbox. Incluye type y status que el servidor necesita.
   /// No incluye user_id: el servidor lo lee del token.
-  Map<String, dynamic> toServerMap() {
-    return {
-      'id': id,
-      'account_id': accountId,
-      'category_id': categoryId,
-      'type': 'unspecified',
-      'amount': amount,
-      'currency_code': currencyCode,
-      'status': 'confirmed',
-      'description': description,
-      'date': date,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-    };
-  }
+  Map<String, dynamic> toServerMap() => toMap();
 
   // ----------------------------------------------------------
   // Helpers para la UI
   // ----------------------------------------------------------
 
   /// true si esta transacción es un gasto.
-  bool get isExpense => categoryType == 'expense';
+  bool get isExpense => type == 'expense';
 
   /// true si esta transacción es un ingreso.
-  bool get isIncome => categoryType == 'income';
+  bool get isIncome => type == 'income';
+
+  /// true si esta transacción es una transferencia.
+  bool get isTransfer => type == 'transfer';
 
   /// Monto formateado con signo para mostrar en listas.
   /// Ejemplos: "+$1,050.00 MXN" / "-$250.00 MXN"
@@ -146,4 +131,30 @@ class TransactionModel {
 
   /// Parsea [date] (YYYY-MM-DD) a un objeto DateTime para formatear en la UI.
   DateTime get parsedDate => DateTime.parse(date);
+
+  static String _transactionTypeToString(TransactionType type) {
+    switch (type) {
+      case TransactionType.TRANSACTION_TYPE_INCOME:
+        return 'income';
+      case TransactionType.TRANSACTION_TYPE_EXPENSE:
+        return 'expense';
+      case TransactionType.TRANSACTION_TYPE_TRANSFER:
+        return 'transfer';
+      default:
+        return 'unspecified';
+    }
+  }
+
+  static TransactionType tringToTransactionType(String type) {
+    switch (type) {
+      case 'income':
+        return TransactionType.TRANSACTION_TYPE_INCOME;
+      case 'expense':
+        return TransactionType.TRANSACTION_TYPE_EXPENSE;
+      case 'transfer':
+        return TransactionType.TRANSACTION_TYPE_TRANSFER;
+      default:
+        return TransactionType.TRANSACTION_TYPE_UNSPECIFIED;
+    }
+  }
 }

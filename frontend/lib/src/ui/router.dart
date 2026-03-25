@@ -30,6 +30,8 @@ import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_route_scope.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_screen.dart';
 import 'package:pocket_pilot/src/features/categories/ui/category_form_screen.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/category_picker_screen.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/transaction_form_route_scope.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_form_screen.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_route_scope.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_screen.dart';
@@ -59,7 +61,21 @@ GoRouter buildRouter() {
             routes: [
               GoRoute(
                 path: 'new',
-                builder: (context, state) => const TransactionFormScreen(),
+                builder: (context, state) =>
+                    const TransactionFormRouteScope(child: TransactionFormScreen()),
+                routes: [
+                  GoRoute(
+                    path: 'category',
+                    builder: (context, state) {
+                      final extra = state.extra as Map<String, dynamic>?;
+                      return TransactionFormRouteScope(
+                        child: CategoryPickerScreen(
+                          type: extra?['type'] as String? ?? 'expense',
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),

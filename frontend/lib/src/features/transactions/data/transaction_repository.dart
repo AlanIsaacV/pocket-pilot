@@ -12,22 +12,18 @@
 import 'dart:convert';
 
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
-import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 
 class TransactionRepository {
   final TransactionLocalStore _local;
   final SyncOutbox _outbox;
-  final CategoryLocalStore _categoryStore;
 
   TransactionRepository({
     required TransactionLocalStore local,
     required SyncOutbox outbox,
-    required CategoryLocalStore categoryStore,
-  })  : _local = local,
-        _outbox = outbox,
-        _categoryStore = categoryStore;
+  }) : _local = local,
+       _outbox = outbox;
 
   // ----------------------------------------------------------
   // READ
@@ -47,9 +43,7 @@ class TransactionRepository {
   ) async {
     final models = <TransactionModel>[];
     for (final row in rows) {
-      final categoryType =
-          await _categoryStore.getCategoryType(row['category_id'] as String);
-      models.add(TransactionModel.fromMap(row, categoryType: categoryType));
+      models.add(TransactionModel.fromMap(row));
     }
     return models;
   }
@@ -66,6 +60,8 @@ class TransactionRepository {
     required String currencyCode,
     required String description,
     required String date, // YYYY-MM-DD
+    required String type,
+    required String status, // 'pending' o 'cleared'
   }) async {
     final now = DateTime.now().toUtc();
     final model = TransactionModel(
@@ -76,9 +72,10 @@ class TransactionRepository {
       currencyCode: currencyCode,
       description: description,
       date: date,
+      type: type,
+      status: status,
       createdAt: now,
       updatedAt: now,
-      categoryType: await _categoryStore.getCategoryType(categoryId),
     );
 
     await _local.upsertRow(model.toMap());

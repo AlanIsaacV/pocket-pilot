@@ -152,7 +152,7 @@ class _AccountCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surfaceDark,
-          borderRadius: AppTheme.radiusLarge,
+          borderRadius: AppTheme.radiusFull,
           border: Border.all(color: AppColors.surfaceElevatedDark, width: 1),
         ),
         child: ListTile(
@@ -166,7 +166,7 @@ class _AccountCard extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.12),
-              borderRadius: AppTheme.radiusLarge,
+              borderRadius: AppTheme.radiusFull,
             ),
             child: Icon(icon, color: AppColors.primary, size: 22),
           ),
@@ -238,15 +238,29 @@ class _DeleteBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
         color: AppColors.error.withValues(alpha: 0.18),
-        borderRadius: AppTheme.radiusMedium,
+        borderRadius: AppTheme.radiusFull,
         border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
       ),
       alignment: Alignment.centerRight,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Eliminar',
+            style: GoogleFonts.ibmPlexSans(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.error,
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+        ],
+      ),
     );
   }
 }

@@ -13,8 +13,10 @@
 //   2. Incrementa `_version` a 2.
 //   ¡Nunca modifiques un archivo .sql ya publicado!
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'dart:developer' as developer;
 
 import 'package:pocket_pilot/src/core/db/migrations_runner.dart';
 
@@ -34,6 +36,10 @@ class DatabaseHelper {
 
   Future<Database> _init() async {
     final dbPath = join(await getDatabasesPath(), 'pocket_pilot.db');
+    if (kDebugMode) {
+      developer.log('SQLite path: $dbPath', name: 'SQLite');
+    }
+
     return openDatabase(
       dbPath,
       version: _version,

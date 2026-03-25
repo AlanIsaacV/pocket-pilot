@@ -460,44 +460,44 @@ class _ColorPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: AppColors.categoryPresets.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 10),
-        itemBuilder: (context, index) {
-          final color = AppColors.categoryPresets[index];
-          final isSelected = selected.toARGB32() == color.toARGB32();
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 7,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+      ),
+      itemCount: AppColors.categoryPresets.length,
+      itemBuilder: (context, index) {
+        final color = AppColors.categoryPresets[index];
+        final isSelected = selected.toARGB32() == color.toARGB32();
 
-          return GestureDetector(
-            onTap: () => onSelected(color),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-                border: isSelected
-                    ? Border.all(color: Colors.white, width: 2)
-                    : null,
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: color.withValues(alpha: 0.5),
-                          blurRadius: 8,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: isSelected
-                  ? const Icon(Icons.check, color: Colors.black, size: 16)
+        return GestureDetector(
+          onTap: () => onSelected(color),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: isSelected
+                  ? Border.all(color: Colors.white, width: 2)
+                  : null,
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.5),
+                        blurRadius: 8,
+                      ),
+                    ]
                   : null,
             ),
-          );
-        },
-      ),
+            child: isSelected
+                ? const Icon(Icons.check, color: Colors.black, size: 16)
+                : null,
+          ),
+        );
+      },
     );
   }
 }

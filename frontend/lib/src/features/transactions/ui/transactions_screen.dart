@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
-import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_view_model.dart';
@@ -26,7 +25,7 @@ class TransactionsScreen extends StatelessWidget {
             children: [
               if (vm.isSyncing && !vm.isLoading)
                 LinearProgressIndicator(
-                  color: AppColors.primary,
+                  color: Theme.of(context).colorScheme.primary,
                   backgroundColor: Theme.of(
                     context,
                   ).colorScheme.surfaceContainer,
@@ -131,7 +130,7 @@ class _MonthHeader extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w600,
           letterSpacing: 1.2,
-          color: AppColors.textMutedDark,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
     );
@@ -168,7 +167,9 @@ class _TransactionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isIncome = transaction.isIncome;
-    final amountColor = isIncome ? AppColors.primary : AppColors.error;
+    final amountColor = isIncome
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.error;
 
     final date = transaction.parsedDate;
     final formattedDate = '${date.day} ${_monthAbbr(date.month)} ${date.year}';
@@ -177,7 +178,7 @@ class _TransactionTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerDark,
+          color: Theme.of(context).colorScheme.surfaceContainer,
           borderRadius: AppTheme.radiusMedium,
         ),
         child: ListTile(
@@ -190,8 +191,8 @@ class _TransactionTile extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               color: isIncome
-                  ? AppColors.primary.withValues(alpha: 0.1)
-                  : AppColors.error.withValues(alpha: 0.1),
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                  : Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
               borderRadius: AppTheme.radiusFull,
             ),
             child: Icon(
@@ -209,7 +210,7 @@ class _TransactionTile extends StatelessWidget {
             style: GoogleFonts.ibmPlexSans(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: AppColors.textPrimaryDark,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -217,7 +218,7 @@ class _TransactionTile extends StatelessWidget {
             formattedDate,
             style: GoogleFonts.ibmPlexSans(
               fontSize: 12,
-              color: AppColors.textMutedDark,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           trailing: Text(

@@ -12,7 +12,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -58,7 +57,7 @@ class SettingsScreen extends StatelessWidget {
                   'MXN',
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 13,
-                    color: AppColors.textMutedDark,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 // TODO: abrir selector de moneda
@@ -71,7 +70,7 @@ class SettingsScreen extends StatelessWidget {
                   'Sistema',
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 13,
-                    color: AppColors.textMutedDark,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 // TODO: abrir selector de tema
@@ -114,7 +113,7 @@ class SettingsScreen extends StatelessWidget {
                   '1.0.0',
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 13,
-                    color: AppColors.textMutedDark,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 onTap: () {},
@@ -162,15 +161,18 @@ class _SettingsSection extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: 1.2,
-              color: AppColors.textMutedDark,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ),
         Container(
           decoration: BoxDecoration(
-            color: AppColors.surfaceContainerDark,
+            color: Theme.of(context).colorScheme.surfaceContainer,
             borderRadius: AppTheme.radiusMedium,
-            border: Border.all(color: AppColors.surfaceElevatedDark, width: 1),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
+              width: 1,
+            ),
           ),
           child: Column(
             children: items.asMap().entries.map((entry) {
@@ -185,7 +187,7 @@ class _SettingsSection extends StatelessWidget {
                     Divider(
                       height: 1,
                       thickness: 1,
-                      color: AppColors.surfaceElevatedDark,
+                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
                       indent: 56,
                     ),
                 ],
@@ -224,7 +226,11 @@ class _SettingsItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: AppColors.textMutedDark),
+            Icon(
+              icon,
+              size: 20,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
@@ -232,18 +238,15 @@ class _SettingsItem extends StatelessWidget {
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimaryDark,
+                  color: Theme.of(context).colorScheme.inverseSurface,
                 ),
               ),
             ),
-            if (trailing != null) ...[
-              trailing!,
-              const SizedBox(width: 6),
-            ],
+            if (trailing != null) ...[trailing!, const SizedBox(width: 6)],
             Icon(
               Icons.chevron_right_rounded,
               size: 18,
-              color: AppColors.textMutedDark,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ],
         ),

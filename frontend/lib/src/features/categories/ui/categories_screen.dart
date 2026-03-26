@@ -40,8 +40,10 @@ class CategoriesScreen extends StatelessWidget {
               children: [
                 if (vm.isSyncing && !vm.isLoading)
                   LinearProgressIndicator(
-                    color: AppColors.primary,
-                    backgroundColor: AppColors.surfaceElevatedDark,
+                    color: Theme.of(context).colorScheme.primary,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHigh,
                     minHeight: 2,
                   ),
                 if (!vm.isAtRoot) _Breadcrumb(vm: vm),
@@ -82,7 +84,7 @@ class CategoriesScreen extends StatelessWidget {
               style: GoogleFonts.ibmPlexSans(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: AppColors.error,
+                color: Theme.of(context).colorScheme.error,
               ),
             ),
           ),
@@ -153,9 +155,12 @@ class _Breadcrumb extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerDark,
+        color: Theme.of(context).colorScheme.surfaceContainer,
         border: Border(
-          bottom: BorderSide(color: AppColors.surfaceElevatedDark, width: 1),
+          bottom: BorderSide(
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            width: 1,
+          ),
         ),
       ),
       child: Row(
@@ -167,7 +172,7 @@ class _Breadcrumb extends StatelessWidget {
               style: GoogleFonts.ibmPlexSans(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: AppColors.primary,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ),
@@ -177,7 +182,7 @@ class _Breadcrumb extends StatelessWidget {
               child: Icon(
                 Icons.chevron_right_rounded,
                 size: 14,
-                color: AppColors.textMutedDark,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             GestureDetector(
@@ -194,8 +199,8 @@ class _Breadcrumb extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: crumb == vm.breadcrumb.last
-                      ? AppColors.textPrimaryDark
-                      : AppColors.primary,
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Theme.of(context).colorScheme.primary,
                 ),
               ),
             ),
@@ -227,7 +232,7 @@ class _CategoryList extends StatelessWidget {
         if (expense.isNotEmpty) ...[
           _SectionHeader(
             title: 'Gastos',
-            color: AppColors.error,
+            color: Theme.of(context).colorScheme.error,
             icon: Icons.arrow_upward_rounded,
           ),
           SliverPadding(
@@ -244,7 +249,7 @@ class _CategoryList extends StatelessWidget {
         if (income.isNotEmpty) ...[
           _SectionHeader(
             title: 'Ingresos',
-            color: AppColors.income,
+            color: Theme.of(context).colorScheme.tertiary,
             icon: Icons.arrow_downward_rounded,
           ),
           SliverPadding(
@@ -261,7 +266,7 @@ class _CategoryList extends StatelessWidget {
         if (deleted.isNotEmpty) ...[
           _SectionHeader(
             title: 'Ocultas',
-            color: AppColors.textMutedDark,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             icon: Icons.visibility_off_outlined,
           ),
           SliverPadding(
@@ -343,13 +348,13 @@ class _CategoryRow extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.1)
-              : AppColors.surfaceContainerDark,
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+              : Theme.of(context).colorScheme.surfaceContainer,
           borderRadius: AppTheme.radiusMedium,
           border: Border.all(
             color: isSelected
-                ? AppColors.primary.withValues(alpha: 0.3)
-                : AppColors.surfaceElevatedDark,
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
+                : Theme.of(context).colorScheme.surfaceContainerHigh,
             width: 1,
           ),
         ),
@@ -365,8 +370,10 @@ class _CategoryRow extends StatelessWidget {
                 Checkbox(
                   value: isSelected,
                   onChanged: (_) => vm.toggleSelection(category.id),
-                  activeColor: AppColors.primary,
-                  side: BorderSide(color: AppColors.textMutedDark),
+                  activeColor: Theme.of(context).colorScheme.primary,
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -388,19 +395,19 @@ class _CategoryRow extends StatelessWidget {
             style: GoogleFonts.ibmPlexSans(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: AppColors.textPrimaryDark,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           subtitle: Text(
             '$count subcategoría${count == 1 ? '' : 's'}',
             style: GoogleFonts.ibmPlexSans(
               fontSize: 11,
-              color: AppColors.textMutedDark,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           trailing: Icon(
             Icons.chevron_right_rounded,
-            color: AppColors.textMutedDark,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             size: 18,
           ),
           onTap: () {
@@ -471,9 +478,12 @@ class _HiddenCategoryRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 6),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
           borderRadius: AppTheme.radiusFull,
-          border: Border.all(color: AppColors.surfaceElevatedDark, width: 1),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            width: 1,
+          ),
         ),
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(
@@ -484,12 +494,12 @@ class _HiddenCategoryRow extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: AppColors.surfaceElevatedDark,
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
               borderRadius: AppTheme.radiusFull,
             ),
             child: Icon(
               CategoryIconData.iconFromHex(category.icon),
-              color: AppColors.textMutedDark,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               size: 18,
             ),
           ),
@@ -498,7 +508,7 @@ class _HiddenCategoryRow extends StatelessWidget {
             style: GoogleFonts.ibmPlexSans(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: AppColors.textMutedDark,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           trailing: TextButton(
@@ -513,7 +523,7 @@ class _HiddenCategoryRow extends StatelessWidget {
               style: GoogleFonts.ibmPlexSans(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: AppColors.primary,
+                color: Theme.of(context).colorScheme.primary,
                 letterSpacing: 0.5,
               ),
             ),
@@ -534,9 +544,11 @@ class _EditBackground extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.18),
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
         borderRadius: AppTheme.radiusMedium,
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+        ),
       ),
       alignment: Alignment.centerRight,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -548,11 +560,15 @@ class _EditBackground extends StatelessWidget {
             style: GoogleFonts.ibmPlexSans(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           const SizedBox(width: 6),
-          const Icon(Icons.edit_outlined, color: AppColors.primary, size: 18),
+          Icon(
+            Icons.edit_outlined,
+            color: Theme.of(context).colorScheme.primary,
+            size: 18,
+          ),
         ],
       ),
     );

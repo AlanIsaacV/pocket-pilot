@@ -11,7 +11,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -22,32 +21,16 @@ class DashboardScreen extends StatelessWidget {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          // --- AppBar personalizado con saludo ---
           SliverAppBar(
             floating: true,
-            backgroundColor: AppColors.backgroundDark,
-            foregroundColor: AppColors.textPrimaryDark,
             elevation: 0,
             scrolledUnderElevation: 0,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Buenos días',
-                  style: GoogleFonts.ibmPlexSans(
-                    fontSize: 13,
-                    color: AppColors.textMutedDark,
-                  ),
-                ),
-                Text(
-                  'Dashboard',
-                  style: GoogleFonts.ibmPlexSans(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimaryDark,
-                  ),
-                ),
-              ],
+            title: Text(
+              'Dashboard',
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
 
@@ -120,9 +103,12 @@ class _NetWorthCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerDark,
+        color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: AppTheme.radiusMedium,
-        border: Border.all(color: AppColors.surfaceElevatedDark, width: 1),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -131,7 +117,7 @@ class _NetWorthCard extends StatelessWidget {
             'Patrimonio neto',
             style: GoogleFonts.ibmPlexSans(
               fontSize: 13,
-              color: AppColors.textMutedDark,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 8),
@@ -141,7 +127,7 @@ class _NetWorthCard extends StatelessWidget {
               fontSize: 40,
               fontWeight: FontWeight.w600,
               letterSpacing: -1,
-              color: AppColors.textPrimaryDark,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 4),
@@ -150,7 +136,7 @@ class _NetWorthCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceElevatedDark,
+                  color: Theme.of(context).colorScheme.surfaceContainerHigh,
                   borderRadius: AppTheme.radiusFull,
                 ),
                 child: Text(
@@ -158,7 +144,7 @@ class _NetWorthCard extends StatelessWidget {
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textMutedDark,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -167,7 +153,7 @@ class _NetWorthCard extends StatelessWidget {
                 'este mes',
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 12,
-                  color: AppColors.textMutedDark,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -223,21 +209,24 @@ class _MetricCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerDark,
+        color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: AppTheme.radiusMedium,
-        border: Border.all(color: AppColors.surfaceElevatedDark, width: 1),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: AppColors.primary),
+          Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
           const SizedBox(height: 8),
           Text(
             value,
             style: GoogleFonts.ibmPlexSans(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimaryDark,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 2),
@@ -245,7 +234,7 @@ class _MetricCard extends StatelessWidget {
             label,
             style: GoogleFonts.ibmPlexSans(
               fontSize: 11,
-              color: AppColors.textMutedDark,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             maxLines: 2,
           ),
@@ -271,7 +260,7 @@ class _SectionHeader extends StatelessWidget {
       style: GoogleFonts.ibmPlexSans(
         fontSize: 16,
         fontWeight: FontWeight.w600,
-        color: AppColors.textPrimaryDark,
+        color: Theme.of(context).colorScheme.onSurface,
       ),
     );
   }
@@ -297,9 +286,12 @@ class _PlaceholderAccountCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerDark,
+        color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: AppTheme.radiusMedium,
-        border: Border.all(color: AppColors.surfaceElevatedDark, width: 1),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
@@ -307,10 +299,16 @@ class _PlaceholderAccountCard extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.12),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.12),
               borderRadius: AppTheme.radiusSmall,
             ),
-            child: Icon(icon, size: 20, color: AppColors.primary),
+            child: Icon(
+              icon,
+              size: 20,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -322,14 +320,14 @@ class _PlaceholderAccountCard extends StatelessWidget {
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimaryDark,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 Text(
                   type,
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 12,
-                    color: AppColors.textMutedDark,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -340,7 +338,7 @@ class _PlaceholderAccountCard extends StatelessWidget {
             style: GoogleFonts.ibmPlexSans(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimaryDark,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],
@@ -368,16 +366,21 @@ class _PlaceholderTransactionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final amountColor = isIncome ? AppColors.income : AppColors.error;
+    final amountColor = isIncome
+        ? Theme.of(context).colorScheme.tertiary
+        : Theme.of(context).colorScheme.error;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerDark,
+          color: Theme.of(context).colorScheme.surfaceContainer,
           borderRadius: AppTheme.radiusMedium,
-          border: Border.all(color: AppColors.surfaceElevatedDark, width: 1),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            width: 1,
+          ),
         ),
         child: Row(
           children: [
@@ -406,14 +409,14 @@ class _PlaceholderTransactionTile extends StatelessWidget {
                     style: GoogleFonts.ibmPlexSans(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.textPrimaryDark,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   Text(
                     date,
                     style: GoogleFonts.ibmPlexSans(
                       fontSize: 11,
-                      color: AppColors.textMutedDark,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],

@@ -5,8 +5,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:pocket_pilot/src/core/theme/app_colors.dart';
-
 class HomeScreen extends StatelessWidget {
   final Widget child;
 
@@ -34,25 +32,37 @@ class HomeScreen extends StatelessWidget {
         onDestinationSelected: (index) => context.go(_routes[index]),
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.transparent,
-        destinations: const [
+        destinations: [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard, color: AppColors.primary),
+            selectedIcon: Icon(
+              Icons.dashboard,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             label: 'Dashboard',
           ),
           NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long, color: AppColors.primary),
+            selectedIcon: Icon(
+              Icons.receipt_long,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             label: 'Transacciones',
           ),
           NavigationDestination(
             icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet, color: AppColors.primary),
+            selectedIcon: Icon(
+              Icons.account_balance_wallet,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             label: 'Cuentas',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings, color: AppColors.primary),
+            selectedIcon: Icon(
+              Icons.settings,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             label: 'Configuración',
           ),
         ],

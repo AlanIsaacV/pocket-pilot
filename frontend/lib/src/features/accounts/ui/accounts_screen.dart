@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
-import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
@@ -26,8 +25,10 @@ class AccountsScreen extends StatelessWidget {
             children: [
               if (vm.isSyncing && !vm.isLoading)
                 LinearProgressIndicator(
-                  color: AppColors.primary,
-                  backgroundColor: AppColors.surfaceElevatedDark,
+                  color: Theme.of(context).colorScheme.primary,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHigh,
                   minHeight: 2,
                 ),
               Expanded(
@@ -123,7 +124,9 @@ class AccountsScreen extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: const Text('Eliminar'),
           ),
         ],
@@ -151,9 +154,12 @@ class _AccountCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerDark,
+          color: Theme.of(context).colorScheme.surfaceContainer,
           borderRadius: AppTheme.radiusMedium,
-          border: Border.all(color: AppColors.surfaceElevatedDark, width: 1),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            width: 1,
+          ),
         ),
         child: ListTile(
           onTap: onTap,
@@ -165,29 +171,35 @@ class _AccountCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.12),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.12),
               borderRadius: AppTheme.radiusFull,
             ),
-            child: Icon(icon, color: AppColors.primary, size: 22),
+            child: Icon(
+              icon,
+              color: Theme.of(context).colorScheme.primary,
+              size: 22,
+            ),
           ),
           title: Text(
             account.name,
             style: GoogleFonts.ibmPlexSans(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimaryDark,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           subtitle: Text(
             typeLabel,
             style: GoogleFonts.ibmPlexSans(
               fontSize: 12,
-              color: AppColors.textMutedDark,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           trailing: Icon(
             Icons.chevron_right_rounded,
-            color: AppColors.textMutedDark,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             size: 20,
           ),
         ),
@@ -240,9 +252,11 @@ class _DeleteBackground extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.18),
+        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.18),
         borderRadius: AppTheme.radiusMedium,
-        border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
+        ),
       ),
       alignment: Alignment.centerRight,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -254,11 +268,14 @@ class _DeleteBackground extends StatelessWidget {
             style: GoogleFonts.ibmPlexSans(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.error,
+              color: Theme.of(context).colorScheme.error,
             ),
           ),
           const SizedBox(width: 6),
-          const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+          Icon(
+            Icons.delete_outline_rounded,
+            color: Theme.of(context).colorScheme.error,
+          ),
         ],
       ),
     );

@@ -136,7 +136,9 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: const Text('Ocultar'),
           ),
         ],
@@ -249,8 +251,10 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
                   child: OutlinedButton(
                     onPressed: _onHide,
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.error,
-                      side: const BorderSide(color: AppColors.error),
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                     child: const Text('Ocultar categoría'),
                   ),
@@ -290,14 +294,18 @@ class _ParentBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dotColor = parent.isIncome ? AppColors.income : AppColors.error;
+    final dotColor = parent.isIncome
+        ? Theme.of(context).colorScheme.tertiary
+        : Theme.of(context).colorScheme.error;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.surfaceElevatedDark,
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
         borderRadius: AppTheme.radiusFull,
-        border: Border.all(color: AppColors.surfaceElevatedDark),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        ),
       ),
       child: Row(
         children: [
@@ -311,7 +319,7 @@ class _ParentBadge extends StatelessWidget {
             'Subcategoría de ',
             style: GoogleFonts.ibmPlexSans(
               fontSize: 13,
-              color: AppColors.textMutedDark,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           Text(
@@ -319,7 +327,7 @@ class _ParentBadge extends StatelessWidget {
             style: GoogleFonts.ibmPlexSans(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimaryDark,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],
@@ -344,7 +352,7 @@ class _SectionLabel extends StatelessWidget {
       style: GoogleFonts.ibmPlexSans(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: AppColors.textMutedDark,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         letterSpacing: 0.3,
       ),
     );
@@ -365,7 +373,7 @@ class _TypeToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceElevatedDark,
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
         borderRadius: AppTheme.radiusFull,
       ),
       child: Row(
@@ -374,14 +382,14 @@ class _TypeToggle extends StatelessWidget {
             label: 'Gasto',
             icon: Icons.arrow_upward_rounded,
             isSelected: value == 'expense',
-            activeColor: AppColors.error,
+            activeColor: Theme.of(context).colorScheme.error,
             onTap: () => onChanged('expense'),
           ),
           _ToggleOption(
             label: 'Ingreso',
             icon: Icons.arrow_downward_rounded,
             isSelected: value == 'income',
-            activeColor: AppColors.income,
+            activeColor: Theme.of(context).colorScheme.onTertiary,
             onTap: () => onChanged('income'),
           ),
         ],
@@ -429,7 +437,9 @@ class _ToggleOption extends StatelessWidget {
               Icon(
                 icon,
                 size: 16,
-                color: isSelected ? activeColor : AppColors.textMutedDark,
+                color: isSelected
+                    ? activeColor
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: 6),
               Text(
@@ -437,7 +447,9 @@ class _ToggleOption extends StatelessWidget {
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: isSelected ? activeColor : AppColors.textMutedDark,
+                  color: isSelected
+                      ? activeColor
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -548,13 +560,15 @@ class _IconPicker extends StatelessWidget {
                 duration: const Duration(milliseconds: 150),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? AppColors.primary.withValues(alpha: 0.15)
-                      : AppColors.surfaceElevatedDark,
+                      ? Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.15)
+                      : Theme.of(context).colorScheme.surfaceContainerHigh,
                   borderRadius: AppTheme.radiusFull,
                   border: Border.all(
                     color: isSelected
-                        ? AppColors.primary
-                        : AppColors.surfaceElevatedDark,
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.surfaceContainerHigh,
                     width: 1,
                   ),
                 ),
@@ -562,8 +576,8 @@ class _IconPicker extends StatelessWidget {
                   icon,
                   size: 22,
                   color: isSelected
-                      ? AppColors.primary
-                      : AppColors.textMutedDark,
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             );
@@ -580,7 +594,7 @@ class _IconPicker extends StatelessWidget {
                     ? Icons.keyboard_arrow_up_rounded
                     : Icons.keyboard_arrow_down_rounded,
                 size: 16,
-                color: AppColors.primary,
+                color: Theme.of(context).colorScheme.primary,
               ),
               const SizedBox(width: 4),
               Text(
@@ -588,7 +602,7 @@ class _IconPicker extends StatelessWidget {
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.primary,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
             ],

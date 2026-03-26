@@ -147,7 +147,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   void _showAccountSheet() {
     showModalBottomSheet<AccountModel>(
       context: context,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -172,7 +172,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   void _showCurrencySheet() {
     showModalBottomSheet<String>(
       context: context,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -311,8 +311,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   // Helpers
   // ----------------------------------------------------------
 
-  Color get _typeColor =>
-      _type == 'income' ? AppColors.income : AppColors.error;
+  Color get _typeColor => _type == 'income'
+      ? Theme.of(context).colorScheme.onTertiary
+      : Theme.of(context).colorScheme.error;
 
   bool get _canSave =>
       _amountInput != '0' &&
@@ -353,7 +354,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       appBar: AppBar(
         title: const Text('Nueva transacción'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
@@ -394,7 +395,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.surfaceElevatedDark,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHigh,
                               borderRadius: AppTheme.radiusFull,
                             ),
                             child: Row(
@@ -405,14 +408,18 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                                   style: GoogleFonts.ibmPlexSans(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
-                                    color: AppColors.textMutedDark,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                                 const SizedBox(width: 2),
-                                const Icon(
+                                Icon(
                                   Icons.unfold_more_rounded,
                                   size: 14,
-                                  color: AppColors.textMutedDark,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                               ],
                             ),
@@ -465,9 +472,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                         lastDate: DateTime(2100),
                         builder: (context, child) => Theme(
                           data: Theme.of(context).copyWith(
-                            colorScheme: Theme.of(
-                              context,
-                            ).colorScheme.copyWith(primary: AppColors.primary),
+                            colorScheme: Theme.of(context).colorScheme.copyWith(
+                              primary: Theme.of(context).colorScheme.primary,
+                            ),
                           ),
                           child: child!,
                         ),
@@ -537,7 +544,7 @@ class _TypeToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceElevatedDark,
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
         borderRadius: AppTheme.radiusFull,
       ),
       child: Row(
@@ -546,14 +553,14 @@ class _TypeToggle extends StatelessWidget {
             label: 'Gasto',
             icon: Icons.arrow_upward_rounded,
             isSelected: value == 'expense',
-            activeColor: AppColors.error,
+            activeColor: Theme.of(context).colorScheme.error,
             onTap: () => onChanged('expense'),
           ),
           _Option(
             label: 'Ingreso',
             icon: Icons.arrow_downward_rounded,
             isSelected: value == 'income',
-            activeColor: AppColors.income,
+            activeColor: Theme.of(context).colorScheme.onTertiary,
             onTap: () => onChanged('income'),
           ),
         ],
@@ -601,7 +608,9 @@ class _Option extends StatelessWidget {
               Icon(
                 icon,
                 size: 16,
-                color: isSelected ? activeColor : AppColors.textMutedDark,
+                color: isSelected
+                    ? activeColor
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: 6),
               Text(
@@ -609,7 +618,9 @@ class _Option extends StatelessWidget {
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: isSelected ? activeColor : AppColors.textMutedDark,
+                  color: isSelected
+                      ? activeColor
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -649,17 +660,17 @@ class _CategorySection extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.category_outlined,
                   size: 18,
-                  color: AppColors.textMutedDark,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 12),
                 Text(
                   'Categoría',
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 14,
-                    color: AppColors.textMutedDark,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const Spacer(),
@@ -668,14 +679,14 @@ class _CategorySection extends StatelessWidget {
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimaryDark,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
                   size: 16,
-                  color: AppColors.textMutedDark,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ],
             ),
@@ -693,7 +704,7 @@ class _CategorySection extends StatelessWidget {
                 final isActive = selectedCategory?.id == cat.id;
                 final chipColor = cat.color.isNotEmpty
                     ? _hexToColor(cat.color)
-                    : AppColors.primary;
+                    : Theme.of(context).colorScheme.primary;
 
                 return GestureDetector(
                   onTap: () => onSelect(cat),
@@ -705,7 +716,7 @@ class _CategorySection extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: isActive
                           ? chipColor.withValues(alpha: 0.2)
-                          : AppColors.surfaceElevatedDark,
+                          : Theme.of(context).colorScheme.surfaceContainerHigh,
                       borderRadius: AppTheme.radiusFull,
                       border: isActive
                           ? Border.all(color: chipColor.withValues(alpha: 0.5))
@@ -720,7 +731,7 @@ class _CategorySection extends StatelessWidget {
                             size: 14,
                             color: isActive
                                 ? chipColor
-                                : AppColors.textPrimaryDark,
+                                : Theme.of(context).colorScheme.onSurface,
                           ),
                           const SizedBox(width: 4),
                         ],
@@ -731,7 +742,7 @@ class _CategorySection extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                             color: isActive
                                 ? chipColor
-                                : AppColors.textPrimaryDark,
+                                : Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ],
@@ -777,17 +788,17 @@ class _TagsSection extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.label_outline_rounded,
                 size: 18,
-                color: AppColors.textMutedDark,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
               Text(
                 'Tags',
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 14,
-                  color: AppColors.textMutedDark,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -801,7 +812,7 @@ class _TagsSection extends StatelessWidget {
               ...selectedTags.map(
                 (t) => Chip(
                   label: Text(t.name),
-                  deleteIcon: const Icon(Icons.close, size: 14),
+                  deleteIcon: Icon(Icons.close, size: 14),
                   onDeleted: () => onRemove(t),
                   visualDensity: VisualDensity.compact,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -826,7 +837,7 @@ class _TagsSection extends StatelessWidget {
                       ),
                       hintStyle: GoogleFonts.ibmPlexSans(
                         fontSize: 13,
-                        color: AppColors.textMutedDark,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                     onChanged: (value) {
@@ -858,14 +869,16 @@ class _TagsSection extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceElevatedDark,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHigh,
                         borderRadius: AppTheme.radiusFull,
                       ),
                       child: Text(
                         tag.name,
                         style: GoogleFonts.ibmPlexSans(
                           fontSize: 12,
-                          color: AppColors.textMutedDark,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -906,13 +919,17 @@ class _DetailRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: AppColors.textMutedDark),
+            Icon(
+              icon,
+              size: 18,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 12),
             Text(
               label,
               style: GoogleFonts.ibmPlexSans(
                 fontSize: 14,
-                color: AppColors.textMutedDark,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const Spacer(),
@@ -921,14 +938,14 @@ class _DetailRow extends StatelessWidget {
               style: GoogleFonts.ibmPlexSans(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: AppColors.textPrimaryDark,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(width: 4),
-            const Icon(
+            Icon(
               Icons.chevron_right_rounded,
               size: 16,
-              color: AppColors.textMutedDark,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ],
         ),
@@ -990,7 +1007,9 @@ class _ScrollableBottomSheet extends StatelessWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceBrightDark,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: AppTheme.radiusFull,
                   ),
                 ),
@@ -1001,7 +1020,7 @@ class _ScrollableBottomSheet extends StatelessWidget {
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimaryDark,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 12),
@@ -1036,7 +1055,11 @@ class _SheetItem extends StatelessWidget {
         child: Row(
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 20, color: AppColors.textMutedDark),
+              Icon(
+                icon,
+                size: 20,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 12),
             ],
             Text(
@@ -1044,7 +1067,7 @@ class _SheetItem extends StatelessWidget {
               style: GoogleFonts.ibmPlexSans(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: AppColors.textPrimaryDark,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ],
@@ -1103,7 +1126,7 @@ class _NumKey extends StatelessWidget {
     final isBackspace = keyValue == 'backspace';
 
     return Material(
-      color: AppColors.surfaceElevatedDark,
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
       borderRadius: AppTheme.radiusMedium,
       child: InkWell(
         onTap: onTap,
@@ -1112,17 +1135,17 @@ class _NumKey extends StatelessWidget {
           height: 52,
           child: Center(
             child: isBackspace
-                ? const Icon(
+                ? Icon(
                     Icons.backspace_outlined,
                     size: 20,
-                    color: AppColors.textMutedDark,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   )
                 : Text(
                     keyValue,
                     style: GoogleFonts.ibmPlexSans(
                       fontSize: 20,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.textPrimaryDark,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
           ),

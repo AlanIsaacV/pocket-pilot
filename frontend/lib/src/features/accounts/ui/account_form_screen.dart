@@ -8,7 +8,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
-import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
@@ -362,7 +361,7 @@ class _SectionLabel extends StatelessWidget {
       style: GoogleFonts.ibmPlexSans(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: AppColors.textMutedDark,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         letterSpacing: 0.3,
       ),
     );
@@ -400,13 +399,15 @@ class _AccountTypeSelector extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: isSelected
-                  ? AppColors.primary.withValues(alpha: 0.15)
-                  : AppColors.surfaceElevatedDark,
+                  ? Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.15)
+                  : Theme.of(context).colorScheme.surfaceContainerHigh,
               borderRadius: AppTheme.radiusFull,
               border: Border.all(
                 color: isSelected
-                    ? AppColors.primary
-                    : AppColors.surfaceElevatedDark,
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.surfaceContainerHigh,
                 width: 1,
               ),
             ),
@@ -417,8 +418,8 @@ class _AccountTypeSelector extends StatelessWidget {
                   icon,
                   size: 16,
                   color: isSelected
-                      ? AppColors.primary
-                      : AppColors.textMutedDark,
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -427,8 +428,8 @@ class _AccountTypeSelector extends StatelessWidget {
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: isSelected
-                        ? AppColors.primary
-                        : AppColors.textMutedDark,
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -453,21 +454,23 @@ class _AccountTypeBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.surfaceElevatedDark,
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
         borderRadius: AppTheme.radiusFull,
-        border: Border.all(color: AppColors.surfaceElevatedDark),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: AppColors.primary),
+          Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 8),
           Text(
             label,
             style: GoogleFonts.ibmPlexSans(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimaryDark,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],

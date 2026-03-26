@@ -22,8 +22,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:pocket_pilot/src/core/theme/app_colors.dart';
-
 class PpScreenState extends StatelessWidget {
   /// true solo cuando no hay datos locales Y se está haciendo sync.
   final bool isLoading;
@@ -60,9 +58,10 @@ class PpScreenState extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isLoading) {
       return _scrollable(
-        child: const Center(
+        context: context,
+        child: Center(
           child: CircularProgressIndicator(
-            color: AppColors.primary,
+            color: Theme.of(context).colorScheme.primary,
             strokeWidth: 2,
           ),
         ),
@@ -71,16 +70,17 @@ class PpScreenState extends StatelessWidget {
 
     if (isEmpty && errorMessage != null) {
       return _scrollable(
+        context: context,
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.wifi_off_rounded,
                   size: 48,
-                  color: AppColors.error,
+                  color: Theme.of(context).colorScheme.error,
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -88,7 +88,7 @@ class PpScreenState extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 14,
-                    color: AppColors.textMutedDark,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -96,7 +96,7 @@ class PpScreenState extends StatelessWidget {
                   'Desliza hacia abajo para reintentar',
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 12,
-                    color: AppColors.textMutedDark,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -108,18 +108,23 @@ class PpScreenState extends StatelessWidget {
 
     if (isEmpty) {
       return _scrollable(
+        context: context,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(emptyIcon, size: 56, color: AppColors.textMutedDark),
+              Icon(
+                emptyIcon,
+                size: 56,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(height: 16),
               Text(
                 emptyLabel,
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textMutedDark,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               if (emptySubLabel != null) ...[
@@ -128,7 +133,7 @@ class PpScreenState extends StatelessWidget {
                   emptySubLabel!,
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 13,
-                    color: AppColors.textMutedDark,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -139,8 +144,8 @@ class PpScreenState extends StatelessWidget {
     }
 
     return RefreshIndicator(
-      color: AppColors.primary,
-      backgroundColor: AppColors.surfaceContainerDark,
+      color: Theme.of(context).colorScheme.primary,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
       onRefresh: onRefresh,
       child: child,
     );
@@ -148,10 +153,10 @@ class PpScreenState extends StatelessWidget {
 
   /// Envuelve [child] en un ScrollView + RefreshIndicator para que el
   /// gesto pull-to-refresh funcione aunque no haya contenido scrollable.
-  Widget _scrollable({required Widget child}) {
+  Widget _scrollable({required BuildContext context, required Widget child}) {
     return RefreshIndicator(
-      color: AppColors.primary,
-      backgroundColor: AppColors.surfaceContainerDark,
+      color: Theme.of(context).colorScheme.primary,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
       onRefresh: onRefresh,
       child: LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(

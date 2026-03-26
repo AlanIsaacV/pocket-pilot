@@ -157,14 +157,16 @@ class _CategoryPickerScreenState extends State<CategoryPickerScreen> {
                         Icon(
                           CategoryIconData.iconFromHex(_breadcrumb.last.icon),
                           size: 18,
-                          color: AppColors.textMutedDark,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           'Subcategorías de ${_breadcrumb.last.name}',
                           style: GoogleFonts.ibmPlexSans(
                             fontSize: 13,
-                            color: AppColors.textMutedDark,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -237,7 +239,7 @@ class _SectionHeader extends StatelessWidget {
       style: GoogleFonts.ibmPlexSans(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: AppColors.textMutedDark,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         letterSpacing: 0.4,
       ),
     );
@@ -258,7 +260,7 @@ class _CategoryChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final chipColor = category.color.isNotEmpty
         ? _hexToColor(category.color)
-        : AppColors.primary;
+        : Theme.of(context).colorScheme.primary;
 
     return GestureDetector(
       onTap: onTap,
@@ -285,7 +287,7 @@ class _CategoryChip extends StatelessWidget {
               style: GoogleFonts.ibmPlexSans(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: AppColors.textPrimaryDark,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             if (hasChildren) ...[
@@ -293,7 +295,7 @@ class _CategoryChip extends StatelessWidget {
               Icon(
                 Icons.chevron_right_rounded,
                 size: 14,
-                color: AppColors.textMutedDark,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ],
           ],
@@ -319,7 +321,7 @@ class _CategoryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final tileColor = category.color.isNotEmpty
         ? _hexToColor(category.color)
-        : AppColors.primary;
+        : Theme.of(context).colorScheme.primary;
 
     return InkWell(
       onTap: onTap,
@@ -354,7 +356,7 @@ class _CategoryTile extends StatelessWidget {
                     style: GoogleFonts.ibmPlexSans(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.textPrimaryDark,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   if (isParentOption)
@@ -362,7 +364,7 @@ class _CategoryTile extends StatelessWidget {
                       'Seleccionar esta categoría',
                       style: GoogleFonts.ibmPlexSans(
                         fontSize: 12,
-                        color: AppColors.textMutedDark,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                 ],
@@ -371,7 +373,9 @@ class _CategoryTile extends StatelessWidget {
             Icon(
               hasChildren ? Icons.chevron_right_rounded : Icons.check_rounded,
               size: 16,
-              color: hasChildren ? AppColors.textMutedDark : AppColors.primary,
+              color: hasChildren
+                  ? Theme.of(context).colorScheme.onSurfaceVariant
+                  : Theme.of(context).colorScheme.primary,
             ),
           ],
         ),

@@ -822,7 +822,7 @@ class _TagsSection extends StatelessWidget {
                       focusedBorder: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 4,
-                        vertical: 8,
+                        vertical: 13,
                       ),
                       hintStyle: GoogleFonts.ibmPlexSans(
                         fontSize: 13,
@@ -1030,9 +1030,9 @@ class _SheetItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: AppTheme.radiusSmall,
+      borderRadius: AppTheme.radiusMedium,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         child: Row(
           children: [
             if (icon != null) ...[
@@ -1104,10 +1104,10 @@ class _NumKey extends StatelessWidget {
 
     return Material(
       color: AppColors.surfaceElevatedDark,
-      borderRadius: AppTheme.radiusFull,
+      borderRadius: AppTheme.radiusMedium,
       child: InkWell(
         onTap: onTap,
-        borderRadius: AppTheme.radiusFull,
+        borderRadius: AppTheme.radiusMedium,
         child: SizedBox(
           height: 52,
           child: Center(

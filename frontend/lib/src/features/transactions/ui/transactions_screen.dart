@@ -19,9 +19,7 @@ class TransactionsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Transacciones'),
-      ),
+      appBar: AppBar(title: const Text('Transacciones')),
       body: Consumer<TransactionsViewModel>(
         builder: (context, vm, _) {
           return Column(
@@ -29,14 +27,17 @@ class TransactionsScreen extends StatelessWidget {
               if (vm.isSyncing && !vm.isLoading)
                 LinearProgressIndicator(
                   color: AppColors.primary,
-                  backgroundColor: AppColors.surfaceElevatedDark,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainer,
                   minHeight: 2,
                 ),
               Expanded(
                 child: PpScreenState(
                   isLoading: vm.isLoading,
-                  errorMessage:
-                      vm.transactions.isEmpty ? vm.errorMessage : null,
+                  errorMessage: vm.transactions.isEmpty
+                      ? vm.errorMessage
+                      : null,
                   isEmpty: vm.transactions.isEmpty,
                   emptyIcon: Icons.receipt_long_outlined,
                   emptyLabel: 'No hay transacciones aún',
@@ -123,7 +124,7 @@ class _MonthHeader extends StatelessWidget {
     final label = '${_monthName(month)} $year';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Text(
         label.toUpperCase(),
         style: GoogleFonts.ibmPlexSans(
@@ -138,8 +139,18 @@ class _MonthHeader extends StatelessWidget {
 
   String _monthName(int month) {
     const names = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
     ];
     return names[month - 1];
   }
@@ -160,30 +171,33 @@ class _TransactionTile extends StatelessWidget {
     final amountColor = isIncome ? AppColors.primary : AppColors.error;
 
     final date = transaction.parsedDate;
-    final formattedDate =
-        '${date.day} ${_monthAbbr(date.month)} ${date.year}';
+    final formattedDate = '${date.day} ${_monthAbbr(date.month)} ${date.year}';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
-          borderRadius: AppTheme.radiusSmall,
+          color: AppColors.surfaceContainerDark,
+          borderRadius: AppTheme.radiusMedium,
         ),
         child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 0,
+          ),
           leading: Container(
             width: 40,
             height: 40,
             decoration: BoxDecoration(
               color: isIncome
-                  ? AppColors.primary.withValues(alpha: 0.12)
-                  : AppColors.error.withValues(alpha: 0.12),
-              borderRadius: AppTheme.radiusSmall,
+                  ? AppColors.primary.withValues(alpha: 0.1)
+                  : AppColors.error.withValues(alpha: 0.1),
+              borderRadius: AppTheme.radiusFull,
             ),
             child: Icon(
-              isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+              isIncome
+                  ? Icons.arrow_downward_rounded
+                  : Icons.arrow_upward_rounded,
               color: amountColor,
               size: 18,
             ),
@@ -221,8 +235,18 @@ class _TransactionTile extends StatelessWidget {
 
   String _monthAbbr(int month) {
     const months = [
-      'ene', 'feb', 'mar', 'abr', 'may', 'jun',
-      'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+      'jul',
+      'ago',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
     ];
     return months[month - 1];
   }

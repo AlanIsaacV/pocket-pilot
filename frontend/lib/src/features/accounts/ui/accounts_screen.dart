@@ -151,15 +151,15 @@ class _AccountCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
-          borderRadius: AppTheme.radiusFull,
+          color: AppColors.surfaceContainerDark,
+          borderRadius: AppTheme.radiusMedium,
           border: Border.all(color: AppColors.surfaceElevatedDark, width: 1),
         ),
         child: ListTile(
           onTap: onTap,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
-            vertical: 10,
+            vertical: 0,
           ),
           leading: Container(
             width: 44,
@@ -241,7 +241,7 @@ class _DeleteBackground extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
         color: AppColors.error.withValues(alpha: 0.18),
-        borderRadius: AppTheme.radiusFull,
+        borderRadius: AppTheme.radiusMedium,
         border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
       ),
       alignment: Alignment.centerRight,

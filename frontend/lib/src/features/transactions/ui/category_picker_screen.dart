@@ -65,9 +65,8 @@ class _CategoryPickerScreenState extends State<CategoryPickerScreen> {
 
   bool get _isAtRoot => _currentParentId == null;
 
-  List<CategoryModel> get _currentCategories => _allCategories
-      .where((c) => c.parentId == _currentParentId)
-      .toList();
+  List<CategoryModel> get _currentCategories =>
+      _allCategories.where((c) => c.parentId == _currentParentId).toList();
 
   List<CategoryModel> get _currentTypeCategories =>
       _currentCategories.where((c) => c.type == widget.type).toList();
@@ -75,14 +74,12 @@ class _CategoryPickerScreenState extends State<CategoryPickerScreen> {
   List<CategoryModel> get _otherTypeCategories =>
       _currentCategories.where((c) => c.type != widget.type).toList();
 
-  List<CategoryModel> get _recentCategories =>
-      _allCategories
-          .where((c) => c.type == widget.type && c.parentId == null)
-          .take(5)
-          .toList();
+  List<CategoryModel> get _recentCategories => _allCategories
+      .where((c) => c.type == widget.type && c.parentId == null)
+      .take(5)
+      .toList();
 
-  bool _hasChildren(String id) =>
-      _allCategories.any((c) => c.parentId == id);
+  bool _hasChildren(String id) => _allCategories.any((c) => c.parentId == id);
 
   void _onTapCategory(CategoryModel cat) {
     if (_hasChildren(cat.id)) {
@@ -99,8 +96,7 @@ class _CategoryPickerScreenState extends State<CategoryPickerScreen> {
     if (_breadcrumb.isEmpty) return;
     setState(() {
       _breadcrumb.removeLast();
-      _currentParentId =
-          _breadcrumb.isEmpty ? null : _breadcrumb.last.id;
+      _currentParentId = _breadcrumb.isEmpty ? null : _breadcrumb.last.id;
     });
   }
 
@@ -140,11 +136,13 @@ class _CategoryPickerScreenState extends State<CategoryPickerScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: _recentCategories
-                        .map((c) => _CategoryChip(
-                              category: c,
-                              hasChildren: _hasChildren(c.id),
-                              onTap: () => _onTapCategory(c),
-                            ))
+                        .map(
+                          (c) => _CategoryChip(
+                            category: c,
+                            hasChildren: _hasChildren(c.id),
+                            onTap: () => _onTapCategory(c),
+                          ),
+                        )
                         .toList(),
                   ),
                   const SizedBox(height: 24),
@@ -157,8 +155,7 @@ class _CategoryPickerScreenState extends State<CategoryPickerScreen> {
                     child: Row(
                       children: [
                         Icon(
-                          CategoryIconData.iconFromHex(
-                              _breadcrumb.last.icon),
+                          CategoryIconData.iconFromHex(_breadcrumb.last.icon),
                           size: 18,
                           color: AppColors.textMutedDark,
                         ),
@@ -178,17 +175,14 @@ class _CategoryPickerScreenState extends State<CategoryPickerScreen> {
                     category: _breadcrumb.last,
                     hasChildren: false,
                     isParentOption: true,
-                    onTap: () =>
-                        Navigator.of(context).pop(_breadcrumb.last),
+                    onTap: () => Navigator.of(context).pop(_breadcrumb.last),
                   ),
                   const Divider(height: 24),
                 ],
 
                 // --- Tipo actual ---
                 if (_isAtRoot)
-                  _SectionHeader(
-                    label: isExpense ? 'Gastos' : 'Ingresos',
-                  ),
+                  _SectionHeader(label: isExpense ? 'Gastos' : 'Ingresos'),
                 if (_isAtRoot) const SizedBox(height: 8),
                 ..._currentTypeCategories.map(
                   (c) => _CategoryTile(
@@ -201,9 +195,7 @@ class _CategoryPickerScreenState extends State<CategoryPickerScreen> {
                 // --- Otro tipo (solo en raíz) ---
                 if (_isAtRoot && _otherTypeCategories.isNotEmpty) ...[
                   const SizedBox(height: 24),
-                  _SectionHeader(
-                    label: isExpense ? 'Ingresos' : 'Gastos',
-                  ),
+                  _SectionHeader(label: isExpense ? 'Ingresos' : 'Gastos'),
                   const SizedBox(height: 8),
                   ..._otherTypeCategories.map(
                     (c) => _CategoryTile(
@@ -331,17 +323,18 @@ class _CategoryTile extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: AppTheme.radiusSmall,
+      borderRadius: AppTheme.radiusMedium,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
         child: Row(
           children: [
             Container(
+              margin: EdgeInsets.fromLTRB(16, 0, 16, 0),
               width: 32,
               height: 32,
               decoration: BoxDecoration(
                 color: tileColor.withValues(alpha: 0.15),
-                borderRadius: AppTheme.radiusSmall,
+                borderRadius: AppTheme.radiusMedium,
               ),
               child: Center(
                 child: Icon(
@@ -376,13 +369,9 @@ class _CategoryTile extends StatelessWidget {
               ),
             ),
             Icon(
-              hasChildren
-                  ? Icons.chevron_right_rounded
-                  : Icons.check_rounded,
+              hasChildren ? Icons.chevron_right_rounded : Icons.check_rounded,
               size: 16,
-              color: hasChildren
-                  ? AppColors.textMutedDark
-                  : AppColors.primary,
+              color: hasChildren ? AppColors.textMutedDark : AppColors.primary,
             ),
           ],
         ),

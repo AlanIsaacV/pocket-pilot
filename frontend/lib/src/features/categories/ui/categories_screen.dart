@@ -300,7 +300,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
         child: Row(
           children: [
             Icon(icon, color: color, size: 14),
@@ -339,13 +339,13 @@ class _CategoryRow extends StatelessWidget {
     final count = vm.childCount(category.id);
 
     final row = Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Container(
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.08)
-              : AppColors.surfaceDark,
-          borderRadius: AppTheme.radiusFull,
+              ? AppColors.primary.withValues(alpha: 0.1)
+              : AppColors.surfaceContainerDark,
+          borderRadius: AppTheme.radiusMedium,
           border: Border.all(
             color: isSelected
                 ? AppColors.primary.withValues(alpha: 0.3)
@@ -355,8 +355,8 @@ class _CategoryRow extends StatelessWidget {
         ),
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 2,
+            horizontal: 16,
+            vertical: 0,
           ),
           leading: Row(
             mainAxisSize: MainAxisSize.min,
@@ -535,11 +535,11 @@ class _EditBackground extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
         color: AppColors.primary.withValues(alpha: 0.18),
-        borderRadius: AppTheme.radiusFull,
+        borderRadius: AppTheme.radiusMedium,
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
       ),
       alignment: Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

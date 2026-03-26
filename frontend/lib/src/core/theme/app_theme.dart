@@ -296,28 +296,25 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surfaceElevated,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
         border: const OutlineInputBorder(
-          borderRadius: radiusFull,
+          borderRadius: radiusSmall,
           borderSide: BorderSide.none,
         ),
         enabledBorder: const OutlineInputBorder(
-          borderRadius: radiusFull,
+          borderRadius: radiusSmall,
           borderSide: BorderSide.none,
         ),
         focusedBorder: const OutlineInputBorder(
-          borderRadius: radiusFull,
+          borderRadius: radiusSmall,
           borderSide: BorderSide(color: AppColors.primary, width: 1.5),
         ),
         errorBorder: const OutlineInputBorder(
-          borderRadius: radiusFull,
+          borderRadius: radiusSmall,
           borderSide: BorderSide(color: AppColors.error, width: 1),
         ),
         focusedErrorBorder: const OutlineInputBorder(
-          borderRadius: radiusFull,
+          borderRadius: radiusSmall,
           borderSide: BorderSide(color: AppColors.error, width: 1.5),
         ),
         hintStyle: GoogleFonts.ibmPlexSans(fontSize: 14, color: textMuted),

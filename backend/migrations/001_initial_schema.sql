@@ -46,7 +46,7 @@ CREATE TABLE tags
     updated_at timestamptz NOT NULL DEFAULT NOW(),
     deleted_at timestamptz
 );
-CREATE INDEX idx_categories_user_id ON categories (user_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_tags_user_id ON tags (user_id) WHERE deleted_at IS NULL;
 
 
 CREATE TYPE transaction_type AS ENUM ('income', 'expense', 'transfer_out', 'transfer_in');

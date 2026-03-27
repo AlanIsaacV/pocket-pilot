@@ -36,6 +36,8 @@ class TransactionRepository {
     return _rowsToModels(rows);
   }
 
+  Future<String?> getLastUsedAccountId() => _local.getLastUsedAccountId();
+
   /// Convierte filas de BD a modelos de dominio, enriqueciendo cada
   /// transacción con el tipo de su categoría.
   Future<List<TransactionModel>> _rowsToModels(

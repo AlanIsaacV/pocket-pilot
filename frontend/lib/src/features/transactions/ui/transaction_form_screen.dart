@@ -51,6 +51,10 @@ class TransactionFormScreen extends StatefulWidget {
   State<TransactionFormScreen> createState() => _TransactionFormScreenState();
 }
 
+enum _AccountSheetSelection { addNew }
+
+enum _CurrencySheetSelection { openPreferences }
+
 class _TransactionFormScreenState extends State<TransactionFormScreen> {
   static const _uuid = Uuid();
 
@@ -95,46 +99,150 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     final tagStore = context.read<TagLocalStore>();
     final currencyPreferencesStore = context
         .read<CurrencyPreferencesLocalStore>();
+    final transactionRepository = context.read<TransactionRepository>();
 
-    final results = await Future.wait([
+    final results = await Future.wait<dynamic>([
       accountStore.getAccounts(),
       categoryStore.getCategories(),
       tagStore.getTags(),
       currencyPreferencesStore.getSnapshot(),
+      transactionRepository.getLastUsedAccountId(),
     ]);
 
+    if (!mounted) return;
+
     final currencySnapshot = results[3] as CurrencyPreferencesSnapshot;
+    final lastUsedAccountId = results[4] as String?;
 
     final accounts = results[0] as List<AccountModel>;
     final categories = results[1] as List<CategoryModel>;
     final tags = results[2] as List<TagModel>;
 
+    if (!_isEditMode && accounts.isEmpty) {
+      await _redirectToCreateAccount();
+      return;
+    }
+
+    var allowedCurrencies = List<String>.from(currencySnapshot.allowedCodes);
+    var selectedCurrencyCode = currencySnapshot.defaultCode;
+    AccountModel? selectedAccount;
+    CategoryModel? selectedCategory;
+
+    if (_isEditMode) {
+      final t = widget.transaction!;
+      _type = t.type;
+      final rawAmount = t.amount / 100;
+      _amountInput = rawAmount == rawAmount.truncateToDouble()
+          ? rawAmount.toInt().toString()
+          : rawAmount.toStringAsFixed(2);
+      selectedCurrencyCode = t.currencyCode;
+      _date = t.parsedDate;
+      for (final account in accounts) {
+        if (account.id == t.accountId) {
+          selectedAccount = account;
+          break;
+        }
+      }
+      for (final category in categories) {
+        if (category.id == t.categoryId) {
+          selectedCategory = category;
+          break;
+        }
+      }
+      _noteController.text = t.description;
+    } else {
+      if (lastUsedAccountId != null) {
+        for (final account in accounts) {
+          if (account.id == lastUsedAccountId) {
+            selectedAccount = account;
+            break;
+          }
+        }
+      }
+      selectedAccount ??= accounts.first;
+      selectedCurrencyCode = selectedAccount.currencyCode;
+    }
+
+    if (!allowedCurrencies.contains(selectedCurrencyCode)) {
+      allowedCurrencies.add(selectedCurrencyCode);
+      allowedCurrencies.sort(compareCurrencyCodes);
+    }
+
     setState(() {
       _accounts = accounts;
       _allCategories = categories;
       _allTags = tags;
-      _allowedCurrencies = currencySnapshot.allowedCodes;
-      _currencyCode = currencySnapshot.defaultCode;
+      _allowedCurrencies = allowedCurrencies;
+      _currencyCode = selectedCurrencyCode;
+      _selectedAccount = selectedAccount;
+      _selectedCategory = selectedCategory;
+    });
+  }
 
-      if (_isEditMode) {
-        final t = widget.transaction!;
-        _type = t.type;
-        final rawAmount = t.amount / 100;
-        _amountInput = rawAmount == rawAmount.truncateToDouble()
-            ? rawAmount.toInt().toString()
-            : rawAmount.toStringAsFixed(2);
-        _currencyCode = t.currencyCode;
-        _date = t.parsedDate;
-        _selectedAccount = accounts.cast<AccountModel?>().firstWhere(
-          (a) => a!.id == t.accountId,
-          orElse: () => null,
-        );
-        _selectedCategory = categories.cast<CategoryModel?>().firstWhere(
-          (c) => c!.id == t.categoryId,
-          orElse: () => null,
-        );
-        _noteController.text = t.description;
+  Future<void> _redirectToCreateAccount() async {
+    await _openCreateAccountFlow(closeIfNoAccounts: true);
+  }
+
+  Future<void> _openCreateAccountFlow({required bool closeIfNoAccounts}) async {
+    final created = await context.push<bool>('/accounts/new');
+    if (!mounted) return;
+
+    if (created == true) {
+      await _loadData();
+      return;
+    }
+
+    final accounts = await context.read<AccountLocalStore>().getAccounts();
+    if (!mounted) return;
+
+    if (accounts.isEmpty && closeIfNoAccounts) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Necesitas crear una cuenta para registrar transacciones',
+          ),
+        ),
+      );
+      context.pop(false);
+      return;
+    }
+
+    await _loadData();
+  }
+
+  Future<void> _openCurrencyPreferencesFlow() async {
+    await context.push<bool>('/settings/currency');
+    if (!mounted) return;
+
+    final snapshot = await context
+        .read<CurrencyPreferencesLocalStore>()
+        .getSnapshot();
+    if (!mounted) return;
+
+    final allowed = List<String>.from(snapshot.allowedCodes);
+    if (_selectedAccount != null &&
+        !allowed.contains(_selectedAccount!.currencyCode)) {
+      allowed.add(_selectedAccount!.currencyCode);
+    }
+
+    var nextCurrencyCode = _currencyCode;
+    if (!allowed.contains(nextCurrencyCode)) {
+      if (_selectedAccount != null &&
+          allowed.contains(_selectedAccount!.currencyCode)) {
+        nextCurrencyCode = _selectedAccount!.currencyCode;
+      } else {
+        nextCurrencyCode = snapshot.defaultCode;
       }
+    }
+
+    if (!allowed.contains(nextCurrencyCode)) {
+      allowed.add(nextCurrencyCode);
+    }
+    allowed.sort(compareCurrencyCodes);
+
+    setState(() {
+      _allowedCurrencies = allowed;
+      _currencyCode = nextCurrencyCode;
     });
   }
 
@@ -174,7 +282,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   // ----------------------------------------------------------
 
   void _showAccountSheet() {
-    showModalBottomSheet<AccountModel>(
+    showModalBottomSheet<Object>(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
       isScrollControlled: true,
@@ -183,23 +291,43 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       ),
       builder: (ctx) => _ScrollableBottomSheet(
         title: 'Seleccionar cuenta',
-        children: _accounts
-            .map(
-              (a) => _SheetItem(
-                icon: _accountIcon(a.type),
-                label: a.name,
-                onTap: () => Navigator.pop(ctx, a),
-              ),
-            )
-            .toList(),
+        children: [
+          _SheetItem(
+            icon: Icons.add_circle_outline_rounded,
+            label: 'Agregar cuenta',
+            onTap: () => Navigator.pop(ctx, _AccountSheetSelection.addNew),
+          ),
+          ..._accounts.map(
+            (a) => _SheetItem(
+              icon: _accountIcon(a.type),
+              label: a.name,
+              onTap: () => Navigator.pop(ctx, a),
+            ),
+          ),
+        ],
       ),
-    ).then((account) {
-      if (account != null) setState(() => _selectedAccount = account);
+    ).then((selection) async {
+      if (selection is AccountModel) {
+        setState(() {
+          _selectedAccount = selection;
+          _currencyCode = selection.currencyCode;
+          if (!_allowedCurrencies.contains(_currencyCode)) {
+            _allowedCurrencies = List<String>.from(_allowedCurrencies)
+              ..add(_currencyCode)
+              ..sort(compareCurrencyCodes);
+          }
+        });
+        return;
+      }
+
+      if (selection == _AccountSheetSelection.addNew) {
+        await _openCreateAccountFlow(closeIfNoAccounts: false);
+      }
     });
   }
 
   void _showCurrencySheet() {
-    showModalBottomSheet<String>(
+    showModalBottomSheet<Object>(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
       isScrollControlled: true,
@@ -208,17 +336,30 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       ),
       builder: (ctx) => _ScrollableBottomSheet(
         title: 'Seleccionar moneda',
-        children: _allowedCurrencies
-            .map(
-              (code) => _SheetItem(
-                label: '$code — ${currencyNameForCode(code)}',
-                onTap: () => Navigator.pop(ctx, code),
-              ),
-            )
-            .toList(),
+        children: [
+          _SheetItem(
+            icon: Icons.tune_rounded,
+            label: 'Configurar monedas',
+            onTap: () =>
+                Navigator.pop(ctx, _CurrencySheetSelection.openPreferences),
+          ),
+          ..._allowedCurrencies.map(
+            (code) => _SheetItem(
+              label: '$code — ${currencyNameForCode(code)}',
+              onTap: () => Navigator.pop(ctx, code),
+            ),
+          ),
+        ],
       ),
-    ).then((code) {
-      if (code != null) setState(() => _currencyCode = code);
+    ).then((selection) async {
+      if (selection is String) {
+        setState(() => _currencyCode = selection);
+        return;
+      }
+
+      if (selection == _CurrencySheetSelection.openPreferences) {
+        await _openCurrencyPreferencesFlow();
+      }
     });
   }
 

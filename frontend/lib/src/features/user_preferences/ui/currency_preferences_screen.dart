@@ -60,32 +60,6 @@ class _CurrencyPreferencesScreenState extends State<CurrencyPreferencesScreen> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
                     children: [
-                      _SectionCard(
-                        title: 'Moneda por defecto',
-                        child: DropdownButtonFormField<String>(
-                          key: ValueKey(
-                            'default-$_defaultDraft-${_allowedDraft.join(',')}',
-                          ),
-                          initialValue: _defaultDraft,
-                          items: _allowedDraft
-                              .map(
-                                (code) => DropdownMenuItem<String>(
-                                  value: code,
-                                  child: Text(
-                                    '$code - ${currencyNameForCode(code)}',
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setState(() => _defaultDraft = value);
-                          },
-                          decoration: const InputDecoration(
-                            labelText: 'Selecciona una moneda',
-                          ),
-                        ),
-                      ),
                       const SizedBox(height: 12),
                       _SectionCard(
                         title: 'Monedas sugeridas',

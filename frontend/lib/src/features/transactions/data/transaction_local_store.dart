@@ -37,6 +37,21 @@ class TransactionLocalStore {
     );
   }
 
+  /// Retorna el account_id de la transacción más recientemente usada
+  /// (según updated_at), ignorando registros eliminados.
+  Future<String?> getLastUsedAccountId() async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'transactions',
+      columns: ['account_id'],
+      where: 'deleted_at IS NULL',
+      orderBy: 'updated_at DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['account_id'] as String?;
+  }
+
   // ----------------------------------------------------------
   // WRITE
   // ----------------------------------------------------------

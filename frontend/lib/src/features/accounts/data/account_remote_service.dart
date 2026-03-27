@@ -32,7 +32,9 @@ class AccountRemoteService {
   Future<UpsertAccountResponse> upsertAccount(Map<String, dynamic> map) async {
     try {
       final account = _buildProto(map);
-      return await _client.upsertAccount(UpsertAccountRequest(account: account));
+      return await _client.upsertAccount(
+        UpsertAccountRequest(account: account),
+      );
     } on GrpcError catch (e) {
       throw Exception('gRPC upsertAccount error: ${e.message}');
     }
@@ -65,16 +67,20 @@ class AccountRemoteService {
       id: map['id'] as String,
       name: map['name'] as String,
       type: AccountModel.stringToAccountType(map['type'] as String),
-      creditLimitCents:
-          creditLimitCents != null ? Int64(creditLimitCents) : null,
+      currencyCode: map['currency_code'] as String,
+      creditLimitCents: creditLimitCents != null
+          ? Int64(creditLimitCents)
+          : null,
       statementDay: statementDay,
       paymentDueDay: paymentDueDay,
       interestRateApr: interestRateApr,
       termMonths: termMonths,
       createdAt: Timestamp.fromDateTime(
-          DateTime.parse(map['created_at'] as String).toUtc()),
+        DateTime.parse(map['created_at'] as String).toUtc(),
+      ),
       updatedAt: Timestamp.fromDateTime(
-          DateTime.parse(map['updated_at'] as String).toUtc()),
+        DateTime.parse(map['updated_at'] as String).toUtc(),
+      ),
     );
   }
 }

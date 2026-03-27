@@ -5,6 +5,7 @@ CREATE TABLE accounts
     user_id            uuid         NOT NULL,
     name               TEXT         NOT NULL,
     type               account_type NOT NULL,
+    currency_code      TEXT         NOT NULL,
 
     credit_limit_cents INTEGER,
     statement_day      SMALLINT,

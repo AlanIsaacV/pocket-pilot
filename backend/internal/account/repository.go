@@ -16,6 +16,7 @@ type Account struct {
 	UserID           uuid.UUID
 	Name             string
 	Type             string // matches account_type enum: 'bank', 'cash', 'credit_card', 'loan', 'investment', 'crypto', 'other'
+	CurrencyCode     string
 	CreditLimitCents *int64
 	StatementDay     *int32
 	PaymentDueDay    *int32
@@ -37,7 +38,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 func (r *Repository) scan(row pgx.Row) (*Account, error) {
 	a := &Account{}
 	err := row.Scan(
-		&a.ID, &a.UserID, &a.Name, &a.Type,
+		&a.ID, &a.UserID, &a.Name, &a.Type, &a.CurrencyCode,
 		&a.CreditLimitCents, &a.StatementDay, &a.PaymentDueDay,
 		&a.InterestRateApr, &a.TermMonths,
 		&a.CreatedAt, &a.UpdatedAt, &a.DeletedAt,
@@ -52,7 +53,7 @@ func (r *Repository) scan(row pgx.Row) (*Account, error) {
 // Used to return the server's current version after a LWW conflict.
 func (r *Repository) GetByID(ctx context.Context, id, userID uuid.UUID) (*Account, error) {
 	row := r.pool.QueryRow(ctx,
-		`SELECT id, user_id, name, type, credit_limit_cents,
+		`SELECT id, user_id, name, type, currency_code, credit_limit_cents,
 			statement_day, payment_due_day, interest_rate_apr,
 			term_months, created_at, updated_at, deleted_at
 		FROM accounts WHERE id = $1 AND user_id = $2`,
@@ -80,7 +81,7 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 	if updatedSince != nil {
 		// Delta sync: return changed records since the cursor (including deletions).
 		rows, err = r.pool.Query(ctx,
-			`SELECT id, user_id, name, type, credit_limit_cents,
+			`SELECT id, user_id, name, type, currency_code, credit_limit_cents,
 				statement_day, payment_due_day, interest_rate_apr,
 				term_months, created_at, updated_at, deleted_at
 			 FROM accounts
@@ -91,7 +92,7 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 	} else {
 		// Full sync: return all active records with pagination.
 		rows, err = r.pool.Query(ctx,
-			`SELECT id, user_id, name, type, credit_limit_cents,
+			`SELECT id, user_id, name, type, currency_code, credit_limit_cents,
 				statement_day, payment_due_day, interest_rate_apr,
 				term_months, created_at, updated_at, deleted_at
 			 FROM accounts
@@ -110,7 +111,7 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 	for rows.Next() {
 		a := &Account{}
 		if err := rows.Scan(
-			&a.ID, &a.UserID, &a.Name, &a.Type,
+			&a.ID, &a.UserID, &a.Name, &a.Type, &a.CurrencyCode,
 			&a.CreditLimitCents, &a.StatementDay, &a.PaymentDueDay,
 			&a.InterestRateApr, &a.TermMonths,
 			&a.CreatedAt, &a.UpdatedAt, &a.DeletedAt,
@@ -130,11 +131,12 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 //   - conflictResolved=true:  the server had a newer version; returned account is the server's.
 func (r *Repository) Upsert(ctx context.Context, a *Account) (*Account, bool, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO accounts (id, user_id, name, type, credit_limit_cents, statement_day, payment_due_day, interest_rate_apr, term_months, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO accounts (id, user_id, name, type, currency_code, credit_limit_cents, statement_day, payment_due_day, interest_rate_apr, term_months, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		ON CONFLICT (id) DO UPDATE SET
 			name              = EXCLUDED.name,
 			type              = EXCLUDED.type,
+			currency_code     = EXCLUDED.currency_code,
 			credit_limit_cents = EXCLUDED.credit_limit_cents,
 			statement_day     = EXCLUDED.statement_day,
 			payment_due_day   = EXCLUDED.payment_due_day,
@@ -142,10 +144,11 @@ func (r *Repository) Upsert(ctx context.Context, a *Account) (*Account, bool, er
 			term_months       = EXCLUDED.term_months,
 			updated_at        = EXCLUDED.updated_at
 		WHERE accounts.updated_at < EXCLUDED.updated_at
-		RETURNING id, user_id, name, type, credit_limit_cents,
+		RETURNING id, user_id, name, type, currency_code, credit_limit_cents,
 			statement_day, payment_due_day, interest_rate_apr,
 			term_months, created_at, updated_at, deleted_at`,
 		a.ID, a.UserID, a.Name, a.Type,
+		a.CurrencyCode,
 		a.CreditLimitCents, a.StatementDay, a.PaymentDueDay,
 		a.InterestRateApr, a.TermMonths,
 		a.CreatedAt, a.UpdatedAt,

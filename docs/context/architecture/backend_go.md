@@ -32,3 +32,7 @@ The `Handler` struct implements the gRPC server interface generated from Protobu
     - `updated_at TIMESTAMP WITH TIME ZONE NOT NULL`
     - `deleted_at TIMESTAMP WITH TIME ZONE` (for soft deletes)
 - **LWW:** Updates must use `ON CONFLICT (id) DO UPDATE SET ... WHERE table.updated_at < EXCLUDED.updated_at`.
+
+### Account Currency Requirement
+- Account domain structs, repository scans, and upsert SQL must map `currency_code` as a required column.
+- Account handlers must validate `account.currency_code` as required input before calling repository upsert.

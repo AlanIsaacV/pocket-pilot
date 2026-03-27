@@ -23,6 +23,7 @@ Standard sync-oriented services **MUST** implement:
 - **Timestamps:** Use `google.protobuf.Timestamp` for all dates/times.
 - **Money:** Use the common `Money` message defined in `common.proto` for all monetary values.
 - **Enums:** Start enum value names with the enum name (e.g., `ACCOUNT_TYPE_BANK`).
+- **Required domain fields:** For MVP entity contracts, include required persistence attributes explicitly in the entity message (for example, `Account.currency_code`) so frontend/backed mappings remain symmetric.
 
 ## Code Generation
 Always run `make proto` from the root directory after any change to a `.proto` file.

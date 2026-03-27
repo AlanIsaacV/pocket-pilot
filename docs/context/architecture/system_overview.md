@@ -17,3 +17,8 @@ Pocket Pilot is an offline-first personal finance application with a Flutter fro
 - User settings (e.g., transaction currency config and app theme mode) are modeled as synchronized key-value records in `user_preferences`.
 - Frontend applies preference changes immediately from local SQLite (offline-first), while server sync happens via outbox.
 - App theme selection uses `app.theme_mode` (`system` | `dark` | `light`) and is applied at runtime by `MaterialApp.themeMode`.
+
+## Account Currency
+- `accounts.currency_code` is required in both client and server persistence models.
+- Account create/edit flows must capture a valid currency code and persist it locally before sync.
+- Transactions keep their own `currency_code` snapshot at creation time; it is not derived dynamically from the account after write.

@@ -36,6 +36,11 @@ Each feature in `lib/src/features/<feature_name>/` must follow the same folder s
 - Preference writes must go through `UserPreferenceRepository` so each write is persisted locally and enqueued in `SyncOutbox` (`entity_type = user_preference`, `entity_id = pref_key`).
 - Domain-specific adapters should wrap raw preferences for UI use (e.g., `CurrencyPreferencesLocalStore`, `ThemePreferencesLocalStore`).
 
+### Accounts Currency Flow
+- `AccountModel` includes required `currencyCode`, persisted as `accounts.currency_code` in SQLite.
+- `AccountFormScreen` reads allowed/default currency options from `user_preferences` through `CurrencyPreferencesLocalStore` and requires a selection during create/edit.
+- Account repository writes `currency_code` in local rows and outbox payload so sync pushes preserve account currency.
+
 ### Theme Preference Flow
 - Source of truth key: `app.theme_mode` with values `system`, `dark`, `light`.
 - `ThemePreferenceController` loads local value on app startup and exposes `ThemeMode` to `MaterialApp.themeMode`.

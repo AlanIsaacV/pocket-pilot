@@ -3,6 +3,7 @@ CREATE TABLE accounts
     id                 TEXT PRIMARY KEY,
     name               TEXT     NOT NULL,
     type               TEXT     NOT NULL,
+    currency_code      TEXT     NOT NULL,
     credit_limit_cents INTEGER,
     statement_day      SMALLINT,
     payment_due_day    SMALLINT,

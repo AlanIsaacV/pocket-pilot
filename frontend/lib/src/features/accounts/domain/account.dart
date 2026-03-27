@@ -7,6 +7,7 @@ class AccountModel {
 
   /// Tipo de cuenta: 'bank', 'cash', 'credit_card', 'loan', 'investment', 'crypto', 'other'.
   final String type;
+  final String currencyCode;
 
   final int? creditLimitCents;
   final int? statementDay;
@@ -21,6 +22,7 @@ class AccountModel {
     required this.id,
     required this.name,
     required this.type,
+    required this.currencyCode,
     this.creditLimitCents,
     this.statementDay,
     this.paymentDueDay,
@@ -36,18 +38,21 @@ class AccountModel {
       id: proto.id,
       name: proto.name,
       type: _accountTypeToString(proto.type),
+      currencyCode: proto.currencyCode,
       creditLimitCents: proto.creditLimitCents != Int64.ZERO
           ? proto.creditLimitCents.toInt()
           : null,
       statementDay: proto.statementDay != 0 ? proto.statementDay : null,
       paymentDueDay: proto.paymentDueDay != 0 ? proto.paymentDueDay : null,
-      interestRateApr:
-          proto.interestRateApr != 0 ? proto.interestRateApr : null,
+      interestRateApr: proto.interestRateApr != 0
+          ? proto.interestRateApr
+          : null,
       termMonths: proto.termMonths != 0 ? proto.termMonths : null,
       createdAt: proto.createdAt.toDateTime().toUtc(),
       updatedAt: proto.updatedAt.toDateTime().toUtc(),
-      deletedAt:
-          proto.hasDeletedAt() ? proto.deletedAt.toDateTime().toUtc() : null,
+      deletedAt: proto.hasDeletedAt()
+          ? proto.deletedAt.toDateTime().toUtc()
+          : null,
     );
   }
 
@@ -56,6 +61,7 @@ class AccountModel {
       id: map['id'] as String,
       name: map['name'] as String,
       type: map['type'] as String,
+      currencyCode: map['currency_code'] as String,
       creditLimitCents: map['credit_limit_cents'] as int?,
       statementDay: map['statement_day'] as int?,
       paymentDueDay: map['payment_due_day'] as int?,
@@ -75,6 +81,7 @@ class AccountModel {
       'id': id,
       'name': name,
       'type': type,
+      'currency_code': currencyCode,
       'credit_limit_cents': creditLimitCents,
       'statement_day': statementDay,
       'payment_due_day': paymentDueDay,

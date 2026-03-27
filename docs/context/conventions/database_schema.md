@@ -35,3 +35,6 @@ This document outlines the conventions for defining database schemas and migrati
 2. Add a PostgreSQL migration to `backend/migrations/`.
 3. Add a SQLite migration to `frontend/assets/migrations/`.
 4. Update the corresponding `Handler` and `LocalStore` to handle new fields.
+
+## MVP Baseline Exception
+- While the project is in MVP stage and no production data exists, it is acceptable to modify the original baseline schema files (`001_*.sql`) directly to introduce new required columns (for example, `accounts.currency_code`).

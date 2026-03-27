@@ -3,6 +3,7 @@ package account
 import (
 	"context"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,8 +12,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
 	pb "github.com/AlanIsaacV/pocket-pilot/internal/gen/proto/pocket_pilot/v1/pocket_pilot/v1"
+	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
 )
 
 func parseUUID(s, field string) (uuid.UUID, error) {
@@ -103,11 +104,12 @@ func stringToAccountType(s string) pb.AccountType {
 
 func toProto(a *Account) *pb.Account {
 	proto := &pb.Account{
-		Id:        a.ID.String(),
-		Name:      a.Name,
-		Type:      stringToAccountType(a.Type),
-		CreatedAt: timestamppb.New(a.CreatedAt),
-		UpdatedAt: timestamppb.New(a.UpdatedAt),
+		Id:           a.ID.String(),
+		Name:         a.Name,
+		Type:         stringToAccountType(a.Type),
+		CurrencyCode: a.CurrencyCode,
+		CreatedAt:    timestamppb.New(a.CreatedAt),
+		UpdatedAt:    timestamppb.New(a.UpdatedAt),
 	}
 	if a.CreditLimitCents != nil {
 		proto.CreditLimitCents = *a.CreditLimitCents
@@ -135,6 +137,10 @@ func toProto(a *Account) *pb.Account {
 func fromProto(p *pb.Account, a *Account) error {
 	a.Name = p.Name
 	a.Type = accountTypeToString(p.Type)
+	a.CurrencyCode = strings.ToUpper(strings.TrimSpace(p.CurrencyCode))
+	if a.CurrencyCode == "" {
+		return status.Error(codes.InvalidArgument, "account.currency_code is required")
+	}
 	a.CreatedAt = p.CreatedAt.AsTime()
 	a.UpdatedAt = p.UpdatedAt.AsTime()
 	if p.CreditLimitCents != 0 {

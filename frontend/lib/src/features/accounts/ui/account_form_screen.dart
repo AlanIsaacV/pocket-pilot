@@ -8,9 +8,14 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
+import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
+import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
 
 class AccountFormScreen extends StatefulWidget {
   final AccountModel? account;
@@ -31,6 +36,10 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
   final _termMonthsController = TextEditingController();
 
   String _selectedType = 'cash';
+  String _selectedCurrencyCode = kInitialDefaultCurrency;
+  List<String> _allowedCurrencies = List<String>.from(
+    kInitialAllowedCurrencies,
+  );
   bool _isSaving = false;
 
   static const _accountTypes = [
@@ -48,9 +57,18 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
   void initState() {
     super.initState();
     final account = widget.account;
-    if (account == null) return;
+    if (account == null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _loadCurrencyOptions(),
+      );
+      return;
+    }
 
     _selectedType = account.type;
+    _selectedCurrencyCode = account.currencyCode;
+    if (!_allowedCurrencies.contains(_selectedCurrencyCode)) {
+      _allowedCurrencies.add(_selectedCurrencyCode);
+    }
     _nameController.text = account.name;
     if (account.creditLimitCents != null) {
       _creditLimitController.text = (account.creditLimitCents! / 100)
@@ -68,6 +86,8 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     if (account.termMonths != null) {
       _termMonthsController.text = account.termMonths.toString();
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCurrencyOptions());
   }
 
   @override
@@ -85,10 +105,66 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
   bool get _isLoan => _selectedType == 'loan';
   bool get _requiresSpecialFields => _isCreditCard || _isLoan;
 
+  Future<void> _loadCurrencyOptions() async {
+    final db = context.read<DatabaseHelper>();
+    final userPreferenceStore = UserPreferenceLocalStore(db: db);
+    final currencyPreferenceStore = CurrencyPreferencesLocalStore(
+      preferences: userPreferenceStore,
+    );
+    final snapshot = await currencyPreferenceStore.getSnapshot();
+    if (!mounted) return;
+
+    final allowed = List<String>.from(snapshot.allowedCodes);
+    if (!allowed.contains(_selectedCurrencyCode)) {
+      allowed.add(_selectedCurrencyCode);
+    }
+    allowed.sort(compareCurrencyCodes);
+
+    setState(() {
+      _allowedCurrencies = allowed;
+      if (!_isEditMode) {
+        _selectedCurrencyCode = snapshot.defaultCode;
+      }
+    });
+  }
+
+  void _showCurrencySheet() {
+    showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _ScrollableBottomSheet(
+        title: 'Seleccionar moneda',
+        children: _allowedCurrencies
+            .map(
+              (code) => _SheetItem(
+                label: '$code - ${currencyNameForCode(code)}',
+                onTap: () => Navigator.pop(ctx, code),
+              ),
+            )
+            .toList(),
+      ),
+    ).then((code) {
+      if (code != null) {
+        setState(() => _selectedCurrencyCode = code);
+      }
+    });
+  }
+
   Future<void> _onSave() async {
     if (_isSaving) return;
     final form = _formKey.currentState;
     if (form == null || !form.validate()) return;
+
+    if (_selectedCurrencyCode.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('La moneda es obligatoria')));
+      return;
+    }
 
     final vm = context.read<AccountsViewModel>();
     final name = _nameController.text.trim();
@@ -119,6 +195,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
         await vm.updateAccount(
           current: widget.account!,
           name: name,
+          currencyCode: _selectedCurrencyCode,
           creditLimitCents: creditLimitCents,
           statementDay: statementDay,
           paymentDueDay: paymentDueDay,
@@ -129,6 +206,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
         await vm.createAccount(
           name: name,
           type: _selectedType,
+          currencyCode: _selectedCurrencyCode,
           creditLimitCents: creditLimitCents,
           statementDay: statementDay,
           paymentDueDay: paymentDueDay,
@@ -239,6 +317,35 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
                   onSelected: (type) => setState(() => _selectedType = type),
                   types: _accountTypes,
                 ),
+              const SizedBox(height: 24),
+              _SectionLabel('Moneda de la cuenta'),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: _showCurrencySheet,
+                borderRadius: AppTheme.radiusSmall,
+                child: InputDecorator(
+                  decoration: const InputDecoration(),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '$_selectedCurrencyCode - ${currencyNameForCode(_selectedCurrencyCode)}',
+                          style: GoogleFonts.ibmPlexSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.unfold_more_rounded,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               if (_requiresSpecialFields) ...[
                 const SizedBox(height: 24),
                 _SectionLabel(
@@ -257,9 +364,9 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
                       RegExp(r'^\d*\.?\d{0,2}'),
                     ),
                   ],
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: '0.00',
-                    prefixText: '\$ ',
+                    prefixText: '$_selectedCurrencyCode ',
                   ),
                   validator: (value) => _validateMoney(
                     value,
@@ -514,5 +621,87 @@ class _AccountTypeBadge extends StatelessWidget {
       default:
         return 'Otra cuenta';
     }
+  }
+}
+
+class _ScrollableBottomSheet extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+
+  const _ScrollableBottomSheet({required this.title, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.5,
+      minChildSize: 0.3,
+      maxChildSize: 0.85,
+      expand: false,
+      builder: (context, scrollController) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    borderRadius: AppTheme.radiusFull,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: GoogleFonts.ibmPlexSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  children: children,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SheetItem extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _SheetItem({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: AppTheme.radiusMedium,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        child: Text(
+          label,
+          style: GoogleFonts.ibmPlexSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
   }
 }

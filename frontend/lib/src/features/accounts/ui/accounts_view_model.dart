@@ -53,6 +53,7 @@ class AccountsViewModel extends ChangeNotifier {
   Future<void> createAccount({
     required String name,
     required String type,
+    required String currencyCode,
     int? creditLimitCents,
     int? statementDay,
     int? paymentDueDay,
@@ -65,6 +66,7 @@ class AccountsViewModel extends ChangeNotifier {
       id: id,
       name: name,
       type: type,
+      currencyCode: currencyCode,
       creditLimitCents: creditLimitCents,
       statementDay: statementDay,
       paymentDueDay: paymentDueDay,
@@ -79,6 +81,7 @@ class AccountsViewModel extends ChangeNotifier {
   Future<void> updateAccount({
     required AccountModel current,
     required String name,
+    required String currencyCode,
     int? creditLimitCents,
     int? statementDay,
     int? paymentDueDay,
@@ -88,6 +91,7 @@ class AccountsViewModel extends ChangeNotifier {
     await _repository.updateAccount(
       current: current,
       name: name,
+      currencyCode: currencyCode,
       creditLimitCents: creditLimitCents,
       statementDay: statementDay,
       paymentDueDay: paymentDueDay,

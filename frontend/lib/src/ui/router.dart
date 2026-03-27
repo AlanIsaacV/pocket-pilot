@@ -23,6 +23,7 @@
 import 'package:go_router/go_router.dart';
 
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
+import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/account_form_screen.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_route_scope.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_screen.dart';
@@ -76,6 +77,14 @@ GoRouter buildRouter() {
                     },
                   ),
                 ],
+              ),
+              GoRoute(
+                path: ':transactionId/edit',
+                builder: (context, state) => TransactionFormRouteScope(
+                  child: TransactionFormScreen(
+                    transaction: state.extra as TransactionModel?,
+                  ),
+                ),
               ),
             ],
           ),

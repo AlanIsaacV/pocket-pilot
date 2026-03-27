@@ -54,7 +54,7 @@ dependencies:
   # --- Tipografía ---
   # google_fonts: descarga y cachea fuentes de Google Fonts en runtime.
   # Usamos Space Grotesk (números), Outfit (títulos) e Inter (cuerpo).
-  google_fonts: ^6.2.1
+  google_fonts: ^8.0.2
 
 dev_dependencies:
   flutter_test:

@@ -22,6 +22,7 @@ import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_repository.dart';
 import 'package:pocket_pilot/src/features/tags/domain/tag.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
+import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 
 // ----------------------------------------------------------
 // Helpers
@@ -52,7 +53,9 @@ const _currencies = <({String code, String name})>[
 ];
 
 class TransactionFormScreen extends StatefulWidget {
-  const TransactionFormScreen({super.key});
+  final TransactionModel? transaction;
+
+  const TransactionFormScreen({this.transaction, super.key});
 
   @override
   State<TransactionFormScreen> createState() => _TransactionFormScreenState();
@@ -60,6 +63,8 @@ class TransactionFormScreen extends StatefulWidget {
 
 class _TransactionFormScreenState extends State<TransactionFormScreen> {
   static const _uuid = Uuid();
+
+  bool get _isEditMode => widget.transaction != null;
 
   String _type = 'expense';
   String _amountInput = '0';
@@ -102,10 +107,36 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       tagStore.getTags(),
     ]);
 
+    final accounts = results[0] as List<AccountModel>;
+    final categories = results[1] as List<CategoryModel>;
+    final tags = results[2] as List<TagModel>;
+
     setState(() {
-      _accounts = results[0] as List<AccountModel>;
-      _allCategories = results[1] as List<CategoryModel>;
-      _allTags = results[2] as List<TagModel>;
+      _accounts = accounts;
+      _allCategories = categories;
+      _allTags = tags;
+
+      if (_isEditMode) {
+        final t = widget.transaction!;
+        _type = t.type;
+        final rawAmount = t.amount / 100;
+        _amountInput = rawAmount == rawAmount.truncateToDouble()
+            ? rawAmount.toInt().toString()
+            : rawAmount.toStringAsFixed(2);
+        _currencyCode = t.currencyCode;
+        _date = t.parsedDate;
+        _selectedAccount =
+            accounts.cast<AccountModel?>().firstWhere(
+              (a) => a!.id == t.accountId,
+              orElse: () => null,
+            );
+        _selectedCategory =
+            categories.cast<CategoryModel?>().firstWhere(
+              (c) => c!.id == t.categoryId,
+              orElse: () => null,
+            );
+        _noteController.text = t.description;
+      }
     });
   }
 
@@ -282,17 +313,32 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       final dateStr =
           '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}';
 
-      await repo.createTransaction(
-        id: _uuid.v4(),
-        accountId: _selectedAccount!.id,
-        categoryId: _selectedCategory!.id,
-        type: _type,
-        amountMinor: amountCents,
-        currencyCode: _currencyCode,
-        description: _noteController.text,
-        date: dateStr,
-        status: 'cleared',
-      );
+      if (_isEditMode) {
+        await repo.updateTransaction(
+          id: widget.transaction!.id,
+          accountId: _selectedAccount!.id,
+          categoryId: _selectedCategory!.id,
+          type: _type,
+          amountMinor: amountCents,
+          currencyCode: _currencyCode,
+          description: _noteController.text,
+          date: dateStr,
+          status: widget.transaction!.status,
+          createdAt: widget.transaction!.createdAt,
+        );
+      } else {
+        await repo.createTransaction(
+          id: _uuid.v4(),
+          accountId: _selectedAccount!.id,
+          categoryId: _selectedCategory!.id,
+          type: _type,
+          amountMinor: amountCents,
+          currencyCode: _currencyCode,
+          description: _noteController.text,
+          date: dateStr,
+          status: 'cleared',
+        );
+      }
 
       unawaited(sync.sync());
       if (mounted) context.pop(true);
@@ -352,7 +398,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
-        title: const Text('Nueva transacción'),
+        title: Text(_isEditMode ? 'Editar transacción' : 'Nueva transacción'),
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: () => Navigator.of(context).maybePop(),

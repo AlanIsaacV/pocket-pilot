@@ -39,6 +39,11 @@ class TransactionsViewModel extends ChangeNotifier {
 
   Future<void> refresh() => _runSync();
 
+  Future<void> deleteTransaction(String id) async {
+    await _repository.deleteTransaction(id);
+    await _loadLocalThenMaybeSync();
+  }
+
   // ----------------------------------------------------------
   // Implementación interna
   // ----------------------------------------------------------

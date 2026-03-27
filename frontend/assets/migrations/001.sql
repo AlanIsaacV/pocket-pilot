@@ -17,7 +17,7 @@ CREATE TRIGGER set_updated_at_accounts
     AFTER UPDATE
     ON accounts
     FOR EACH ROW
-WHEN NEW.updated_at = OLD.updated_at
+    WHEN new.updated_at = old.updated_at
 BEGIN
     UPDATE accounts
     SET updated_at = CURRENT_TIMESTAMP
@@ -40,7 +40,7 @@ CREATE TRIGGER set_updated_at_categories
     AFTER UPDATE
     ON categories
     FOR EACH ROW
-WHEN NEW.updated_at = OLD.updated_at
+    WHEN new.updated_at = old.updated_at
 BEGIN
     UPDATE categories
     SET updated_at = CURRENT_TIMESTAMP
@@ -60,7 +60,7 @@ CREATE TRIGGER set_updated_at_tags
     AFTER UPDATE
     ON tags
     FOR EACH ROW
-WHEN NEW.updated_at = OLD.updated_at
+    WHEN new.updated_at = old.updated_at
 BEGIN
     UPDATE tags
     SET updated_at = CURRENT_TIMESTAMP
@@ -70,26 +70,26 @@ END;
 
 CREATE TABLE transactions
 (
-    id            TEXT PRIMARY KEY,
-    account_id    TEXT     NOT NULL REFERENCES accounts (id),
-    category_id   TEXT     REFERENCES categories (id),
-    linked_transaction_id TEXT transactions (id),
-    type          TEXT     NOT NULL,
-    amount_cents  BIGINT   NOT NULL,
-    currency_code TEXT     NOT NULL,
-    status        TEXT     NOT NULL,
-    tags          TEXT,
-    description   TEXT     NOT NULL DEFAULT '',
-    date          DATE     NOT NULL,
-    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at    DATETIME
+    id                    TEXT PRIMARY KEY,
+    account_id            TEXT     NOT NULL REFERENCES accounts (id),
+    category_id           TEXT REFERENCES categories (id),
+    linked_transaction_id TEXT,
+    type                  TEXT     NOT NULL,
+    amount_cents          BIGINT   NOT NULL,
+    currency_code         TEXT     NOT NULL,
+    status                TEXT     NOT NULL,
+    tags                  TEXT,
+    description           TEXT     NOT NULL DEFAULT '',
+    date                  DATE     NOT NULL,
+    created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at            DATETIME
 );
 CREATE TRIGGER set_updated_at_transactions
     AFTER UPDATE
     ON transactions
     FOR EACH ROW
-WHEN NEW.updated_at = OLD.updated_at
+    WHEN new.updated_at = old.updated_at
 BEGIN
     UPDATE transactions
     SET updated_at = CURRENT_TIMESTAMP
@@ -110,11 +110,11 @@ CREATE TRIGGER set_updated_at_user_preferences
     AFTER UPDATE
     ON user_preferences
     FOR EACH ROW
-WHEN NEW.updated_at = OLD.updated_at
+    WHEN new.updated_at = old.updated_at
 BEGIN
     UPDATE user_preferences
     SET updated_at = CURRENT_TIMESTAMP
-    WHERE pref_key = NEW.pref_key;
+    WHERE pref_key = new.pref_key;
 END;
 
 CREATE INDEX idx_user_preferences_updated_at
@@ -159,7 +159,8 @@ CREATE TABLE sync_metadata
 );
 
 
-CREATE TABLE app_metadata (
+CREATE TABLE app_metadata
+(
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );

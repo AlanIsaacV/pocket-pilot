@@ -52,21 +52,21 @@ CREATE INDEX idx_tags_user_id ON tags (user_id) WHERE deleted_at IS NULL;
 CREATE TYPE transaction_type AS ENUM ('income', 'expense', 'transfer_out', 'transfer_in');
 CREATE TABLE transactions
 (
-    id            uuid PRIMARY KEY          DEFAULT gen_random_uuid(),
-    user_id       uuid             NOT NULL,
-    account_id    uuid             NOT NULL REFERENCES accounts (id),
-    category_id   uuid             REFERENCES categories (id),
-    linked_transaction_id uuid     transactions (id),
-    type          transaction_type NOT NULL,
-    amount_cents  BIGINT           NOT NULL,
-    currency_code TEXT             NOT NULL,
-    status        TEXT             NOT NULL,
-    tags          TEXT[],
-    description   TEXT             NOT NULL DEFAULT '',
-    date          DATE             NOT NULL,
-    created_at    timestamptz      NOT NULL DEFAULT NOW(),
-    updated_at    timestamptz      NOT NULL DEFAULT NOW(),
-    deleted_at    timestamptz
+    id                    uuid PRIMARY KEY          DEFAULT gen_random_uuid(),
+    user_id               uuid             NOT NULL,
+    account_id            uuid             NOT NULL REFERENCES accounts (id),
+    category_id           uuid REFERENCES categories (id),
+    linked_transaction_id uuid,
+    type                  transaction_type NOT NULL,
+    amount_cents          BIGINT           NOT NULL,
+    currency_code         TEXT             NOT NULL,
+    status                TEXT             NOT NULL,
+    tags                  TEXT[],
+    description           TEXT             NOT NULL DEFAULT '',
+    date                  DATE             NOT NULL,
+    created_at            timestamptz      NOT NULL DEFAULT NOW(),
+    updated_at            timestamptz      NOT NULL DEFAULT NOW(),
+    deleted_at            timestamptz
 );
 CREATE INDEX idx_transactions_user_date
     ON transactions (user_id, date DESC)

@@ -29,6 +29,8 @@ import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_repository.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
 
 class TransactionFormRouteScope extends StatelessWidget {
   final Widget child;
@@ -44,6 +46,10 @@ class TransactionFormRouteScope extends StatelessWidget {
     final accountStore = AccountLocalStore(db: db);
     final categoryStore = CategoryLocalStore(db: db);
     final tagStore = TagLocalStore(db: db);
+    final userPreferenceStore = UserPreferenceLocalStore(db: db);
+    final currencyPreferencesStore = CurrencyPreferencesLocalStore(
+      preferences: userPreferenceStore,
+    );
     final tagRepository = TagRepository(local: tagStore, outbox: outbox);
     final transactionLocalStore = TransactionLocalStore(db: db);
     final transactionRepository = TransactionRepository(
@@ -57,6 +63,7 @@ class TransactionFormRouteScope extends StatelessWidget {
         Provider.value(value: categoryStore),
         Provider.value(value: tagStore),
         Provider.value(value: tagRepository),
+        Provider.value(value: currencyPreferencesStore),
         Provider.value(value: transactionRepository),
         Provider.value(value: syncService),
       ],

@@ -24,6 +24,7 @@ import 'package:pocket_pilot/src/core/sync/connectivity_monitor.dart';
 import 'package:pocket_pilot/src/core/sync/sync_metadata_store.dart';
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
+import 'package:pocket_pilot/src/core/theme/theme_preference_controller.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_remote_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_sync_handler.dart';
@@ -37,6 +38,11 @@ import 'package:pocket_pilot/src/features/tags/data/tag_sync_handler.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_remote_service.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_sync_handler.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/theme_preferences_local_store.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_remote_service.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_repository.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_sync_handler.dart';
 import 'package:pocket_pilot/src/ui/app.dart';
 import 'package:pocket_pilot/src/ui/router.dart';
 
@@ -48,6 +54,19 @@ Future<void> main() async {
   final dbHelper = DatabaseHelper();
   final syncOutbox = SyncOutbox(db: dbHelper);
   final syncMetadataStore = SyncMetadataStore(db: dbHelper);
+  final userPreferenceLocalStore = UserPreferenceLocalStore(db: dbHelper);
+
+  final userPreferenceRepository = UserPreferenceRepository(
+    local: userPreferenceLocalStore,
+    outbox: syncOutbox,
+  );
+  final themePreferenceController = ThemePreferenceController(
+    localStore: ThemePreferencesLocalStore(
+      preferences: userPreferenceLocalStore,
+    ),
+    repository: userPreferenceRepository,
+  );
+  await themePreferenceController.loadFromLocal();
 
   // Un SyncHandler por tipo de entidad.
   // Cada handler tiene su propio LocalStore + RemoteService (independientes de los RouteScopes).
@@ -71,6 +90,11 @@ Future<void> main() async {
     remote: TransactionRemoteService(),
   );
 
+  final userPreferenceSyncHandler = UserPreferenceSyncHandler(
+    local: userPreferenceLocalStore,
+    remote: UserPreferenceRemoteService(),
+  );
+
   final syncService = SyncService(
     outbox: syncOutbox,
     metadataStore: syncMetadataStore,
@@ -79,6 +103,7 @@ Future<void> main() async {
       categorySyncHandler,
       tagSyncHandler,
       transactionSyncHandler,
+      userPreferenceSyncHandler,
     ],
   );
 
@@ -98,6 +123,9 @@ Future<void> main() async {
         Provider<DatabaseHelper>.value(value: dbHelper),
         Provider<SyncOutbox>.value(value: syncOutbox),
         Provider<SyncService>.value(value: syncService),
+        ChangeNotifierProvider<ThemePreferenceController>.value(
+          value: themePreferenceController,
+        ),
       ],
       child: PocketPilotApp(router: buildRouter()),
     ),
@@ -106,4 +134,5 @@ Future<void> main() async {
   // Iniciar monitoreo de conectividad y lanzar sync inicial si hay conexión.
   connectivityMonitor.startMonitoring();
   await connectivityMonitor.checkAndSync();
+  await themePreferenceController.loadFromLocal();
 }

@@ -77,6 +77,25 @@ CREATE INDEX idx_transactions_category_id
     WHERE deleted_at IS NULL;
 
 
+CREATE TABLE user_preferences
+(
+    user_id    uuid        NOT NULL,
+    pref_key   VARCHAR(50) NOT NULL,
+    pref_value TEXT        NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT NOW(),
+    updated_at timestamptz NOT NULL DEFAULT NOW(),
+    deleted_at timestamptz,
+    PRIMARY KEY (user_id, pref_key)
+);
+
+CREATE INDEX idx_user_preferences_user_id
+    ON user_preferences (user_id)
+    WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_user_preferences_user_updated_at
+    ON user_preferences (user_id, updated_at);
+
+
 CREATE OR REPLACE FUNCTION trigger_set_updated_at()
     RETURNS TRIGGER AS
 $$
@@ -107,5 +126,11 @@ EXECUTE FUNCTION trigger_set_updated_at();
 CREATE TRIGGER set_updated_at_transactions
     BEFORE UPDATE
     ON transactions
+    FOR EACH ROW
+EXECUTE FUNCTION trigger_set_updated_at();
+
+CREATE TRIGGER set_updated_at_user_preferences
+    BEFORE UPDATE
+    ON user_preferences
     FOR EACH ROW
 EXECUTE FUNCTION trigger_set_updated_at();

@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "pocket_pilot/v1/common.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+message UserPreference {
+  string pref_key = 1;
+  string pref_value = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp updated_at = 4;
+  google.protobuf.Timestamp deleted_at = 5;
+}
+
+service UserPreferenceService {
+  rpc ListUserPreferences(ListUserPreferencesRequest) returns (ListUserPreferencesResponse);
+  rpc UpsertUserPreference(UpsertUserPreferenceRequest) returns (UpsertUserPreferenceResponse);
+  rpc DeleteUserPreference(DeleteUserPreferenceRequest) returns (google.protobuf.Empty);
+}
+
+message ListUserPreferencesRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListUserPreferencesResponse {
+  repeated UserPreference preferences = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertUserPreferenceRequest {
+  UserPreference preference = 1;
+}
+
+message UpsertUserPreferenceResponse {
+  UserPreference preference = 1;
+  bool conflict_resolved = 2;
+}
+
+message DeleteUserPreferenceRequest {
+  string pref_key = 1;
+  google.protobuf.Timestamp deleted_at = 2;
+}

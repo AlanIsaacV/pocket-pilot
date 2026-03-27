@@ -10,8 +10,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
+import 'package:pocket_pilot/src/core/theme/theme_preference_controller.dart';
 
 class PocketPilotApp extends StatelessWidget {
   /// El router se inyecta desde main.dart para facilitar el testing
@@ -22,6 +24,8 @@ class PocketPilotApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themePreference = context.watch<ThemePreferenceController>();
+
     return MaterialApp.router(
       title: 'Pocket Pilot',
       debugShowCheckedModeBanner: false,
@@ -31,8 +35,8 @@ class PocketPilotApp extends StatelessWidget {
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
 
-      // ThemeMode.system sigue la preferencia del OS (claro/oscuro/auto).
-      themeMode: ThemeMode.system,
+      // ThemeMode se controla por preferencia sincronizable del usuario.
+      themeMode: themePreference.themeMode,
 
       // routerConfig le dice a MaterialApp que delegue toda la navegación
       // a nuestro GoRouter.

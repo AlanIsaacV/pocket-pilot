@@ -12,12 +12,15 @@ down:
 # Waits for the healthcheck to pass, then applies the migration.
 migrate: up
 	@echo "Waiting for PostgreSQL to be healthy..."
-	@until docker inspect --format='{{.State.Health.Status}}' pocket-pilot-db 2>/dev/null | grep -q "healthy"; do sleep 1; done
-	docker exec -i pocket-pilot-db psql \
-		-U $${POSTGRES_USER:-pocket_pilot} \
-		-d $${POSTGRES_DB:-pocket_pilot} \
-		< backend/migrations/001_initial_schema.sql
-	@echo "Migration applied."
+	@until [ "$$(docker inspect --format='{{.State.Health.Status}}' pocket-pilot-db 2>/dev/null)" = "healthy" ]; do sleep 1; done
+	@for file in backend/migrations/*.sql; do \
+		echo "Applying $$file"; \
+		docker exec -i pocket-pilot-db psql \
+			-U $${POSTGRES_USER:-pocket_pilot} \
+			-d $${POSTGRES_DB:-pocket_pilot} \
+			< $$file; \
+	done
+	@echo "Migrations applied."
 
 ## ── Code generation ───────────────────────────────────────────────────────────
 proto:

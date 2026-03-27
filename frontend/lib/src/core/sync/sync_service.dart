@@ -15,11 +15,11 @@ class SyncService {
     required SyncOutbox outbox,
     required SyncMetadataStore metadataStore,
     required List<SyncHandler> handlers,
-  })  : _outbox = outbox,
-        _metadataStore = metadataStore,
-        _handlers = {for (final h in handlers) h.entityType: h};
+  }) : _outbox = outbox,
+       _metadataStore = metadataStore,
+       _handlers = {for (final h in handlers) h.entityType: h};
 
-  /// Ejecuta un ciclo completo de sync: Pull → Push para todas las entidades.
+  /// Ejecuta un ciclo completo de sync: Pull -> Push para todas las entidades.
   /// Si ya hay un sync en curso, este llamado retorna inmediatamente.
   Future<void> sync() async {
     if (_isSyncing) return;
@@ -36,13 +36,16 @@ class SyncService {
 
   Future<void> _pullEntity(SyncHandler handler) async {
     try {
-      final lastSyncedAt =
-          await _metadataStore.getLastSyncedAt(handler.entityType);
+      final lastSyncedAt = await _metadataStore.getLastSyncedAt(
+        handler.entityType,
+      );
       final result = await handler.pull(lastSyncedAt);
 
       for (final item in result.items) {
-        final outboxEntry =
-            await _outbox.findByEntityId(handler.entityType, item.id);
+        final outboxEntry = await _outbox.findByEntityId(
+          handler.entityType,
+          item.id,
+        );
 
         if (outboxEntry == null) {
           await handler.saveLocally(item.data);
@@ -58,7 +61,9 @@ class SyncService {
       }
 
       await _metadataStore.updateLastSyncedAt(
-          handler.entityType, result.syncedAt);
+        handler.entityType,
+        result.syncedAt,
+      );
     } catch (_) {
       // Pull falló (sin conexión, error de servidor, etc.).
       // No actualizamos last_synced_at: el próximo sync reintentará desde el mismo punto.

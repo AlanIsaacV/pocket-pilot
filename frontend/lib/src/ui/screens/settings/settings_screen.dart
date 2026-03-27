@@ -6,19 +6,53 @@
 // ejecutan ninguna acción aún — placeholder hasta implementar
 // la lógica correspondiente.
 //
-// TODO: conectar cada opción a su respectivo caso de uso.
+// TODO: conectar opciones pendientes a sus casos de uso.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
+import 'package:pocket_pilot/src/core/theme/theme_preference_controller.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
+import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
+import 'package:pocket_pilot/src/features/user_preferences/domain/theme_preferences.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
   @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  String _defaultCurrency = kInitialDefaultCurrency;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCurrencyDefault());
+  }
+
+  Future<void> _loadCurrencyDefault() async {
+    final db = context.read<DatabaseHelper>();
+    final userPreferenceStore = UserPreferenceLocalStore(db: db);
+    final currencyPreferenceStore = CurrencyPreferencesLocalStore(
+      preferences: userPreferenceStore,
+    );
+    final snapshot = await currencyPreferenceStore.getSnapshot();
+    if (!mounted) return;
+    setState(() => _defaultCurrency = snapshot.defaultCode);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final themePreferenceController = context
+        .watch<ThemePreferenceController>();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Configuración')),
       body: ListView(
@@ -54,27 +88,29 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.currency_exchange_rounded,
                 label: 'Moneda',
                 trailing: Text(
-                  'MXN',
+                  _defaultCurrency,
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 13,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                // TODO: abrir selector de moneda
-                onTap: () {},
+                onTap: () => context.push('/settings/currency').then((result) {
+                  if (result == true) {
+                    _loadCurrencyDefault();
+                  }
+                }),
               ),
               _SettingsItem(
                 icon: Icons.palette_outlined,
                 label: 'Tema',
                 trailing: Text(
-                  'Sistema',
+                  themePreferenceController.label,
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 13,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                // TODO: abrir selector de tema
-                onTap: () {},
+                onTap: () => _openThemePicker(themePreferenceController),
               ),
               _SettingsItem(
                 icon: Icons.notifications_none_rounded,
@@ -133,6 +169,64 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _openThemePicker(ThemePreferenceController controller) async {
+    final selected = await showModalBottomSheet<AppThemePreference>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        final current = controller.preference;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.brightness_auto_rounded),
+                title: const Text('Sistema'),
+                trailing: current == AppThemePreference.system
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () =>
+                    Navigator.of(context).pop(AppThemePreference.system),
+              ),
+              ListTile(
+                leading: const Icon(Icons.dark_mode_outlined),
+                title: const Text('Oscuro'),
+                trailing: current == AppThemePreference.dark
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () => Navigator.of(context).pop(AppThemePreference.dark),
+              ),
+              ListTile(
+                leading: const Icon(Icons.light_mode_outlined),
+                title: const Text('Claro'),
+                trailing: current == AppThemePreference.light
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () =>
+                    Navigator.of(context).pop(AppThemePreference.light),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selected == null || selected == controller.preference) {
+      return;
+    }
+
+    await controller.savePreference(selected);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Tema actualizado a ${appThemePreferenceLabel(selected)}.',
+        ),
       ),
     );
   }

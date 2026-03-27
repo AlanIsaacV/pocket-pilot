@@ -95,6 +95,30 @@ BEGIN
 END;
 
 
+CREATE TABLE user_preferences
+(
+    pref_key   TEXT PRIMARY KEY,
+    pref_value TEXT     NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME
+);
+
+CREATE TRIGGER set_updated_at_user_preferences
+    AFTER UPDATE
+    ON user_preferences
+    FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+    UPDATE user_preferences
+    SET updated_at = CURRENT_TIMESTAMP
+    WHERE pref_key = NEW.pref_key;
+END;
+
+CREATE INDEX idx_user_preferences_updated_at
+    ON user_preferences (updated_at);
+
+
 CREATE INDEX idx_transactions_account_id
     ON transactions (account_id)
     WHERE deleted_at IS NULL;

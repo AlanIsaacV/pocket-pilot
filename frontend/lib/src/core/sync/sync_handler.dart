@@ -41,7 +41,8 @@ class SyncPushResult {
 /// Contrato que cada entidad implementa para participar en el ciclo de sync.
 /// El user_id ya NO se pasa aquí: el servidor lo extrae del token de auth.
 abstract class SyncHandler {
-  /// Identificador del tipo de entidad: 'account', 'category', 'tag', 'transaction'.
+  /// Identificador del tipo de entidad: 'account', 'category', 'tag',
+  /// 'transaction', 'user_preference'.
   String get entityType;
 
   /// Pull delta: trae registros del servidor.

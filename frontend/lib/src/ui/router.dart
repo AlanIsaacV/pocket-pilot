@@ -35,6 +35,8 @@ import 'package:pocket_pilot/src/features/transactions/ui/transaction_form_route
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_form_screen.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_route_scope.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_screen.dart';
+import 'package:pocket_pilot/src/features/user_preferences/ui/currency_preferences_screen.dart';
+import 'package:pocket_pilot/src/features/user_preferences/ui/user_preferences_route_scope.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/settings/settings_screen.dart';
@@ -61,8 +63,9 @@ GoRouter buildRouter() {
             routes: [
               GoRoute(
                 path: 'new',
-                builder: (context, state) =>
-                    const TransactionFormRouteScope(child: TransactionFormScreen()),
+                builder: (context, state) => const TransactionFormRouteScope(
+                  child: TransactionFormScreen(),
+                ),
                 routes: [
                   GoRoute(
                     path: 'category',
@@ -118,8 +121,7 @@ GoRouter buildRouter() {
           GoRoute(
             path: 'new',
             builder: (context, state) => CategoriesRouteScope(
-              child:
-                  CategoryFormScreen(parent: state.extra as CategoryModel?),
+              child: CategoryFormScreen(parent: state.extra as CategoryModel?),
             ),
           ),
           GoRoute(
@@ -131,6 +133,11 @@ GoRouter buildRouter() {
             ),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/settings/currency',
+        builder: (context, state) =>
+            const UserPreferencesRouteScope(child: CurrencyPreferencesScreen()),
       ),
     ],
   );

@@ -22,6 +22,9 @@ import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_repository.dart';
 import 'package:pocket_pilot/src/features/tags/domain/tag.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
+import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
+import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
 
 // ----------------------------------------------------------
 // Helpers
@@ -37,19 +40,6 @@ Color _hexToColor(String hex) {
     return AppColors.primary;
   }
 }
-
-const _currencies = <({String code, String name})>[
-  (code: 'MXN', name: 'Peso Mexicano'),
-  (code: 'USD', name: 'US Dollar'),
-  (code: 'EUR', name: 'Euro'),
-  (code: 'GBP', name: 'British Pound'),
-  (code: 'CAD', name: 'Canadian Dollar'),
-  (code: 'COP', name: 'Peso Colombiano'),
-  (code: 'ARS', name: 'Peso Argentino'),
-  (code: 'BRL', name: 'Real Brasileño'),
-  (code: 'CLP', name: 'Peso Chileno'),
-  (code: 'PEN', name: 'Sol Peruano'),
-];
 
 class TransactionFormScreen extends StatefulWidget {
   const TransactionFormScreen({super.key});
@@ -74,6 +64,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   List<AccountModel> _accounts = [];
   List<CategoryModel> _allCategories = [];
   List<TagModel> _allTags = [];
+  List<String> _allowedCurrencies = List<String>.from(
+    kInitialAllowedCurrencies,
+  );
 
   final _tagController = TextEditingController();
   final _noteController = TextEditingController();
@@ -95,17 +88,24 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     final accountStore = context.read<AccountLocalStore>();
     final categoryStore = context.read<CategoryLocalStore>();
     final tagStore = context.read<TagLocalStore>();
+    final currencyPreferencesStore = context
+        .read<CurrencyPreferencesLocalStore>();
 
     final results = await Future.wait([
       accountStore.getAccounts(),
       categoryStore.getCategories(),
       tagStore.getTags(),
+      currencyPreferencesStore.getSnapshot(),
     ]);
+
+    final currencySnapshot = results[3] as CurrencyPreferencesSnapshot;
 
     setState(() {
       _accounts = results[0] as List<AccountModel>;
       _allCategories = results[1] as List<CategoryModel>;
       _allTags = results[2] as List<TagModel>;
+      _allowedCurrencies = currencySnapshot.allowedCodes;
+      _currencyCode = currencySnapshot.defaultCode;
     });
   }
 
@@ -179,11 +179,11 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       ),
       builder: (ctx) => _ScrollableBottomSheet(
         title: 'Seleccionar moneda',
-        children: _currencies
+        children: _allowedCurrencies
             .map(
-              (c) => _SheetItem(
-                label: '${c.code} — ${c.name}',
-                onTap: () => Navigator.pop(ctx, c.code),
+              (code) => _SheetItem(
+                label: '$code — ${currencyNameForCode(code)}',
+                onTap: () => Navigator.pop(ctx, code),
               ),
             )
             .toList(),

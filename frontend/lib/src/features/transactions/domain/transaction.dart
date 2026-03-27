@@ -145,7 +145,7 @@ class TransactionModel {
     }
   }
 
-  static TransactionType tringToTransactionType(String type) {
+  static TransactionType stringToTransactionType(String type) {
     switch (type) {
       case 'income':
         return TransactionType.TRANSACTION_TYPE_INCOME;

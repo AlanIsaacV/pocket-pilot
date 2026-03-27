@@ -87,6 +87,41 @@ class TransactionRepository {
     );
   }
 
+  Future<void> updateTransaction({
+    required String id,
+    required String accountId,
+    required String categoryId,
+    required int amountMinor,
+    required String currencyCode,
+    required String description,
+    required String date, // YYYY-MM-DD
+    required String type,
+    required String status,
+    required DateTime createdAt,
+  }) async {
+    final model = TransactionModel(
+      id: id,
+      accountId: accountId,
+      categoryId: categoryId,
+      amount: amountMinor,
+      currencyCode: currencyCode,
+      description: description,
+      date: date,
+      type: type,
+      status: status,
+      createdAt: createdAt,
+      updatedAt: DateTime.now().toUtc(),
+    );
+
+    await _local.upsertRow(model.toMap());
+    await _outbox.enqueue(
+      entityType: 'transaction',
+      entityId: id,
+      operation: 'upsert',
+      payload: jsonEncode(model.toServerMap()),
+    );
+  }
+
   Future<void> deleteTransaction(String id) async {
     final now = DateTime.now().toUtc();
     await _local.softDelete(id, now);

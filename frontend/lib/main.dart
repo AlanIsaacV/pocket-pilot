@@ -111,6 +111,7 @@ Future<void> main() async {
   final categorySeeder = CategorySeeder(
     local: CategoryLocalStore(db: dbHelper),
     db: dbHelper,
+    outbox: syncOutbox,
   );
   await categorySeeder.seedIfNeeded();
 

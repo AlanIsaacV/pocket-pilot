@@ -42,7 +42,7 @@ class TransactionsScreen extends StatelessWidget {
                   emptyLabel: 'No hay transacciones aún',
                   emptySubLabel: 'Presiona + para registrar una',
                   onRefresh: vm.refresh,
-                  child: _TransactionList(transactions: vm.transactions),
+                  child: _TransactionList(transactions: vm.transactions, vm: vm),
                 ),
               ),
             ],
@@ -68,8 +68,9 @@ class TransactionsScreen extends StatelessWidget {
 
 class _TransactionList extends StatelessWidget {
   final List<TransactionModel> transactions;
+  final TransactionsViewModel vm;
 
-  const _TransactionList({required this.transactions});
+  const _TransactionList({required this.transactions, required this.vm});
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +97,41 @@ class _TransactionList extends StatelessWidget {
           offset++;
           final itemIndex = index - offset;
           if (itemIndex < section.value.length) {
-            return _TransactionTile(transaction: section.value[itemIndex]);
+            final t = section.value[itemIndex];
+            return Dismissible(
+              key: ValueKey(t.id),
+              direction: DismissDirection.endToStart,
+              background: _DeleteBackground(),
+              confirmDismiss: (_) => _confirmDelete(context, t.description),
+              onDismissed: (_) async {
+                try {
+                  await vm.deleteTransaction(t.id);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Transacción eliminada')),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('No se pudo eliminar: $e')),
+                    );
+                  }
+                }
+              },
+              child: _TransactionTile(
+                transaction: t,
+                onTap: () {
+                  context
+                      .push('/transactions/${t.id}/edit', extra: t)
+                      .then((result) {
+                    if (result == true && context.mounted) {
+                      vm.loadOnAppear();
+                    }
+                  });
+                },
+              ),
+            );
           }
           offset += section.value.length;
         }
@@ -161,8 +196,9 @@ class _MonthHeader extends StatelessWidget {
 
 class _TransactionTile extends StatelessWidget {
   final TransactionModel transaction;
+  final VoidCallback onTap;
 
-  const _TransactionTile({required this.transaction});
+  const _TransactionTile({required this.transaction, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -182,6 +218,7 @@ class _TransactionTile extends StatelessWidget {
           borderRadius: AppTheme.radiusMedium,
         ),
         child: ListTile(
+          onTap: onTap,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 0,
@@ -250,5 +287,69 @@ class _TransactionTile extends StatelessWidget {
       'dic',
     ];
     return months[month - 1];
+  }
+}
+
+// ============================================================
+// Helpers de eliminación
+// ============================================================
+
+Future<bool?> _confirmDelete(BuildContext context, String description) {
+  final label = description.isNotEmpty ? '"$description"' : 'esta transacción';
+  return showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Eliminar transacción'),
+      content: Text('Se eliminará $label.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(ctx).colorScheme.error,
+          ),
+          child: const Text('Eliminar'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _DeleteBackground extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.18),
+        borderRadius: AppTheme.radiusMedium,
+        border: Border.all(
+          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
+        ),
+      ),
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Eliminar',
+            style: GoogleFonts.ibmPlexSans(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Icon(
+            Icons.delete_outline_rounded,
+            color: Theme.of(context).colorScheme.error,
+          ),
+        ],
+      ),
+    );
   }
 }

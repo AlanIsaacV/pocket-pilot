@@ -5,6 +5,7 @@ import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/transaction_service.pbgrpc.dart';
 import 'package:pocket_pilot/src/core/grpc/auth_interceptor.dart';
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
+import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 
 class TransactionRemoteService {
   late final TransactionServiceClient _client;
@@ -16,7 +17,9 @@ class TransactionRemoteService {
     );
   }
 
-  Future<ListTransactionsResponse> listTransactions({DateTime? updatedSince}) async {
+  Future<ListTransactionsResponse> listTransactions({
+    DateTime? updatedSince,
+  }) async {
     try {
       final request = ListTransactionsRequest();
       if (updatedSince != null) {
@@ -28,26 +31,32 @@ class TransactionRemoteService {
     }
   }
 
-  Future<UpsertTransactionResponse> upsertTransaction(Map<String, dynamic> map) async {
+  Future<UpsertTransactionResponse> upsertTransaction(
+    Map<String, dynamic> map,
+  ) async {
     try {
       final now = DateTime.now().toUtc();
       final transaction = Transaction(
         id: map['id'] as String,
         accountId: map['account_id'] as String,
         categoryId: map['category_id'] as String,
-        type: TransactionType.TRANSACTION_TYPE_UNSPECIFIED,
-        amountCents: Int64(map['amount'] as int),
+        type: TransactionModel.stringToTransactionType(map['type'] as String),
+        amountCents: Int64(map['amount_cents'] as int),
         currencyCode: map['currency_code'] as String,
-        status: map['status'] as String? ?? 'confirmed',
+        status: map['status'] as String? ?? 'cleared',
         description: map['description'] as String,
-        date: Timestamp.fromDateTime(DateTime.parse(map['date'] as String).toUtc()),
+        date: Timestamp.fromDateTime(
+          DateTime.parse(map['date'] as String).toUtc(),
+        ),
         updatedAt: Timestamp.fromDateTime(
-            map['updated_at'] != null
-                ? DateTime.parse(map['updated_at'] as String).toUtc()
-                : now),
+          map['updated_at'] != null
+              ? DateTime.parse(map['updated_at'] as String).toUtc()
+              : now,
+        ),
       );
       return await _client.upsertTransaction(
-          UpsertTransactionRequest(transaction: transaction));
+        UpsertTransactionRequest(transaction: transaction),
+      );
     } on GrpcError catch (e) {
       throw Exception('gRPC upsertTransaction error: ${e.message}');
     }

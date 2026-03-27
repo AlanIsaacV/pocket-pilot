@@ -12,3 +12,8 @@ Pocket Pilot is an offline-first personal finance application with a Flutter fro
 - **Sync Pull:** `SyncService` -> `SyncHandler` -> `gRPC (List<Entity>Request)` -> `PostgreSQL`.
 - **Sync Push:** `SyncService` -> `SyncHandler` -> `SyncOutbox` -> `gRPC (Upsert<Entity>Request)` -> `PostgreSQL`.
 - **Conflict Resolution:** Handled by the server using `updated_at` timestamps. If the client's version is outdated, the server returns the current version, and the client updates its local SQLite.
+
+## User Preferences (Cross-Cutting)
+- User settings (e.g., transaction currency config and app theme mode) are modeled as synchronized key-value records in `user_preferences`.
+- Frontend applies preference changes immediately from local SQLite (offline-first), while server sync happens via outbox.
+- App theme selection uses `app.theme_mode` (`system` | `dark` | `light`) and is applied at runtime by `MaterialApp.themeMode`.

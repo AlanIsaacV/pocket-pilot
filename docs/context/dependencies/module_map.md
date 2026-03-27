@@ -13,6 +13,7 @@ This document outlines the dependencies between internal modules and external li
     - `Repository` depends on `LocalStore` and `SyncOutbox`.
     - `SyncHandler` depends on `LocalStore` and `RemoteService`.
     - `RemoteService` depends on generated gRPC Proto code.
+    - App-level controllers (e.g., theme preference) may depend on a feature `Repository` and are provided from app root.
 
 ## Key External Libraries
 ### Backend (Go)

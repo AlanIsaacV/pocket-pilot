@@ -4,7 +4,7 @@ This document outlines the conventions for defining database schemas and migrati
 
 ## General Principles
 - **Idempotency:** Migrations should be idempotent whenever possible.
-- **LWW Columns:** Every table **MUST** include `id`, `user_id`, `created_at`, `updated_at`, and `deleted_at`.
+- **LWW Columns:** Syncable tables should include `created_at`, `updated_at`, and `deleted_at`; identity columns may vary by entity shape.
 - **Naming:** Table names should be plural (e.g., `accounts`, `transactions`) and column names should be `snake_case`.
 
 ## PostgreSQL (Backend)
@@ -15,11 +15,16 @@ This document outlines the conventions for defining database schemas and migrati
 - **LWW Logic:** All tables must implement LWW via `ON CONFLICT (id) DO UPDATE SET ... WHERE table.updated_at < EXCLUDED.updated_at`.
 - **Soft Deletes:** Records should not be physically removed; update the `deleted_at` timestamp instead.
 
+### Composite-key sync entities
+- Some syncable entities use composite identities instead of single `id` (e.g., `user_preferences` with `PRIMARY KEY (user_id, pref_key)`).
+- For composite-key entities, implement LWW conflict checks against the same unique key used by `ON CONFLICT`.
+
 ## SQLite (Frontend)
 - **Data Types:**
     - Use `TEXT` for UUIDs.
     - Use `TEXT` for ISO 8601 formatted timestamps (UTC).
     - Use `INTEGER` for money amounts in cents.
+- **Single-user local model:** SQLite tables may omit `user_id` for per-user app data and rely on auth/session context at sync boundaries.
 - **Migrations:**
     1. Add the next numbered `.sql` file to `frontend/assets/migrations/`.
     2. Increment the `_version` in `DatabaseHelper`.

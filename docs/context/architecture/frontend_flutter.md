@@ -17,6 +17,7 @@ Each feature in `lib/src/features/<feature_name>/` must follow the same folder s
 ## State Management
 - **Provider:** Use `Provider` and `ChangeNotifier` for all feature-specific state management.
 - **Dependency Injection:** Use `Provider` or `MultiProvider` to wire up dependencies like `LocalStore`, `Repository`, and `SyncHandler`.
+- **Global app controllers:** App-wide runtime concerns (e.g., active theme mode) are provided at app root (`main.dart`) as `ChangeNotifier`s and consumed by `PocketPilotApp`.
 
 ## Data Persistence (SQLite)
 - **DatabaseHelper:** Manages database initialization and migrations in `lib/src/core/db/`.
@@ -29,6 +30,16 @@ Each feature in `lib/src/features/<feature_name>/` must follow the same folder s
 - **Form screens** that need cross-feature data (e.g., transaction form needs accounts, categories, tags) use a separate `*_form_route_scope.dart` with `Provider.value` for each store/repository needed.
 - LocalStore instances are stateless DAOs — creating multiple instances pointing to the same SQLite is safe.
 - RouteScopes are applied in `router.dart` wrapping the corresponding `GoRoute.builder`.
+
+### User Preferences (key-value)
+- Shared user settings are stored in SQLite table `user_preferences` as key-value rows (`pref_key`, `pref_value`) with LWW timestamps.
+- Preference writes must go through `UserPreferenceRepository` so each write is persisted locally and enqueued in `SyncOutbox` (`entity_type = user_preference`, `entity_id = pref_key`).
+- Domain-specific adapters should wrap raw preferences for UI use (e.g., `CurrencyPreferencesLocalStore`, `ThemePreferencesLocalStore`).
+
+### Theme Preference Flow
+- Source of truth key: `app.theme_mode` with values `system`, `dark`, `light`.
+- `ThemePreferenceController` loads local value on app startup and exposes `ThemeMode` to `MaterialApp.themeMode`.
+- Settings updates theme via `UserPreferenceRepository`; UI theme updates immediately and sync is handled asynchronously by outbox + `UserPreferenceSyncHandler`.
 
 ## UI Conventions
 

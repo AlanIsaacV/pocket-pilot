@@ -12,11 +12,11 @@ Every entity should have its own `.proto` file (e.g., `account_service.proto`).
 
 ### Service Structure
 Standard sync-oriented services **MUST** implement:
-- `List<Entity>Request`: Should include `user_id`, `updated_since` (optional Timestamp), and `page` (optional PageRequest).
+- `List<Entity>Request`: Should include `updated_since` (optional Timestamp) and `page` (optional PageRequest). `user_id` is inferred from authenticated context in handlers.
 - `List<Entity>Response`: Should include the list of entities, `page` (PageResponse), and `synced_at` (Timestamp).
 - `Upsert<Entity>Request`: Should wrap the full entity message.
 - `Upsert<Entity>Response`: Should include the updated entity and a `conflict_resolved` boolean.
-- `Delete<Entity>Request`: Should include `id`, `user_id`, and `deleted_at` (Timestamp) for LWW client-side soft deletes.
+- `Delete<Entity>Request`: Should include entity identity fields (e.g., `id` or `pref_key`) and `deleted_at` (Timestamp) for LWW soft deletes.
 
 ## Message Conventions
 - **IDs:** Use `string` for UUIDs.

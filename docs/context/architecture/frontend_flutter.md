@@ -36,11 +36,12 @@ Each feature in `lib/src/features/<feature_name>/` must follow the same folder s
 - Stored as Material 3 codePoint hex strings (e.g., `"ef52"`) in `CategoryModel.icon`.
 - Render with `Icon(CategoryIconData.iconFromHex(model.icon))` — **never** `Text(model.icon)`.
 - Convert back with `CategoryIconData.iconToHex(iconData)`.
+- `CategoryIconData.resolveIcon(nameOrHex)` converts Material icon names (e.g., `"restaurant"`) to hex; returns the input as-is if already hex. Used by the seeder so `defaults.json` can use readable names.
 - Utility in `categories/ui/category_icon_data.dart`.
 
 ### Category Colors
-- Stored as 6-char hex strings, may or may not include `#` prefix (e.g., `"FF5722"` or `"#FF5722"`).
-- Always sanitize with: `hex.replaceFirst('#', '')` before parsing.
+- Stored as 6-char hex strings **without** `#` prefix (e.g., `"FF5722"`).
+- Always sanitize with: `hex.replaceFirst('#', '')` before parsing (defensive in case `#` is present).
 - Helper pattern: `Color(int.parse('FF$sanitized', radix: 16))` with try/catch fallback.
 
 ### Custom Numpad + System Keyboard
@@ -48,6 +49,13 @@ Each feature in `lib/src/features/<feature_name>/` must follow the same folder s
 - Pattern: `resizeToAvoidBottomInset: false` + `MediaQuery.of(context).viewInsets.bottom > 0` to detect keyboard.
 - When keyboard visible: hide numpad/save button, add `bottomInset` padding to the scroll area.
 - When keyboard hidden: show numpad, remove extra padding.
+
+## Category Seeder
+- `CategorySeeder.seedIfNeeded()` runs in `main()` before `runApp()`. Skips if `app_metadata['categories_seeded']` already exists.
+- Reads `assets/categories/defaults.json` and recursively flattens the tree (supports N-level nesting).
+- Generates UUIDs and timestamps per node. Children inherit `type` and `color` from their parent when not specified.
+- Icons in the JSON use Material names (e.g., `"restaurant"`), resolved to hex via `CategoryIconData.resolveIcon()`.
+- After local insert, all categories are enqueued to `SyncOutbox` so they sync to the server on the next cycle.
 
 ## Synchronization Flow
 1. **Pull:** `SyncService` iterates through all registered `SyncHandlers`. Each handler's `pull` method is called to fetch and save server-side changes.

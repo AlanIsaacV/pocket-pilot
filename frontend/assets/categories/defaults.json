@@ -3,26 +3,32 @@
     "name": "Alimentación",
     "type": "expense",
     "color": "#FF5722",
-    "children": [{ "name": "Despensa" }, { "name": "Restaurante" }]
+    "icon": "restaurant",
+    "children": [
+      { "name": "Despensa", "icon": "shopping_cart" },
+      { "name": "Restaurante", "icon": "restaurant" }
+    ]
   },
   {
     "name": "Hogar",
     "type": "expense",
     "color": "#9C27B0",
+    "icon": "home",
     "children": [
-      { "name": "Renta / Hipoteca" },
-      { "name": "Mantenimiento" },
-      { "name": "Decoracion" },
-      { "name": "Muebles" },
-      { "name": "Herramientas" },
-      { "name": "Jardin" },
+      { "name": "Renta / Hipoteca", "icon": "home" },
+      { "name": "Mantenimiento", "icon": "build" },
+      { "name": "Decoracion", "icon": "weekend" },
+      { "name": "Muebles", "icon": "chair" },
+      { "name": "Herramientas", "icon": "handyman" },
+      { "name": "Jardin", "icon": "yard" },
       {
         "name": "Servicios",
+        "icon": "receipt_long",
         "children": [
-          { "name": "Electricidad" },
-          { "name": "Agua" },
-          { "name": "Gas" },
-          { "name": "Internet" }
+          { "name": "Electricidad", "icon": "electric_bolt" },
+          { "name": "Agua", "icon": "water_drop" },
+          { "name": "Gas", "icon": "local_gas_station" },
+          { "name": "Internet", "icon": "wifi" }
         ]
       }
     ]
@@ -31,17 +37,19 @@
     "name": "Transporte",
     "type": "expense",
     "color": "#3F51B5",
+    "icon": "directions_car",
     "children": [
-      { "name": "Taxi / Uber" },
-      { "name": "Transporte público" },
-      { "name": "Larga distancia" },
+      { "name": "Taxi / Uber", "icon": "local_taxi" },
+      { "name": "Transporte público", "icon": "train" },
+      { "name": "Larga distancia", "icon": "flight" },
       {
-        "name": "vehículo",
+        "name": "Vehículo",
+        "icon": "directions_car",
         "children": [
-          { "name": "Seguro de vehículo" },
-          { "name": "Estacionamiento" },
-          { "name": "Mantenimiento" },
-          { "name": "Combustible" }
+          { "name": "Seguro de vehículo", "icon": "receipt_long" },
+          { "name": "Estacionamiento", "icon": "local_parking" },
+          { "name": "Mantenimiento", "icon": "build" },
+          { "name": "Combustible", "icon": "local_gas_station" }
         ]
       }
     ]
@@ -50,69 +58,75 @@
     "name": "Compras",
     "type": "expense",
     "color": "#2196F3",
+    "icon": "shopping_cart",
     "children": [
-      { "name": "Gasolina" },
-      { "name": "Taxi / Uber" },
-      { "name": "Transporte público" }
+      { "name": "Gasolina", "icon": "local_gas_station" },
+      { "name": "Taxi / Uber", "icon": "local_taxi" },
+      { "name": "Transporte público", "icon": "train" }
     ]
   },
   {
     "name": "Salud",
     "type": "expense",
     "color": "#F44336",
+    "icon": "local_hospital",
     "children": [
-      { "name": "Médico" },
-      { "name": "Farmacia" },
-      { "name": "Gimnasio" },
-      { "name": "Seguros" },
-      { "name": "Belleza" }
+      { "name": "Médico", "icon": "local_hospital" },
+      { "name": "Farmacia", "icon": "local_pharmacy" },
+      { "name": "Gimnasio", "icon": "fitness_center" },
+      { "name": "Seguros", "icon": "receipt_long" },
+      { "name": "Belleza", "icon": "spa" }
     ]
   },
   {
     "name": "Entretenimiento",
     "type": "expense",
     "color": "#FF9800",
+    "icon": "movie",
     "children": [
-      { "name": "Streaming" },
-      { "name": "Cine / Teatro" },
-      { "name": "Eventos" }
+      { "name": "Streaming", "icon": "movie" },
+      { "name": "Cine / Teatro", "icon": "theaters" },
+      { "name": "Eventos", "icon": "event" }
     ]
   },
   {
-    "name": "Technología",
+    "name": "Tecnología",
     "type": "expense",
     "color": "#9E9E9E",
+    "icon": "laptop",
     "children": [
-      { "name": "Software / Apps" },
-      { "name": "Phone" },
-      { "name": "Electronicos" }
+      { "name": "Software / Apps", "icon": "phone_android" },
+      { "name": "Phone", "icon": "phone_android" },
+      { "name": "Electrónicos", "icon": "laptop" }
     ]
   },
   {
     "name": "Ropa y accesorios",
     "type": "expense",
     "color": "#00BCD4",
+    "icon": "checkroom",
     "children": [
-      { "name": "Ropa" },
-      { "name": "Zapatos" },
-      { "name": "Accesorios" }
+      { "name": "Ropa", "icon": "checkroom" },
+      { "name": "Zapatos", "icon": "checkroom" },
+      { "name": "Accesorios", "icon": "inventory" }
     ]
   },
   {
     "name": "Educación",
     "type": "expense",
     "color": "#3F51B5",
+    "icon": "school",
     "children": [
-      { "name": "Libros" },
-      { "name": "Cursos" },
-      { "name": "Material escolar" },
-      { "name": "Colegiatura" },
-      { "name": "Eventos" }
+      { "name": "Libros", "icon": "menu_book" },
+      { "name": "Cursos", "icon": "school" },
+      { "name": "Material escolar", "icon": "book" },
+      { "name": "Colegiatura", "icon": "school" },
+      { "name": "Eventos", "icon": "event" }
     ]
   },
-  { "name": "Viajes", "type": "expense", "color": "#009688" },
-  { "name": "Ventas", "type": "income", "color": "#4CAF50" },
-  { "name": "Regalos", "type": "income", "color": "#81C784" },
-  { "name": "Salario", "type": "income", "color": "#4CAF50" },
-  { "name": "Inversiones", "type": "income", "color": "#81C784" }
+  { "name": "Viajes", "type": "expense", "color": "#009688", "icon": "flight" },
+  { "name": "Ventas", "type": "income", "color": "#4CAF50", "icon": "storefront" },
+  { "name": "Regalos", "type": "income", "color": "#81C784", "icon": "card_giftcard" },
+  { "name": "Salario", "type": "income", "color": "#4CAF50", "icon": "work" },
+  { "name": "Inversiones", "type": "income", "color": "#81C784", "icon": "savings" }
 ]

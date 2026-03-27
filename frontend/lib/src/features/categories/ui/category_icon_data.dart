@@ -22,6 +22,70 @@ abstract final class CategoryIconData {
   static String iconToHex(IconData icon) =>
       icon.codePoint.toRadixString(16);
 
+  /// Resuelve un nombre de icono Material a su hex codePoint.
+  /// Si [nameOrHex] ya es un hex válido o está vacío, lo devuelve tal cual.
+  static String resolveIcon(String nameOrHex) {
+    if (nameOrHex.isEmpty) return nameOrHex;
+    final icon = _nameToIcon[nameOrHex];
+    if (icon != null) return iconToHex(icon);
+    return nameOrHex;
+  }
+
+  static final Map<String, IconData> _nameToIcon = {
+    'shopping_cart': Icons.shopping_cart_outlined,
+    'restaurant': Icons.restaurant_outlined,
+    'directions_car': Icons.directions_car_outlined,
+    'home': Icons.home_outlined,
+    'work': Icons.work_outline,
+    'school': Icons.school_outlined,
+    'fitness_center': Icons.fitness_center_outlined,
+    'local_hospital': Icons.local_hospital_outlined,
+    'flight': Icons.flight_outlined,
+    'movie': Icons.movie_outlined,
+    'phone_android': Icons.phone_android_outlined,
+    'pets': Icons.pets_outlined,
+    'sports_soccer': Icons.sports_soccer_outlined,
+    'attach_money': Icons.attach_money_outlined,
+    'savings': Icons.savings_outlined,
+    'card_giftcard': Icons.card_giftcard_outlined,
+    'local_cafe': Icons.local_cafe_outlined,
+    'local_gas_station': Icons.local_gas_station_outlined,
+    'train': Icons.train_outlined,
+    'park': Icons.park_outlined,
+    'child_care': Icons.child_care_outlined,
+    'local_pharmacy': Icons.local_pharmacy_outlined,
+    'music_note': Icons.music_note_outlined,
+    'brush': Icons.brush_outlined,
+    'camera_alt': Icons.camera_alt_outlined,
+    'wifi': Icons.wifi_outlined,
+    'electric_bolt': Icons.electric_bolt_outlined,
+    'water_drop': Icons.water_drop_outlined,
+    'local_laundry_service': Icons.local_laundry_service_outlined,
+    'checkroom': Icons.checkroom_outlined,
+    'spa': Icons.spa_outlined,
+    'sports_esports': Icons.sports_esports_outlined,
+    'menu_book': Icons.menu_book_outlined,
+    'storefront': Icons.storefront_outlined,
+    'local_bar': Icons.local_bar_outlined,
+    'bike_scooter': Icons.bike_scooter_outlined,
+    'laptop': Icons.laptop_outlined,
+    'headphones': Icons.headphones_outlined,
+    'volunteer_activism': Icons.volunteer_activism_outlined,
+    'receipt_long': Icons.receipt_long_outlined,
+    'local_taxi': Icons.local_taxi_outlined,
+    'local_parking': Icons.local_parking_outlined,
+    'build': Icons.build_outlined,
+    'chair': Icons.chair_outlined,
+    'yard': Icons.yard_outlined,
+    'handyman': Icons.handyman_outlined,
+    'weekend': Icons.weekend_outlined,
+    'theaters': Icons.theaters_outlined,
+    'event': Icons.event_outlined,
+    'book': Icons.book_outlined,
+    'inventory': Icons.inventory_outlined,
+    'category': Icons.category_outlined,
+  };
+
   /// Iconos comunes (~16) — subset inicial visible en el picker.
   static const List<IconData> commonIcons = [
     Icons.shopping_cart_outlined,

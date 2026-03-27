@@ -73,7 +73,7 @@ CREATE TABLE transactions
     id            TEXT PRIMARY KEY,
     account_id    TEXT     NOT NULL REFERENCES accounts (id),
     category_id   TEXT     REFERENCES categories (id),
-    linked_transaction_id TEXT REFERENCES transactions (id),
+    linked_transaction_id TEXT transactions (id),
     type          TEXT     NOT NULL,
     amount_cents  BIGINT   NOT NULL,
     currency_code TEXT     NOT NULL,

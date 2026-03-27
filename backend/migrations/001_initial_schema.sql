@@ -56,7 +56,7 @@ CREATE TABLE transactions
     user_id       uuid             NOT NULL,
     account_id    uuid             NOT NULL REFERENCES accounts (id),
     category_id   uuid             REFERENCES categories (id),
-    linked_transaction_id uuid     REFERENCES transactions (id),
+    linked_transaction_id uuid     transactions (id),
     type          transaction_type NOT NULL,
     amount_cents  BIGINT           NOT NULL,
     currency_code TEXT             NOT NULL,

@@ -39,9 +39,17 @@ class TransactionsViewModel extends ChangeNotifier {
 
   Future<void> refresh() => _runSync();
 
-  Future<void> deleteTransaction(String id) async {
-    await _repository.deleteTransaction(id);
+  Future<void> deleteTransaction(String id, {String? linkedTransactionId}) async {
+    await _repository.deleteTransaction(id, linkedTransactionId: linkedTransactionId);
     await _loadLocalThenMaybeSync();
+  }
+
+  TransactionModel? findLinked(String linkedId) {
+    try {
+      return transactions.firstWhere((t) => t.id == linkedId);
+    } catch (_) {
+      return null;
+    }
   }
 
   // ----------------------------------------------------------

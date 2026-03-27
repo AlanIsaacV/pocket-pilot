@@ -36,6 +36,8 @@ import 'package:pocket_pilot/src/features/transactions/ui/transaction_form_route
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_form_screen.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_route_scope.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_screen.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/transfer_form_route_scope.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/transfer_form_screen.dart';
 import 'package:pocket_pilot/src/features/user_preferences/ui/currency_preferences_screen.dart';
 import 'package:pocket_pilot/src/features/user_preferences/ui/user_preferences_route_scope.dart';
 import 'screens/dashboard/dashboard_screen.dart';
@@ -82,12 +84,36 @@ GoRouter buildRouter() {
                 ],
               ),
               GoRoute(
+                path: 'transfer',
+                builder: (context, state) {
+                  final extra = state.extra as Map<String, TransactionModel>?;
+                  return TransferFormRouteScope(
+                    child: TransferFormScreen(
+                      transferOut: extra?['out'],
+                      transferIn: extra?['in'],
+                    ),
+                  );
+                },
+              ),
+              GoRoute(
                 path: ':transactionId/edit',
                 builder: (context, state) => TransactionFormRouteScope(
                   child: TransactionFormScreen(
                     transaction: state.extra as TransactionModel?,
                   ),
                 ),
+              ),
+              GoRoute(
+                path: ':transactionId/edit-transfer',
+                builder: (context, state) {
+                  final extra = state.extra as Map<String, TransactionModel>;
+                  return TransferFormRouteScope(
+                    child: TransferFormScreen(
+                      transferOut: extra['out'],
+                      transferIn: extra['in'],
+                    ),
+                  );
+                },
               ),
             ],
           ),

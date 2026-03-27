@@ -11,20 +11,21 @@ import (
 
 // Transaction mirrors the `transactions` table.
 type Transaction struct {
-	ID           uuid.UUID
-	UserID       uuid.UUID
-	AccountID    uuid.UUID
-	CategoryID   uuid.UUID
-	Type         string // "income" | "expense" | "transfer"
-	AmountCents  int64
-	CurrencyCode string
-	Status       string
-	Tags         []string
-	Description  string
-	Date         time.Time  // only the date component is meaningful (PostgreSQL DATE)
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	DeletedAt    *time.Time
+	ID                  uuid.UUID
+	UserID              uuid.UUID
+	AccountID           uuid.UUID
+	CategoryID          *uuid.UUID // nullable — transfers have no category
+	LinkedTransactionID *uuid.UUID // pairs TRANSFER_OUT ↔ TRANSFER_IN
+	Type                string     // "income" | "expense" | "transfer_out" | "transfer_in"
+	AmountCents         int64
+	CurrencyCode        string
+	Status              string
+	Tags                []string
+	Description         string
+	Date                time.Time  // only the date component is meaningful (PostgreSQL DATE)
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	DeletedAt           *time.Time
 }
 
 type Repository struct {
@@ -35,12 +36,12 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-const scanColumns = `id, user_id, account_id, category_id, type, amount_cents, currency_code, status, tags, description, date, created_at, updated_at, deleted_at`
+const scanColumns = `id, user_id, account_id, category_id, linked_transaction_id, type, amount_cents, currency_code, status, tags, description, date, created_at, updated_at, deleted_at`
 
 func (r *Repository) scan(row pgx.Row) (*Transaction, error) {
 	t := &Transaction{}
 	err := row.Scan(
-		&t.ID, &t.UserID, &t.AccountID, &t.CategoryID,
+		&t.ID, &t.UserID, &t.AccountID, &t.CategoryID, &t.LinkedTransactionID,
 		&t.Type, &t.AmountCents, &t.CurrencyCode, &t.Status,
 		&t.Tags, &t.Description, &t.Date,
 		&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt,
@@ -102,7 +103,7 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 	for rows.Next() {
 		t := &Transaction{}
 		if err := rows.Scan(
-			&t.ID, &t.UserID, &t.AccountID, &t.CategoryID,
+			&t.ID, &t.UserID, &t.AccountID, &t.CategoryID, &t.LinkedTransactionID,
 			&t.Type, &t.AmountCents, &t.CurrencyCode, &t.Status,
 			&t.Tags, &t.Description, &t.Date,
 			&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt,
@@ -121,22 +122,23 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 //   - conflictResolved=true:  server had a newer version; returned transaction is the server's.
 func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, bool, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO transactions (id, user_id, account_id, category_id, type, amount_cents, currency_code, status, tags, description, date, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		INSERT INTO transactions (id, user_id, account_id, category_id, linked_transaction_id, type, amount_cents, currency_code, status, tags, description, date, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		ON CONFLICT (id) DO UPDATE SET
-			account_id    = EXCLUDED.account_id,
-			category_id   = EXCLUDED.category_id,
-			type          = EXCLUDED.type,
-			amount_cents  = EXCLUDED.amount_cents,
-			currency_code = EXCLUDED.currency_code,
-			status        = EXCLUDED.status,
-			tags          = EXCLUDED.tags,
-			description   = EXCLUDED.description,
-			date          = EXCLUDED.date,
-			updated_at    = EXCLUDED.updated_at
+			account_id              = EXCLUDED.account_id,
+			category_id             = EXCLUDED.category_id,
+			linked_transaction_id   = EXCLUDED.linked_transaction_id,
+			type                    = EXCLUDED.type,
+			amount_cents            = EXCLUDED.amount_cents,
+			currency_code           = EXCLUDED.currency_code,
+			status                  = EXCLUDED.status,
+			tags                    = EXCLUDED.tags,
+			description             = EXCLUDED.description,
+			date                    = EXCLUDED.date,
+			updated_at              = EXCLUDED.updated_at
 		WHERE transactions.updated_at < EXCLUDED.updated_at
 		RETURNING `+scanColumns,
-		t.ID, t.UserID, t.AccountID, t.CategoryID,
+		t.ID, t.UserID, t.AccountID, t.CategoryID, t.LinkedTransactionID,
 		t.Type, t.AmountCents, t.CurrencyCode, t.Status,
 		t.Tags, t.Description, t.Date,
 		t.CreatedAt, t.UpdatedAt,
@@ -159,11 +161,39 @@ func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, 
 }
 
 // SoftDelete sets deleted_at on a transaction, applying LWW by comparing timestamps.
+// When the transaction has a linked_transaction_id (transfer pair), both legs are
+// soft-deleted in the same database transaction for consistency.
 func (r *Repository) SoftDelete(ctx context.Context, id, userID uuid.UUID, deletedAt time.Time) error {
-	_, err := r.pool.Exec(ctx, `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Soft-delete the primary transaction and retrieve its linked ID.
+	var linkedID *uuid.UUID
+	err = tx.QueryRow(ctx, `
 		UPDATE transactions SET deleted_at = $3, updated_at = $3
 		WHERE id = $1 AND user_id = $2
 		  AND (deleted_at IS NULL OR updated_at < $3)
-	`, id, userID, deletedAt)
-	return err
+		RETURNING linked_transaction_id
+	`, id, userID, deletedAt).Scan(&linkedID)
+
+	if err != nil && err != pgx.ErrNoRows {
+		return err
+	}
+
+	// Cascade to the linked transfer leg if present.
+	if linkedID != nil {
+		_, err = tx.Exec(ctx, `
+			UPDATE transactions SET deleted_at = $3, updated_at = $3
+			WHERE id = $1 AND user_id = $2
+			  AND (deleted_at IS NULL OR updated_at < $3)
+		`, *linkedID, userID, deletedAt)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }

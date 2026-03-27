@@ -1,12 +1,6 @@
 // ============================================================
 // Modelo de dominio: Transacción
 // ============================================================
-//
-// Una transacción no lleva su propio "tipo" (ingreso/gasto) —
-// ese dato viene de la categoría asociada. Para poder mostrar
-// el color correcto en la UI sin cargar la categoría completa,
-// guardamos el tipo de categoría como campo derivado al momento
-// de construir el modelo desde el repositorio.
 
 // pbgrpc re-exporta transaction_service.pb.dart (Transaction).
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/transaction_service.pbgrpc.dart';
@@ -14,7 +8,8 @@ import 'package:pocket_pilot/src/generated/pocket_pilot/v1/transaction_service.p
 class TransactionModel {
   final String id;
   final String accountId;
-  final String categoryId;
+  final String? categoryId;
+  final String? linkedTransactionId;
 
   /// Monto en unidades menores (centavos).
   final int amount;
@@ -23,7 +18,6 @@ class TransactionModel {
   final String description;
 
   /// Fecha de la transacción como string ISO 8601 (YYYY-MM-DD).
-  /// Ej: "2026-03-14"
   final String date;
   final String type;
   final String status;
@@ -34,7 +28,8 @@ class TransactionModel {
   const TransactionModel({
     required this.id,
     required this.accountId,
-    required this.categoryId,
+    this.categoryId,
+    this.linkedTransactionId,
     required this.amount,
     required this.currencyCode,
     required this.description,
@@ -48,13 +43,13 @@ class TransactionModel {
   // ----------------------------------------------------------
   // Factory: desde proto gRPC
   // ----------------------------------------------------------
-  /// [type] debe ser pasado desde afuera porque el proto
-  /// de Transaction no incluye el tipo de su categoría.
   factory TransactionModel.fromProto(Transaction proto) {
     return TransactionModel(
       id: proto.id,
       accountId: proto.accountId,
-      categoryId: proto.categoryId,
+      categoryId: proto.hasCategoryId() ? proto.categoryId : null,
+      linkedTransactionId:
+          proto.hasLinkedTransactionId() ? proto.linkedTransactionId : null,
       amount: proto.amountCents.toInt(),
       currencyCode: proto.currencyCode,
       description: proto.description,
@@ -73,7 +68,8 @@ class TransactionModel {
     return TransactionModel(
       id: map['id'] as String,
       accountId: map['account_id'] as String,
-      categoryId: map['category_id'] as String,
+      categoryId: map['category_id'] as String?,
+      linkedTransactionId: map['linked_transaction_id'] as String?,
       amount: map['amount_cents'] as int,
       currencyCode: map['currency_code'] as String,
       description: map['description'] as String,
@@ -93,11 +89,12 @@ class TransactionModel {
       'id': id,
       'account_id': accountId,
       'category_id': categoryId,
+      'linked_transaction_id': linkedTransactionId,
       'amount_cents': amount,
       'currency_code': currencyCode,
       'description': description,
       'date': date,
-      "type": type,
+      'type': type,
       'status': status,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -112,19 +109,15 @@ class TransactionModel {
   // Helpers para la UI
   // ----------------------------------------------------------
 
-  /// true si esta transacción es un gasto.
   bool get isExpense => type == 'expense';
-
-  /// true si esta transacción es un ingreso.
   bool get isIncome => type == 'income';
-
-  /// true si esta transacción es una transferencia.
-  bool get isTransfer => type == 'transfer';
+  bool get isTransferOut => type == 'transfer_out';
+  bool get isTransferIn => type == 'transfer_in';
+  bool get isTransfer => isTransferOut || isTransferIn;
 
   /// Monto formateado con signo para mostrar en listas.
-  /// Ejemplos: "+$1,050.00 MXN" / "-$250.00 MXN"
   String get formattedAmount {
-    final sign = isIncome ? '+' : '-';
+    final sign = (isIncome || isTransferIn) ? '+' : '-';
     final value = amount / 100.0;
     return '$sign\$${value.toStringAsFixed(2)} $currencyCode';
   }
@@ -138,8 +131,10 @@ class TransactionModel {
         return 'income';
       case TransactionType.TRANSACTION_TYPE_EXPENSE:
         return 'expense';
-      case TransactionType.TRANSACTION_TYPE_TRANSFER:
-        return 'transfer';
+      case TransactionType.TRANSACTION_TYPE_TRANSFER_OUT:
+        return 'transfer_out';
+      case TransactionType.TRANSACTION_TYPE_TRANSFER_IN:
+        return 'transfer_in';
       default:
         return 'unspecified';
     }
@@ -151,8 +146,10 @@ class TransactionModel {
         return TransactionType.TRANSACTION_TYPE_INCOME;
       case 'expense':
         return TransactionType.TRANSACTION_TYPE_EXPENSE;
-      case 'transfer':
-        return TransactionType.TRANSACTION_TYPE_TRANSFER;
+      case 'transfer_out':
+        return TransactionType.TRANSACTION_TYPE_TRANSFER_OUT;
+      case 'transfer_in':
+        return TransactionType.TRANSACTION_TYPE_TRANSFER_IN;
       default:
         return TransactionType.TRANSACTION_TYPE_UNSPECIFIED;
     }

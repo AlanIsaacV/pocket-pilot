@@ -26,6 +26,7 @@ import 'package:pocket_pilot/src/features/user_preferences/data/currency_prefere
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
 
 // ----------------------------------------------------------
 // Helpers
@@ -289,16 +290,16 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) => _ScrollableBottomSheet(
+      builder: (ctx) => ScrollableBottomSheet(
         title: 'Seleccionar cuenta',
         children: [
-          _SheetItem(
+          SheetItem(
             icon: Icons.add_circle_outline_rounded,
             label: 'Agregar cuenta',
             onTap: () => Navigator.pop(ctx, _AccountSheetSelection.addNew),
           ),
           ..._accounts.map(
-            (a) => _SheetItem(
+            (a) => SheetItem(
               icon: _accountIcon(a.type),
               label: a.name,
               onTap: () => Navigator.pop(ctx, a),
@@ -334,17 +335,17 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) => _ScrollableBottomSheet(
+      builder: (ctx) => ScrollableBottomSheet(
         title: 'Seleccionar moneda',
         children: [
-          _SheetItem(
+          SheetItem(
             icon: Icons.tune_rounded,
             label: 'Configurar monedas',
             onTap: () =>
                 Navigator.pop(ctx, _CurrencySheetSelection.openPreferences),
           ),
           ..._allowedCurrencies.map(
-            (code) => _SheetItem(
+            (code) => SheetItem(
               label: '$code — ${currencyNameForCode(code)}',
               onTap: () => Navigator.pop(ctx, code),
             ),
@@ -637,7 +638,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   ),
 
                   // Cuenta
-                  _DetailRow(
+                  DetailRow(
                     icon: Icons.account_balance_wallet_outlined,
                     label: 'Cuenta',
                     value: _selectedAccount?.name ?? 'Sin cuenta',
@@ -645,7 +646,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   ),
 
                   // Fecha
-                  _DetailRow(
+                  DetailRow(
                     icon: Icons.calendar_today_outlined,
                     label: 'Fecha',
                     value: _formatDate(_date),
@@ -669,7 +670,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   ),
 
                   // Tags
-                  _TagsSection(
+                  TagsSection(
                     selectedTags: _selectedTags,
                     recentTags: _recentTags,
                     controller: _tagController,
@@ -683,7 +684,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   ),
 
                   // Nota
-                  _NoteField(controller: _noteController),
+                  NoteField(controller: _noteController),
                 ],
               ),
             ),
@@ -691,7 +692,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
           // --- Numpad + guardar (ocultar cuando el teclado está abierto) ---
           if (!keyboardOpen) ...[
-            _NumPad(onKey: _onNumpad),
+            NumPad(onKey: _onNumpad),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               child: SizedBox(
@@ -939,403 +940,6 @@ class _CategorySection extends StatelessWidget {
           ),
         if (recentCategories.isNotEmpty) const SizedBox(height: 4),
       ],
-    );
-  }
-}
-
-// ============================================================
-// Sección de tags (chips + input + recientes)
-// ============================================================
-
-class _TagsSection extends StatelessWidget {
-  final List<TagModel> selectedTags;
-  final List<TagModel> recentTags;
-  final TextEditingController controller;
-  final ValueChanged<String> onAdd;
-  final ValueChanged<TagModel> onRemove;
-  final ValueChanged<TagModel> onAddRecent;
-
-  const _TagsSection({
-    required this.selectedTags,
-    required this.recentTags,
-    required this.controller,
-    required this.onAdd,
-    required this.onRemove,
-    required this.onAddRecent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.label_outline_rounded,
-                size: 18,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Tags',
-                style: GoogleFonts.ibmPlexSans(
-                  fontSize: 14,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              ...selectedTags.map(
-                (t) => Chip(
-                  label: Text(t.name),
-                  deleteIcon: Icon(Icons.close, size: 14),
-                  onDeleted: () => onRemove(t),
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-              SizedBox(
-                width: 120,
-                height: 36,
-                child: Center(
-                  child: TextField(
-                    controller: controller,
-                    style: GoogleFonts.ibmPlexSans(fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: 'Agregar tag...',
-                      filled: false,
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 13,
-                      ),
-                      hintStyle: GoogleFonts.ibmPlexSans(
-                        fontSize: 13,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    onChanged: (value) {
-                      if (value.endsWith(' ') && value.trim().isNotEmpty) {
-                        onAdd(value.trim());
-                      }
-                    },
-                    onSubmitted: onAdd,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (recentTags.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            SizedBox(
-              height: 28,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: recentTags.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 6),
-                itemBuilder: (_, i) {
-                  final tag = recentTags[i];
-                  return GestureDetector(
-                    onTap: () => onAddRecent(tag),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHigh,
-                        borderRadius: AppTheme.radiusFull,
-                      ),
-                      child: Text(
-                        tag.name,
-                        style: GoogleFonts.ibmPlexSans(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================
-// Fila de detalle
-// ============================================================
-
-class _DetailRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final VoidCallback onTap;
-
-  const _DetailRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppTheme.radiusSmall,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: GoogleFonts.ibmPlexSans(
-                fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              value,
-              style: GoogleFonts.ibmPlexSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 16,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// Campo de nota
-// ============================================================
-
-class _NoteField extends StatelessWidget {
-  final TextEditingController controller;
-  const _NoteField({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: TextField(
-        controller: controller,
-        decoration: const InputDecoration(
-          hintText: 'Nota (opcional)',
-          prefixIcon: Icon(Icons.edit_note_rounded, size: 20),
-        ),
-        maxLines: 1,
-      ),
-    );
-  }
-}
-
-// ============================================================
-// Bottom Sheet scrollable
-// ============================================================
-
-class _ScrollableBottomSheet extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
-
-  const _ScrollableBottomSheet({required this.title, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.5,
-      minChildSize: 0.3,
-      maxChildSize: 0.85,
-      expand: false,
-      builder: (context, scrollController) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                    borderRadius: AppTheme.radiusFull,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: GoogleFonts.ibmPlexSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  children: children,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _SheetItem extends StatelessWidget {
-  final IconData? icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _SheetItem({this.icon, required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppTheme.radiusMedium,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        child: Row(
-          children: [
-            if (icon != null) ...[
-              Icon(
-                icon,
-                size: 20,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 12),
-            ],
-            Text(
-              label,
-              style: GoogleFonts.ibmPlexSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// Numpad personalizado
-// ============================================================
-
-class _NumPad extends StatelessWidget {
-  final ValueChanged<String> onKey;
-
-  const _NumPad({required this.onKey});
-
-  static const _keys = [
-    ['7', '8', '9'],
-    ['4', '5', '6'],
-    ['1', '2', '3'],
-    ['.', '0', 'backspace'],
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        children: _keys.map((row) {
-          return Row(
-            children: row.map((key) {
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: _NumKey(keyValue: key, onTap: () => onKey(key)),
-                ),
-              );
-            }).toList(),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-class _NumKey extends StatelessWidget {
-  final String keyValue;
-  final VoidCallback onTap;
-
-  const _NumKey({required this.keyValue, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final isBackspace = keyValue == 'backspace';
-
-    return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerHigh,
-      borderRadius: AppTheme.radiusMedium,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppTheme.radiusMedium,
-        child: SizedBox(
-          height: 52,
-          child: Center(
-            child: isBackspace
-                ? Icon(
-                    Icons.backspace_outlined,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  )
-                : Text(
-                    keyValue,
-                    style: GoogleFonts.ibmPlexSans(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-          ),
-        ),
-      ),
     );
   }
 }

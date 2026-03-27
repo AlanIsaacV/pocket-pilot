@@ -129,7 +129,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
   }
 
   void _showCurrencySheet() {
-    showModalBottomSheet<String>(
+    showModalBottomSheet<Object>(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
       isScrollControlled: true,
@@ -138,20 +138,38 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
       ),
       builder: (ctx) => _ScrollableBottomSheet(
         title: 'Seleccionar moneda',
-        children: _allowedCurrencies
-            .map(
-              (code) => _SheetItem(
-                label: '$code - ${currencyNameForCode(code)}',
-                onTap: () => Navigator.pop(ctx, code),
-              ),
-            )
-            .toList(),
+        children: [
+          _SheetItem(
+            label: 'Configurar monedas',
+            icon: Icons.tune_rounded,
+            onTap: () => Navigator.pop(ctx, '__preferences__'),
+          ),
+          ..._allowedCurrencies.map(
+            (code) => _SheetItem(
+              label: '$code - ${currencyNameForCode(code)}',
+              onTap: () => Navigator.pop(ctx, code),
+            ),
+          ),
+        ],
       ),
-    ).then((code) {
-      if (code != null) {
-        setState(() => _selectedCurrencyCode = code);
+    ).then((selection) async {
+      if (selection == null) return;
+
+      if (selection is String && selection == '__preferences__') {
+        await _openCurrencyPreferencesFlow();
+        return;
+      }
+
+      if (selection is String) {
+        setState(() => _selectedCurrencyCode = selection);
       }
     });
+  }
+
+  Future<void> _openCurrencyPreferencesFlow() async {
+    await context.push<bool>('/settings/currency');
+    if (!mounted) return;
+    await _loadCurrencyOptions();
   }
 
   Future<void> _onSave() async {
@@ -682,9 +700,10 @@ class _ScrollableBottomSheet extends StatelessWidget {
 
 class _SheetItem extends StatelessWidget {
   final String label;
+  final IconData? icon;
   final VoidCallback onTap;
 
-  const _SheetItem({required this.label, required this.onTap});
+  const _SheetItem({required this.label, this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -693,13 +712,25 @@ class _SheetItem extends StatelessWidget {
       borderRadius: AppTheme.radiusMedium,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        child: Text(
-          label,
-          style: GoogleFonts.ibmPlexSans(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
+        child: Row(
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 20,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 12),
+            ],
+            Text(
+              label,
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
         ),
       ),
     );

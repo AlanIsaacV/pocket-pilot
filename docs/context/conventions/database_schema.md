@@ -36,5 +36,9 @@ This document outlines the conventions for defining database schemas and migrati
 3. Add a SQLite migration to `frontend/assets/migrations/`.
 4. Update the corresponding `Handler` and `LocalStore` to handle new fields.
 
+## Nullable Foreign Keys
+- Some foreign keys may be nullable when a relationship is conditional by type. For example, `transactions.category_id` is nullable because transfer-type transactions have no category.
+- Self-referencing foreign keys (e.g., `transactions.linked_transaction_id REFERENCES transactions(id)`) are used to pair related rows without a join table. Use a partial index (`WHERE column IS NOT NULL`) for efficient lookups.
+
 ## MVP Baseline Exception
 - While the project is in MVP stage and no production data exists, it is acceptable to modify the original baseline schema files (`001_*.sql`) directly to introduce new required columns (for example, `accounts.currency_code`).

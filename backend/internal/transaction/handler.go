@@ -66,8 +66,10 @@ func transactionTypeToString(t pb.TransactionType) string {
 		return "income"
 	case pb.TransactionType_TRANSACTION_TYPE_EXPENSE:
 		return "expense"
-	case pb.TransactionType_TRANSACTION_TYPE_TRANSFER:
-		return "transfer"
+	case pb.TransactionType_TRANSACTION_TYPE_TRANSFER_OUT:
+		return "transfer_out"
+	case pb.TransactionType_TRANSACTION_TYPE_TRANSFER_IN:
+		return "transfer_in"
 	default:
 		return "expense"
 	}
@@ -79,8 +81,10 @@ func stringToTransactionType(s string) pb.TransactionType {
 		return pb.TransactionType_TRANSACTION_TYPE_INCOME
 	case "expense":
 		return pb.TransactionType_TRANSACTION_TYPE_EXPENSE
-	case "transfer":
-		return pb.TransactionType_TRANSACTION_TYPE_TRANSFER
+	case "transfer_out":
+		return pb.TransactionType_TRANSACTION_TYPE_TRANSFER_OUT
+	case "transfer_in":
+		return pb.TransactionType_TRANSACTION_TYPE_TRANSFER_IN
 	default:
 		return pb.TransactionType_TRANSACTION_TYPE_UNSPECIFIED
 	}
@@ -90,7 +94,6 @@ func toProto(t *Transaction) *pb.Transaction {
 	proto := &pb.Transaction{
 		Id:           t.ID.String(),
 		AccountId:    t.AccountID.String(),
-		CategoryId:   t.CategoryID.String(),
 		Type:         stringToTransactionType(t.Type),
 		AmountCents:  t.AmountCents,
 		CurrencyCode: t.CurrencyCode,
@@ -100,6 +103,14 @@ func toProto(t *Transaction) *pb.Transaction {
 		Date:         timestamppb.New(t.Date),
 		CreatedAt:    timestamppb.New(t.CreatedAt),
 		UpdatedAt:    timestamppb.New(t.UpdatedAt),
+	}
+	if t.CategoryID != nil {
+		s := t.CategoryID.String()
+		proto.CategoryId = &s
+	}
+	if t.LinkedTransactionID != nil {
+		s := t.LinkedTransactionID.String()
+		proto.LinkedTransactionId = &s
 	}
 	if t.DeletedAt != nil {
 		proto.DeletedAt = timestamppb.New(*t.DeletedAt)
@@ -116,9 +127,23 @@ func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
 	if err != nil {
 		return nil, err
 	}
-	categoryID, err := parseUUID(p.CategoryId, "transaction.category_id")
-	if err != nil {
-		return nil, err
+
+	var categoryID *uuid.UUID
+	if p.CategoryId != nil && *p.CategoryId != "" {
+		cid, err := parseUUID(*p.CategoryId, "transaction.category_id")
+		if err != nil {
+			return nil, err
+		}
+		categoryID = &cid
+	}
+
+	var linkedID *uuid.UUID
+	if p.LinkedTransactionId != nil && *p.LinkedTransactionId != "" {
+		lid, err := parseUUID(*p.LinkedTransactionId, "transaction.linked_transaction_id")
+		if err != nil {
+			return nil, err
+		}
+		linkedID = &lid
 	}
 
 	var date time.Time
@@ -127,19 +152,20 @@ func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
 	}
 
 	return &Transaction{
-		ID:           id,
-		UserID:       userID,
-		AccountID:    accountID,
-		CategoryID:   categoryID,
-		Type:         transactionTypeToString(p.Type),
-		AmountCents:  p.AmountCents,
-		CurrencyCode: p.CurrencyCode,
-		Status:       p.Status,
-		Tags:         p.Tags,
-		Description:  p.Description,
-		Date:         date,
-		CreatedAt:    p.CreatedAt.AsTime(),
-		UpdatedAt:    p.UpdatedAt.AsTime(),
+		ID:                  id,
+		UserID:              userID,
+		AccountID:           accountID,
+		CategoryID:          categoryID,
+		LinkedTransactionID: linkedID,
+		Type:                transactionTypeToString(p.Type),
+		AmountCents:         p.AmountCents,
+		CurrencyCode:        p.CurrencyCode,
+		Status:              p.Status,
+		Tags:                p.Tags,
+		Description:         p.Description,
+		Date:                date,
+		CreatedAt:           p.CreatedAt.AsTime(),
+		UpdatedAt:           p.UpdatedAt.AsTime(),
 	}, nil
 }
 

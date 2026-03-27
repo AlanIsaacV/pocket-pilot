@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_view_model.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
@@ -50,15 +51,68 @@ class TransactionsScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _onAddTap(context),
-        tooltip: 'Agregar transacción',
+        onPressed: () => _showAddOptions(context),
+        tooltip: 'Agregar',
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  void _onAddTap(BuildContext context) {
-    context.go('/transactions/new');
+  void _showAddOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: AppTheme.radiusFull,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Nuevo registro',
+                style: GoogleFonts.ibmPlexSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SheetItem(
+                icon: Icons.receipt_long_outlined,
+                label: 'Nueva transacción',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.go('/transactions/new');
+                },
+              ),
+              SheetItem(
+                icon: Icons.swap_horiz_rounded,
+                label: 'Nueva transferencia',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.go('/transactions/transfer');
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -102,13 +156,22 @@ class _TransactionList extends StatelessWidget {
               key: ValueKey(t.id),
               direction: DismissDirection.endToStart,
               background: _DeleteBackground(),
-              confirmDismiss: (_) => _confirmDelete(context, t.description),
+              confirmDismiss: (_) => _confirmDelete(context, t),
               onDismissed: (_) async {
                 try {
-                  await vm.deleteTransaction(t.id);
+                  await vm.deleteTransaction(
+                    t.id,
+                    linkedTransactionId: t.linkedTransactionId,
+                  );
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Transacción eliminada')),
+                      SnackBar(
+                        content: Text(
+                          t.isTransfer
+                              ? 'Transferencia eliminada'
+                              : 'Transacción eliminada',
+                        ),
+                      ),
                     );
                   }
                 } catch (e) {
@@ -122,13 +185,17 @@ class _TransactionList extends StatelessWidget {
               child: _TransactionTile(
                 transaction: t,
                 onTap: () {
-                  context
-                      .push('/transactions/${t.id}/edit', extra: t)
-                      .then((result) {
-                    if (result == true && context.mounted) {
-                      vm.loadOnAppear();
-                    }
-                  });
+                  if (t.isTransfer) {
+                    _openTransferEdit(context, t);
+                  } else {
+                    context
+                        .push('/transactions/${t.id}/edit', extra: t)
+                        .then((result) {
+                      if (result == true && context.mounted) {
+                        vm.loadOnAppear();
+                      }
+                    });
+                  }
                 },
               ),
             );
@@ -139,6 +206,36 @@ class _TransactionList extends StatelessWidget {
       },
     );
   }
+
+  void _openTransferEdit(BuildContext context, TransactionModel t) {
+    final linked = t.linkedTransactionId != null
+        ? vm.findLinked(t.linkedTransactionId!)
+        : null;
+
+    // Determine which is out and which is in.
+    final TransactionModel? outLeg;
+    final TransactionModel? inLeg;
+    if (t.isTransferOut) {
+      outLeg = t;
+      inLeg = linked;
+    } else {
+      outLeg = linked;
+      inLeg = t;
+    }
+
+    if (outLeg != null && inLeg != null) {
+      context
+          .push(
+            '/transactions/${t.id}/edit-transfer',
+            extra: {'out': outLeg, 'in': inLeg},
+          )
+          .then((result) {
+        if (result == true && context.mounted) {
+          vm.loadOnAppear();
+        }
+      });
+    }
+  }
 }
 
 // ============================================================
@@ -146,7 +243,7 @@ class _TransactionList extends StatelessWidget {
 // ============================================================
 
 class _MonthHeader extends StatelessWidget {
-  final String monthKey; // "YYYY-MM"
+  final String monthKey;
 
   const _MonthHeader({required this.monthKey});
 
@@ -173,18 +270,8 @@ class _MonthHeader extends StatelessWidget {
 
   String _monthName(int month) {
     const names = [
-      'Enero',
-      'Febrero',
-      'Marzo',
-      'Abril',
-      'Mayo',
-      'Junio',
-      'Julio',
-      'Agosto',
-      'Septiembre',
-      'Octubre',
-      'Noviembre',
-      'Diciembre',
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
     ];
     return names[month - 1];
   }
@@ -202,19 +289,38 @@ class _TransactionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isIncome = transaction.isIncome;
-    final amountColor = isIncome
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).colorScheme.error;
+    final cs = Theme.of(context).colorScheme;
+
+    final Color iconBgColor;
+    final Color amountColor;
+    final IconData icon;
+
+    if (transaction.isTransfer) {
+      iconBgColor = cs.secondary.withValues(alpha: 0.1);
+      amountColor = transaction.isTransferIn ? cs.primary : cs.onSurfaceVariant;
+      icon = Icons.swap_horiz_rounded;
+    } else if (transaction.isIncome) {
+      iconBgColor = cs.primary.withValues(alpha: 0.1);
+      amountColor = cs.primary;
+      icon = Icons.arrow_downward_rounded;
+    } else {
+      iconBgColor = cs.error.withValues(alpha: 0.1);
+      amountColor = cs.error;
+      icon = Icons.arrow_upward_rounded;
+    }
 
     final date = transaction.parsedDate;
     final formattedDate = '${date.day} ${_monthAbbr(date.month)} ${date.year}';
+
+    final subtitle = transaction.isTransfer
+        ? 'Transferencia · $formattedDate'
+        : formattedDate;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
       child: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainer,
+          color: cs.surfaceContainer,
           borderRadius: AppTheme.radiusMedium,
         ),
         child: ListTile(
@@ -227,18 +333,10 @@ class _TransactionTile extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: isIncome
-                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-                  : Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
+              color: iconBgColor,
               borderRadius: AppTheme.radiusFull,
             ),
-            child: Icon(
-              isIncome
-                  ? Icons.arrow_downward_rounded
-                  : Icons.arrow_upward_rounded,
-              color: amountColor,
-              size: 18,
-            ),
+            child: Icon(icon, color: amountColor, size: 18),
           ),
           title: Text(
             transaction.description.isNotEmpty
@@ -247,15 +345,15 @@ class _TransactionTile extends StatelessWidget {
             style: GoogleFonts.ibmPlexSans(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: Theme.of(context).colorScheme.onSurface,
+              color: cs.onSurface,
             ),
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
-            formattedDate,
+            subtitle,
             style: GoogleFonts.ibmPlexSans(
               fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: cs.onSurfaceVariant,
             ),
           ),
           trailing: Text(
@@ -273,18 +371,8 @@ class _TransactionTile extends StatelessWidget {
 
   String _monthAbbr(int month) {
     const months = [
-      'ene',
-      'feb',
-      'mar',
-      'abr',
-      'may',
-      'jun',
-      'jul',
-      'ago',
-      'sep',
-      'oct',
-      'nov',
-      'dic',
+      'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+      'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
     ];
     return months[month - 1];
   }
@@ -294,13 +382,18 @@ class _TransactionTile extends StatelessWidget {
 // Helpers de eliminación
 // ============================================================
 
-Future<bool?> _confirmDelete(BuildContext context, String description) {
-  final label = description.isNotEmpty ? '"$description"' : 'esta transacción';
+Future<bool?> _confirmDelete(BuildContext context, TransactionModel t) {
+  final isTransfer = t.isTransfer;
+  final label = t.description.isNotEmpty ? '"${t.description}"' : 'esta transacción';
   return showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Eliminar transacción'),
-      content: Text('Se eliminará $label.'),
+      title: Text(isTransfer ? 'Eliminar transferencia' : 'Eliminar transacción'),
+      content: Text(
+        isTransfer
+            ? 'Se eliminará esta transferencia completa (ambos movimientos).'
+            : 'Se eliminará $label.',
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(false),

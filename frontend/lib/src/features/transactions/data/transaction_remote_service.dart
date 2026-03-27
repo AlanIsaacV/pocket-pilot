@@ -39,7 +39,6 @@ class TransactionRemoteService {
       final transaction = Transaction(
         id: map['id'] as String,
         accountId: map['account_id'] as String,
-        categoryId: map['category_id'] as String,
         type: TransactionModel.stringToTransactionType(map['type'] as String),
         amountCents: Int64(map['amount_cents'] as int),
         currencyCode: map['currency_code'] as String,
@@ -54,6 +53,13 @@ class TransactionRemoteService {
               : now,
         ),
       );
+      if (map['category_id'] != null) {
+        transaction.categoryId = map['category_id'] as String;
+      }
+      if (map['linked_transaction_id'] != null) {
+        transaction.linkedTransactionId =
+            map['linked_transaction_id'] as String;
+      }
       return await _client.upsertTransaction(
         UpsertTransactionRequest(transaction: transaction),
       );

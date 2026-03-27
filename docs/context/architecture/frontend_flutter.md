@@ -47,6 +47,32 @@ Each feature in `lib/src/features/<feature_name>/` must follow the same folder s
 - `ThemePreferenceController` loads local value on app startup and exposes `ThemeMode` to `MaterialApp.themeMode`.
 - Settings updates theme via `UserPreferenceRepository`; UI theme updates immediately and sync is handled asynchronously by outbox + `UserPreferenceSyncHandler`.
 
+## Transfers Between Accounts
+Transfers are modeled as two linked `Transaction` rows (`transfer_out` + `transfer_in`) connected by `linked_transaction_id`. This avoids a separate entity/table — transfers reuse the entire transaction sync, outbox, and repository infrastructure.
+
+### Paired Transaction Pattern
+- `TransactionRepository.createTransfer()` generates two UUIDs, builds both `TransactionModel` legs, writes both to SQLite, and enqueues both to `SyncOutbox` independently.
+- Each leg syncs via the existing `UpsertTransaction` RPC — the server treats them as normal transactions.
+- Cascade delete: `softDelete(id, linkedId:)` uses a SQLite batch to atomically delete both legs; two outbox entries are enqueued.
+- Backend `SoftDelete` also cascades within a PostgreSQL transaction as defense-in-depth.
+
+### Shared Form Widgets
+Reusable widgets shared between `TransactionFormScreen` and `TransferFormScreen` are extracted to `form_widgets.dart`:
+- `NumPad`, `TagsSection`, `NoteField`, `DetailRow`, `ScrollableBottomSheet`, `SheetItem`.
+- The original transaction form uses `typedef _NumPad = NumPad;` etc. to preserve private naming internally.
+
+### Transfer Form (`TransferFormScreen`)
+- DESDE/HACIA cards with account + currency selectors.
+- Numpad targets the active field (source amount, destination amount, or rate).
+- When currencies match: destination mirrors source, rate toggle hidden.
+- When currencies differ: MONTO mode (type destination amount) or RATE mode (type exchange rate).
+- Optional split dates for multi-day transfers.
+- `TransferFormRouteScope` provides DI without `CategoryLocalStore` (transfers have no category).
+
+### Nullable `category_id`
+- `TransactionModel.categoryId` is `String?` — transfers set it to `null`.
+- Forms and list tiles check `isTransfer` to skip category-related UI.
+
 ## UI Conventions
 
 ### Category Icons

@@ -49,13 +49,14 @@ CREATE TABLE tags
 CREATE INDEX idx_categories_user_id ON categories (user_id) WHERE deleted_at IS NULL;
 
 
-CREATE TYPE transaction_type AS ENUM ('income', 'expense', 'transfer');
+CREATE TYPE transaction_type AS ENUM ('income', 'expense', 'transfer_out', 'transfer_in');
 CREATE TABLE transactions
 (
     id            uuid PRIMARY KEY          DEFAULT gen_random_uuid(),
     user_id       uuid             NOT NULL,
     account_id    uuid             NOT NULL REFERENCES accounts (id),
-    category_id   uuid             NOT NULL REFERENCES categories (id),
+    category_id   uuid             REFERENCES categories (id),
+    linked_transaction_id uuid     REFERENCES transactions (id),
     type          transaction_type NOT NULL,
     amount_cents  BIGINT           NOT NULL,
     currency_code TEXT             NOT NULL,
@@ -76,6 +77,9 @@ CREATE INDEX idx_transactions_account_id
 CREATE INDEX idx_transactions_category_id
     ON transactions (category_id)
     WHERE deleted_at IS NULL;
+CREATE INDEX idx_transactions_linked
+    ON transactions (linked_transaction_id)
+    WHERE linked_transaction_id IS NOT NULL;
 
 
 CREATE TABLE user_preferences

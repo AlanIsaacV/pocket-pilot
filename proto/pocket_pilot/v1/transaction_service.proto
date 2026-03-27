@@ -12,13 +12,14 @@ enum TransactionType {
   TRANSACTION_TYPE_UNSPECIFIED = 0;
   TRANSACTION_TYPE_INCOME = 1;
   TRANSACTION_TYPE_EXPENSE = 2;
-  TRANSACTION_TYPE_TRANSFER = 3;
+  TRANSACTION_TYPE_TRANSFER_OUT = 3;
+  TRANSACTION_TYPE_TRANSFER_IN = 4;
 }
 
 message Transaction {
   string id = 1;
   string account_id = 2;
-  string category_id = 3;
+  optional string category_id = 3;
   TransactionType type = 4;
   int64 amount_cents = 5;
   string currency_code = 6;
@@ -29,6 +30,7 @@ message Transaction {
   google.protobuf.Timestamp created_at = 11;
   google.protobuf.Timestamp updated_at = 12;
   google.protobuf.Timestamp deleted_at = 13;
+  optional string linked_transaction_id = 14;
 }
 
 service TransactionService {

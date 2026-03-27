@@ -72,7 +72,8 @@ CREATE TABLE transactions
 (
     id            TEXT PRIMARY KEY,
     account_id    TEXT     NOT NULL REFERENCES accounts (id),
-    category_id   TEXT     NOT NULL REFERENCES categories (id),
+    category_id   TEXT     REFERENCES categories (id),
+    linked_transaction_id TEXT REFERENCES transactions (id),
     type          TEXT     NOT NULL,
     amount_cents  BIGINT   NOT NULL,
     currency_code TEXT     NOT NULL,
@@ -131,6 +132,10 @@ CREATE INDEX idx_transactions_category_id
 CREATE INDEX idx_transactions_currency_code
     ON transactions (currency_code)
     WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_transactions_linked
+    ON transactions (linked_transaction_id)
+    WHERE linked_transaction_id IS NOT NULL;
 
 
 CREATE TABLE sync_outbox

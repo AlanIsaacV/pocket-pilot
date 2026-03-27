@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_remote_service.dart';
+import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/core/sync/sync_handler.dart';
 
 class TransactionSyncHandler implements SyncHandler {
@@ -22,18 +23,10 @@ class TransactionSyncHandler implements SyncHandler {
     final response = await _remote.listTransactions(updatedSince: updatedSince);
 
     final items = response.transactions.map((proto) {
-      final row = {
-        'id': proto.id,
-        'account_id': proto.accountId,
-        'category_id': proto.categoryId,
-        'type': proto.type.name,
-        'amount': proto.amountCents.toInt(),
-        'currency_code': proto.currencyCode,
-        'status': proto.status,
-        'description': proto.description,
-        'date': proto.date.toDateTime().toIso8601String().substring(0, 10),
-        'created_at': proto.createdAt.toDateTime().toUtc().toIso8601String(),
-        'updated_at': proto.updatedAt.toDateTime().toUtc().toIso8601String(),
+      final model = TransactionModel.fromProto(proto);
+      final row = <String, dynamic>{
+        ...model.toMap(),
+        // fromProto/toMap doesn't carry deleted_at — add it from the proto.
         'deleted_at': proto.hasDeletedAt()
             ? proto.deletedAt.toDateTime().toUtc().toIso8601String()
             : null,
@@ -62,19 +55,9 @@ class TransactionSyncHandler implements SyncHandler {
     final response = await _remote.upsertTransaction(map);
 
     if (response.conflictResolved) {
-      final proto = response.transaction;
-      final serverRow = {
-        'id': proto.id,
-        'account_id': proto.accountId,
-        'category_id': proto.categoryId,
-        'type': proto.type.name,
-        'amount': proto.amountCents.toInt(),
-        'currency_code': proto.currencyCode,
-        'status': proto.status,
-        'description': proto.description,
-        'date': proto.date.toDateTime().toIso8601String().substring(0, 10),
-        'created_at': proto.createdAt.toDateTime().toUtc().toIso8601String(),
-        'updated_at': proto.updatedAt.toDateTime().toUtc().toIso8601String(),
+      final model = TransactionModel.fromProto(response.transaction);
+      final serverRow = <String, dynamic>{
+        ...model.toMap(),
         'deleted_at': null,
       };
       return SyncPushResult(conflictResolved: true, serverData: serverRow);

@@ -83,16 +83,24 @@ class TransactionLocalStore {
   }
 
   /// Marca una transacción como eliminada (soft delete con LWW).
-  Future<void> softDelete(String id, DateTime deletedAt) async {
+  /// Cuando [linkedId] no es null, elimina ambas transacciones en un batch
+  /// atómico (usado para transferencias).
+  Future<void> softDelete(String id, DateTime deletedAt, {String? linkedId}) async {
     final db = await _db.database;
-    await db.update(
-      'transactions',
-      {
-        'deleted_at': deletedAt.toIso8601String(),
-        'updated_at': deletedAt.toIso8601String(),
-      },
-      where: 'id = ? AND (deleted_at IS NULL OR deleted_at < ?)',
-      whereArgs: [id, deletedAt.toIso8601String()],
-    );
+    final values = {
+      'deleted_at': deletedAt.toIso8601String(),
+      'updated_at': deletedAt.toIso8601String(),
+    };
+    const where = 'id = ? AND (deleted_at IS NULL OR deleted_at < ?)';
+    final ts = deletedAt.toIso8601String();
+
+    if (linkedId != null) {
+      final batch = db.batch();
+      batch.update('transactions', values, where: where, whereArgs: [id, ts]);
+      batch.update('transactions', values, where: where, whereArgs: [linkedId, ts]);
+      await batch.commit(noResult: true);
+    } else {
+      await db.update('transactions', values, where: where, whereArgs: [id, ts]);
+    }
   }
 }

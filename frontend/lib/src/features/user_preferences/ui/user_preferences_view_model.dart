@@ -21,8 +21,6 @@ class UserPreferencesViewModel extends ChangeNotifier {
   String defaultCurrency = kInitialDefaultCurrency;
   AppThemePreference themePreference = kInitialThemePreference;
 
-  DateTime? _lastSyncAt;
-
   UserPreferencesViewModel({
     required UserPreferenceRepository repository,
     required SyncService syncService,
@@ -65,6 +63,7 @@ class UserPreferencesViewModel extends ChangeNotifier {
     );
 
     await _reloadLocal();
+    await _runSync();
   }
 
   Future<void> saveThemePreference(AppThemePreference preference) async {
@@ -74,20 +73,12 @@ class UserPreferencesViewModel extends ChangeNotifier {
     );
     themePreference = preference;
     notifyListeners();
+    await _runSync();
   }
 
   Future<void> _loadLocalThenMaybeSync() async {
     await _ensureSeededLocally();
     await _reloadLocal();
-    await _maybeSyncRemote();
-  }
-
-  Future<void> _maybeSyncRemote() async {
-    final last = _lastSyncAt;
-    if (last != null &&
-        DateTime.now().difference(last) < const Duration(seconds: 5)) {
-      return;
-    }
     await _runSync();
   }
 
@@ -100,7 +91,6 @@ class UserPreferencesViewModel extends ChangeNotifier {
       await _syncService.sync();
       await _ensureSeededLocally();
       await _reloadLocal();
-      _lastSyncAt = DateTime.now();
       errorMessage = null;
     } catch (e) {
       errorMessage = e.toString();

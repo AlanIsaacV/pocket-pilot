@@ -9,7 +9,8 @@ class SyncService {
   final SyncMetadataStore _metadataStore;
   final Map<String, SyncHandler> _handlers;
 
-  bool _isSyncing = false;
+  bool _syncRequested = false;
+  Future<void>? _activeSyncFuture;
 
   SyncService({
     required SyncOutbox outbox,
@@ -20,17 +21,25 @@ class SyncService {
        _handlers = {for (final h in handlers) h.entityType: h};
 
   /// Ejecuta un ciclo completo de sync: Pull -> Push para todas las entidades.
-  /// Si ya hay un sync en curso, este llamado retorna inmediatamente.
-  Future<void> sync() async {
-    if (_isSyncing) return;
-    _isSyncing = true;
+  /// Si llega otra petición mientras hay un sync en curso, se agenda una
+  /// segunda pasada al terminar la actual (coalescing de solicitudes).
+  Future<void> sync() {
+    _syncRequested = true;
+    _activeSyncFuture ??= _runSyncLoop();
+    return _activeSyncFuture!;
+  }
+
+  Future<void> _runSyncLoop() async {
     try {
-      for (final handler in _handlers.values) {
-        await _pullEntity(handler);
-        await _pushEntity(handler);
+      while (_syncRequested) {
+        _syncRequested = false;
+        for (final handler in _handlers.values) {
+          await _pullEntity(handler);
+          await _pushEntity(handler);
+        }
       }
     } finally {
-      _isSyncing = false;
+      _activeSyncFuture = null;
     }
   }
 

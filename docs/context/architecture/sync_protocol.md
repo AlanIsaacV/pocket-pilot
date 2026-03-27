@@ -14,6 +14,7 @@ Pocket Pilot uses an offline-first strategy based on an Outbox pattern for write
 - **Mechanism:** Every local write (insert/update/delete) is enqueued in a `sync_outbox` table in SQLite.
 - **Deduplication:** The outbox only keeps the latest operation per `(entity_type, entity_id)` to avoid redundant network calls.
 - **Retry Logic:** Each entry has a `retry_count` (max 3 retries). If all retries fail, the entry is marked as permanently failed for manual intervention or full re-sync.
+- **Concurrent Sync Calls:** If `sync()` is requested while another sync cycle is running, the request is coalesced and an additional pass runs immediately after the current one finishes (no request is dropped).
 
 ### 3. Last Write Wins (LWW)
 - **Rule:** The version with the most recent `updated_at` timestamp (UTC) is the source of truth.

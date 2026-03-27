@@ -35,6 +35,7 @@ Each feature in `lib/src/features/<feature_name>/` must follow the same folder s
 - Shared user settings are stored in SQLite table `user_preferences` as key-value rows (`pref_key`, `pref_value`) with LWW timestamps.
 - Preference writes must go through `UserPreferenceRepository` so each write is persisted locally and enqueued in `SyncOutbox` (`entity_type = user_preference`, `entity_id = pref_key`).
 - Domain-specific adapters should wrap raw preferences for UI use (e.g., `CurrencyPreferencesLocalStore`, `ThemePreferencesLocalStore`).
+- Preferences UI should trigger sync on screen entry and after save actions to minimize propagation latency across devices.
 
 ### Accounts Currency Flow
 - `AccountModel` includes required `currencyCode`, persisted as `accounts.currency_code` in SQLite.

@@ -20,6 +20,7 @@ Before starting any task, identify the relevant domain (Backend, Frontend, or Pr
 
 ### Decision Records & Dependencies
 - [decisions/0001-sync-strategy.md](decisions/0001-sync-strategy.md) - Initial ADR: Why we chose Last Write Wins (LWW) and Delta Pull.
+- [decisions/0002-sync-coalescing-and-user-preferences.md](decisions/0002-sync-coalescing-and-user-preferences.md) - Ensures concurrent sync requests are coalesced and preference saves flush to server immediately.
 - [dependencies/module_map.md](dependencies/module_map.md) - Dependency graph between internal modules and external libraries.
 
 ### Session Logs

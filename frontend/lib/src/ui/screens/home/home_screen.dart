@@ -26,6 +26,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex(context),

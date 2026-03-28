@@ -628,6 +628,13 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                       ],
                     ),
                   ),
+                  // Cuenta
+                  DetailRow(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Cuenta',
+                    value: _selectedAccount?.name ?? 'Sin cuenta',
+                    onTap: _showAccountSheet,
+                  ),
 
                   // Categoría
                   _CategorySection(
@@ -637,13 +644,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                     onOpenPicker: _openCategoryPicker,
                   ),
 
-                  // Cuenta
-                  DetailRow(
-                    icon: Icons.account_balance_wallet_outlined,
-                    label: 'Cuenta',
-                    value: _selectedAccount?.name ?? 'Sin cuenta',
-                    onTap: _showAccountSheet,
-                  ),
+                  // Nota
+                  NoteField(controller: _noteController),
 
                   // Fecha
                   DetailRow(
@@ -682,9 +684,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                       }
                     }),
                   ),
-
-                  // Nota
-                  NoteField(controller: _noteController),
                 ],
               ),
             ),

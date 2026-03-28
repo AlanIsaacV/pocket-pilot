@@ -19,6 +19,7 @@ class TagsSection extends StatelessWidget {
   final ValueChanged<String> onAdd;
   final ValueChanged<TagModel> onRemove;
   final ValueChanged<TagModel> onAddRecent;
+  final VoidCallback? onFieldTap;
 
   const TagsSection({
     required this.selectedTags,
@@ -27,6 +28,7 @@ class TagsSection extends StatelessWidget {
     required this.onAdd,
     required this.onRemove,
     required this.onAddRecent,
+    this.onFieldTap,
     super.key,
   });
 
@@ -75,6 +77,7 @@ class TagsSection extends StatelessWidget {
                 child: Center(
                   child: TextField(
                     controller: controller,
+                    onTap: onFieldTap,
                     style: GoogleFonts.ibmPlexSans(fontSize: 13),
                     decoration: InputDecoration(
                       hintText: 'Agregar tag...',
@@ -212,7 +215,9 @@ class DetailRow extends StatelessWidget {
 
 class NoteField extends StatelessWidget {
   final TextEditingController controller;
-  const NoteField({required this.controller, super.key});
+  final VoidCallback? onTap;
+
+  const NoteField({required this.controller, this.onTap, super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -220,6 +225,7 @@ class NoteField extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: TextField(
         controller: controller,
+        onTap: onTap,
         decoration: const InputDecoration(
           hintText: 'Nota (opcional)',
           prefixIcon: Icon(Icons.edit_note_rounded, size: 20),
@@ -299,7 +305,12 @@ class SheetItem extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
 
-  const SheetItem({this.icon, required this.label, required this.onTap, super.key});
+  const SheetItem({
+    this.icon,
+    required this.label,
+    required this.onTap,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -337,35 +348,97 @@ class SheetItem extends StatelessWidget {
 // Numpad personalizado
 // ============================================================
 
+enum NumPadMode { numeric, calculator }
+
 class NumPad extends StatelessWidget {
   final ValueChanged<String> onKey;
+  final ValueChanged<String>? onOperation;
+  final NumPadMode mode;
 
-  const NumPad({required this.onKey, super.key});
+  const NumPad({
+    required this.onKey,
+    this.onOperation,
+    this.mode = NumPadMode.numeric,
+    super.key,
+  }) : assert(
+         mode == NumPadMode.numeric || onOperation != null,
+         'onOperation is required when mode is calculator',
+       );
 
-  static const _keys = [
+  static const _numericKeys = [
     ['7', '8', '9'],
     ['4', '5', '6'],
     ['1', '2', '3'],
     ['.', '0', 'backspace'],
   ];
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        children: _keys.map((row) {
-          return Row(
+  static const _operationKeys = ['*', '/', '-', '+', '='];
+  static const _padHeight = 240.0;
+  static const _operationColumnWidth = 72.0;
+
+  Widget _buildNumericGrid() {
+    return Column(
+      children: _numericKeys.map((row) {
+        return Expanded(
+          child: Row(
             children: row.map((key) {
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(4),
-                  child: _NumKey(keyValue: key, onTap: () => onKey(key)),
+                  child: _NumKey(
+                    keyValue: key,
+                    onTap: () => onKey(key),
+                    stretchHeight: true,
+                  ),
                 ),
               );
             }).toList(),
-          );
-        }).toList(),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final numericGrid = _buildNumericGrid();
+
+    if (mode == NumPadMode.numeric) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        child: SizedBox(height: _padHeight, child: numericGrid),
+      );
+    }
+
+    final onOperationTap = onOperation!;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: SizedBox(
+        height: _padHeight,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: numericGrid),
+            const SizedBox(width: 4),
+            SizedBox(
+              width: _operationColumnWidth,
+              child: Column(
+                children: _operationKeys.map((operation) {
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: _OperationKey(
+                        operation: operation,
+                        onTap: () => onOperationTap(operation),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -374,8 +447,13 @@ class NumPad extends StatelessWidget {
 class _NumKey extends StatelessWidget {
   final String keyValue;
   final VoidCallback onTap;
+  final bool stretchHeight;
 
-  const _NumKey({required this.keyValue, required this.onTap});
+  const _NumKey({
+    required this.keyValue,
+    required this.onTap,
+    this.stretchHeight = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -388,7 +466,7 @@ class _NumKey extends StatelessWidget {
         onTap: onTap,
         borderRadius: AppTheme.radiusMedium,
         child: SizedBox(
-          height: 52,
+          height: stretchHeight ? null : 52,
           child: Center(
             child: isBackspace
                 ? Icon(
@@ -404,6 +482,46 @@ class _NumKey extends StatelessWidget {
                       color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OperationKey extends StatelessWidget {
+  final String operation;
+  final VoidCallback onTap;
+
+  const _OperationKey({required this.operation, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isEquals = operation == '=';
+    final label = switch (operation) {
+      '*' => 'x',
+      '/' => '/',
+      _ => operation,
+    };
+
+    final colors = Theme.of(context).colorScheme;
+    final background = isEquals ? colors.primary : colors.surfaceContainerHigh;
+    final foreground = isEquals ? colors.onPrimary : colors.primary;
+
+    return Material(
+      color: background,
+      borderRadius: AppTheme.radiusMedium,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppTheme.radiusMedium,
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.ibmPlexSans(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: foreground,
+            ),
           ),
         ),
       ),

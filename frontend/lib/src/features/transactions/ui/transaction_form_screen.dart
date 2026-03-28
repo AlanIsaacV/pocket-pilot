@@ -27,6 +27,7 @@ import 'package:pocket_pilot/src/features/user_preferences/domain/currency_prefe
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/transaction_amount_calculator.dart';
 
 // ----------------------------------------------------------
 // Helpers
@@ -62,7 +63,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   bool get _isEditMode => widget.transaction != null;
 
   String _type = 'expense';
-  String _amountInput = '0';
+  final TransactionAmountCalculator _amountCalculator =
+      TransactionAmountCalculator();
   String _currencyCode = 'MXN';
   DateTime _date = DateTime.now();
   bool _isSaving = false;
@@ -128,12 +130,13 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     var selectedCurrencyCode = currencySnapshot.defaultCode;
     AccountModel? selectedAccount;
     CategoryModel? selectedCategory;
+    var initialAmount = '0';
 
     if (_isEditMode) {
       final t = widget.transaction!;
       _type = t.type;
       final rawAmount = t.amount / 100;
-      _amountInput = rawAmount == rawAmount.truncateToDouble()
+      initialAmount = rawAmount == rawAmount.truncateToDouble()
           ? rawAmount.toInt().toString()
           : rawAmount.toStringAsFixed(2);
       selectedCurrencyCode = t.currencyCode;
@@ -168,6 +171,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       allowedCurrencies.add(selectedCurrencyCode);
       allowedCurrencies.sort(compareCurrencyCodes);
     }
+
+    _amountCalculator.reset(initialAmount);
 
     setState(() {
       _accounts = accounts;
@@ -254,28 +259,60 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   void _onNumpad(String key) {
     setState(() {
       if (key == 'backspace') {
-        if (_amountInput.length > 1) {
-          _amountInput = _amountInput.substring(0, _amountInput.length - 1);
-        } else {
-          _amountInput = '0';
-        }
+        _amountCalculator.onBackspace();
       } else if (key == '.') {
-        if (!_amountInput.contains('.')) {
-          _amountInput += '.';
-        }
-      } else {
-        if (_amountInput == '0') {
-          _amountInput = key;
-        } else {
-          if (_amountInput.contains('.')) {
-            final parts = _amountInput.split('.');
-            if (parts[1].length < 2) _amountInput += key;
-          } else {
-            _amountInput += key;
-          }
-        }
+        _amountCalculator.onDecimalPoint();
+      } else if (key.length == 1 && _isDigit(key.codeUnitAt(0))) {
+        _amountCalculator.onDigit(key);
       }
     });
+
+    _showCalculatorErrorIfAny();
+  }
+
+  void _onNumpadOperation(String operation) {
+    setState(() {
+      switch (operation) {
+        case '+':
+          _amountCalculator.onOperator(CalcOperator.add);
+        case '-':
+          _amountCalculator.onOperator(CalcOperator.subtract);
+        case '*':
+          _amountCalculator.onOperator(CalcOperator.multiply);
+        case '/':
+          _amountCalculator.onOperator(CalcOperator.divide);
+        case '=':
+          _amountCalculator.onEquals();
+      }
+    });
+
+    _showCalculatorErrorIfAny();
+  }
+
+  void _commitPendingAmountIfAny() {
+    if (!_amountCalculator.hasPendingExpression) {
+      return;
+    }
+
+    setState(() {
+      _amountCalculator.commitPendingIfAny();
+    });
+
+    _showCalculatorErrorIfAny();
+  }
+
+  void _showCalculatorErrorIfAny() {
+    final message = _amountCalculator.consumeLastError();
+    if (message == null || !mounted) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+      );
   }
 
   // ----------------------------------------------------------
@@ -283,6 +320,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   // ----------------------------------------------------------
 
   void _showAccountSheet() {
+    _commitPendingAmountIfAny();
+
     showModalBottomSheet<Object>(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -328,6 +367,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   }
 
   void _showCurrencySheet() {
+    _commitPendingAmountIfAny();
+
     showModalBottomSheet<Object>(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -365,6 +406,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   }
 
   Future<void> _openCategoryPicker() async {
+    _commitPendingAmountIfAny();
+
     final result = await context.push<CategoryModel>(
       '/transactions/new/category',
       extra: {'type': _type},
@@ -379,6 +422,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   // ----------------------------------------------------------
 
   Future<void> _addTag(String name) async {
+    _commitPendingAmountIfAny();
+
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
 
@@ -443,13 +488,18 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
   Future<void> _onSave() async {
     if (_isSaving) return;
-    setState(() => _isSaving = true);
+
+    setState(() {
+      _isSaving = true;
+      _amountCalculator.commitPendingIfAny();
+    });
+    _showCalculatorErrorIfAny();
 
     try {
       final repo = context.read<TransactionRepository>();
       final sync = context.read<SyncService>();
 
-      final amountCents = (double.parse(_amountInput) * 100).round();
+      final amountCents = _amountCalculator.getAmountMinorForSaveRounded2();
       final dateStr =
           '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}';
 
@@ -502,10 +552,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       : Theme.of(context).colorScheme.error;
 
   bool get _canSave =>
-      _amountInput != '0' &&
+      _amountCalculator.getAmountMinorForSaveRounded2() != 0 &&
       _selectedAccount != null &&
       _selectedCategory != null &&
       !_isSaving;
+
+  bool _isDigit(int codeUnit) => codeUnit >= 48 && codeUnit <= 57;
 
   IconData _accountIcon(String type) {
     switch (type) {
@@ -551,12 +603,16 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: _TypeToggle(
               value: _type,
-              onChanged: (t) => setState(() {
-                _type = t;
-                if (_selectedCategory != null && _selectedCategory!.type != t) {
-                  _selectedCategory = null;
-                }
-              }),
+              onChanged: (t) {
+                _commitPendingAmountIfAny();
+                setState(() {
+                  _type = t;
+                  if (_selectedCategory != null &&
+                      _selectedCategory!.type != t) {
+                    _selectedCategory = null;
+                  }
+                });
+              },
             ),
           ),
 
@@ -570,61 +626,80 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   // Display del monto: [MXN ▾]  $150.00 (centrado)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Row(
+                    child: Column(
                       children: [
-                        // Currency pill pinned left
-                        GestureDetector(
-                          onTap: _showCurrencySheet,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerHigh,
-                              borderRadius: AppTheme.radiusFull,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _currencyCode,
-                                  style: GoogleFonts.ibmPlexSans(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
+                        Row(
+                          children: [
+                            // Currency pill pinned left
+                            GestureDetector(
+                              onTap: _showCurrencySheet,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
                                 ),
-                                const SizedBox(width: 2),
-                                Icon(
-                                  Icons.unfold_more_rounded,
-                                  size: 14,
+                                decoration: BoxDecoration(
                                   color: Theme.of(
                                     context,
-                                  ).colorScheme.onSurfaceVariant,
+                                  ).colorScheme.surfaceContainerHigh,
+                                  borderRadius: AppTheme.radiusFull,
                                 ),
-                              ],
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _currencyCode,
+                                      style: GoogleFonts.ibmPlexSans(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Icon(
+                                      Icons.unfold_more_rounded,
+                                      size: 14,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
+                            // Amount centered in remaining space
+                            Expanded(
+                              child: Center(
+                                child: Text(
+                                  '\$${_amountCalculator.displayAmount}',
+                                  style: GoogleFonts.ibmPlexSans(
+                                    fontSize: 48,
+                                    fontWeight: FontWeight.w600,
+                                    color: _typeColor,
+                                    letterSpacing: -2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        // Amount centered in remaining space
-                        Expanded(
-                          child: Center(
+                        if (_amountCalculator.expressionDisplay.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              '\$$_amountInput',
+                              _amountCalculator.expressionDisplay,
+                              textAlign: TextAlign.center,
                               style: GoogleFonts.ibmPlexSans(
-                                fontSize: 48,
-                                fontWeight: FontWeight.w600,
-                                color: _typeColor,
-                                letterSpacing: -2,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -640,12 +715,18 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   _CategorySection(
                     selectedCategory: _selectedCategory,
                     recentCategories: _recentCategories,
-                    onSelect: (c) => setState(() => _selectedCategory = c),
+                    onSelect: (c) {
+                      _commitPendingAmountIfAny();
+                      setState(() => _selectedCategory = c);
+                    },
                     onOpenPicker: _openCategoryPicker,
                   ),
 
                   // Nota
-                  NoteField(controller: _noteController),
+                  NoteField(
+                    controller: _noteController,
+                    onTap: _commitPendingAmountIfAny,
+                  ),
 
                   // Fecha
                   DetailRow(
@@ -653,6 +734,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                     label: 'Fecha',
                     value: _formatDate(_date),
                     onTap: () async {
+                      _commitPendingAmountIfAny();
+
                       final picked = await showDatePicker(
                         context: context,
                         initialDate: _date,
@@ -678,11 +761,15 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                     controller: _tagController,
                     onAdd: _addTag,
                     onRemove: _removeTag,
-                    onAddRecent: (t) => setState(() {
-                      if (!_selectedTags.any((s) => s.id == t.id)) {
-                        _selectedTags.add(t);
-                      }
-                    }),
+                    onFieldTap: _commitPendingAmountIfAny,
+                    onAddRecent: (t) {
+                      _commitPendingAmountIfAny();
+                      setState(() {
+                        if (!_selectedTags.any((s) => s.id == t.id)) {
+                          _selectedTags.add(t);
+                        }
+                      });
+                    },
                   ),
                 ],
               ),
@@ -691,7 +778,11 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
           // --- Numpad + guardar (ocultar cuando el teclado está abierto) ---
           if (!keyboardOpen) ...[
-            NumPad(onKey: _onNumpad),
+            NumPad(
+              mode: NumPadMode.calculator,
+              onKey: _onNumpad,
+              onOperation: _onNumpadOperation,
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               child: SizedBox(

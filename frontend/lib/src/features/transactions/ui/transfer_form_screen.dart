@@ -966,137 +966,140 @@ class _TransferCard extends StatelessWidget {
     return GestureDetector(
       onTap: onAmountTap,
       child: Container(
-      decoration: BoxDecoration(
-        color: cs.surfaceContainer,
-        borderRadius: AppTheme.radiusMedium,
-        border: isActive
-            ? Border.all(color: activeColor.withValues(alpha: 0.4), width: 1.5)
-            : Border.all(color: Colors.transparent, width: 1.5),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Fila encabezado: etiqueta + trailing opcional
-          Row(
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.ibmPlexSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.0,
-                  color: mutedColor,
-                ),
-              ),
-              const Spacer(),
-              ?trailing,
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // Fila cuenta
-          InkWell(
-            onTap: onAccountTap,
-            borderRadius: AppTheme.radiusSmall,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      account?.name ?? 'Seleccionar cuenta',
-                      style: GoogleFonts.ibmPlexSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: account != null ? cs.onSurface : mutedColor,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: 18,
+        decoration: BoxDecoration(
+          color: cs.surfaceContainer,
+          borderRadius: AppTheme.radiusMedium,
+          border: isActive
+              ? Border.all(
+                  color: activeColor.withValues(alpha: 0.4),
+                  width: 1.5,
+                )
+              : Border.all(color: Colors.transparent, width: 1.5),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Fila encabezado: etiqueta + trailing opcional
+            Row(
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.ibmPlexSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.0,
                     color: mutedColor,
                   ),
-                ],
-              ),
+                ),
+                const Spacer(),
+                ?trailing,
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-          // Fila pill de moneda + monto
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Pill de moneda
-              GestureDetector(
-                onTap: currencyCode.isNotEmpty ? onCurrencyTap : null,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHigh,
-                    borderRadius: AppTheme.radiusFull,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        currencyCode.isNotEmpty ? currencyCode : '---',
+            // Fila cuenta
+            InkWell(
+              onTap: onAccountTap,
+              borderRadius: AppTheme.radiusSmall,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        account?.name ?? 'Seleccionar cuenta',
                         style: GoogleFonts.ibmPlexSans(
-                          fontSize: 13,
+                          fontSize: 15,
                           fontWeight: FontWeight.w500,
-                          color: mutedColor,
+                          color: account != null ? cs.onSurface : mutedColor,
                         ),
                       ),
-                      const SizedBox(width: 2),
-                      Icon(
-                        Icons.unfold_more_rounded,
-                        size: 13,
-                        color: mutedColor,
-                      ),
-                    ],
-                  ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: mutedColor,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
+            ),
+            const SizedBox(height: 12),
 
-              // Monto
-              Expanded(
-                child: GestureDetector(
-                  onTap: onAmountTap,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        amountInput,
-                        textAlign: TextAlign.end,
-                        style: GoogleFonts.ibmPlexSans(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -1,
-                          color: isActive ? activeColor : mutedColor,
-                        ),
-                      ),
-                      if (rateHint != null)
+            // Fila pill de moneda + monto
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Pill de moneda
+                GestureDetector(
+                  onTap: currencyCode.isNotEmpty ? onCurrencyTap : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHigh,
+                      borderRadius: AppTheme.radiusFull,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         Text(
-                          rateHint!,
-                          textAlign: TextAlign.end,
+                          currencyCode.isNotEmpty ? currencyCode : '---',
                           style: GoogleFonts.ibmPlexSans(
-                            fontSize: 11,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
                             color: mutedColor,
                           ),
                         ),
-                    ],
+                        const SizedBox(width: 2),
+                        Icon(
+                          Icons.unfold_more_rounded,
+                          size: 13,
+                          color: mutedColor,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
+                const SizedBox(width: 8),
+
+                // Monto
+                Expanded(
+                  child: GestureDetector(
+                    onTap: onAmountTap,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          amountInput,
+                          textAlign: TextAlign.end,
+                          style: GoogleFonts.ibmPlexSans(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -1,
+                            color: isActive ? activeColor : mutedColor,
+                          ),
+                        ),
+                        if (rateHint != null)
+                          Text(
+                            rateHint!,
+                            textAlign: TextAlign.end,
+                            style: GoogleFonts.ibmPlexSans(
+                              fontSize: 11,
+                              color: mutedColor,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -32,6 +32,18 @@ class TransactionRepository {
 
   Future<String?> getLastUsedAccountId() => _local.getLastUsedAccountId();
 
+  Future<TransactionModel?> getInitialBalanceTransaction({
+    required String accountId,
+    required String type,
+  }) async {
+    final row = await _local.queryInitialBalanceRow(
+      accountId: accountId,
+      type: type,
+    );
+    if (row == null) return null;
+    return TransactionModel.fromMap(row);
+  }
+
   // ----------------------------------------------------------
   // WRITE — income/expense
   // ----------------------------------------------------------
@@ -39,7 +51,7 @@ class TransactionRepository {
   Future<void> createTransaction({
     required String id,
     required String accountId,
-    required String categoryId,
+    required String? categoryId,
     required int amountMinor,
     required String currencyCode,
     required String description,
@@ -74,7 +86,7 @@ class TransactionRepository {
   Future<void> updateTransaction({
     required String id,
     required String accountId,
-    required String categoryId,
+    required String? categoryId,
     required int amountMinor,
     required String currencyCode,
     required String description,
@@ -235,7 +247,10 @@ class TransactionRepository {
   // DELETE (with optional cascade for transfers)
   // ----------------------------------------------------------
 
-  Future<void> deleteTransaction(String id, {String? linkedTransactionId}) async {
+  Future<void> deleteTransaction(
+    String id, {
+    String? linkedTransactionId,
+  }) async {
     final now = DateTime.now().toUtc();
     await _local.softDelete(id, now, linkedId: linkedTransactionId);
     await _outbox.enqueue(

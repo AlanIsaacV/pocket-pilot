@@ -35,6 +35,19 @@ class AccountLocalStore {
     return rows.map(AccountModel.fromMap).toList();
   }
 
+  /// Retorna una cuenta activa por id, o null si no existe/esta eliminada.
+  Future<AccountModel?> getById(String id) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'accounts',
+      where: 'id = ? AND deleted_at IS NULL',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return AccountModel.fromMap(rows.first);
+  }
+
   // ----------------------------------------------------------
   // WRITE
   // ----------------------------------------------------------

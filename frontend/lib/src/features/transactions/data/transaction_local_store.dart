@@ -52,6 +52,31 @@ class TransactionLocalStore {
     return rows.first['account_id'] as String?;
   }
 
+  /// Busca la transaccion inicial de una cuenta usando filtros estructurales:
+  /// - misma cuenta,
+  /// - mismo tipo esperado segun la cuenta,
+  /// - sin categoria,
+  /// - no es transferencia (linked_transaction_id NULL),
+  /// - activa (deleted_at IS NULL).
+  ///
+  /// Si hay mas de una candidata, retorna la mas antigua.
+  Future<Map<String, dynamic>?> queryInitialBalanceRow({
+    required String accountId,
+    required String type,
+  }) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'transactions',
+      where:
+          'account_id = ? AND type = ? AND category_id IS NULL AND linked_transaction_id IS NULL AND deleted_at IS NULL',
+      whereArgs: [accountId, type],
+      orderBy: 'created_at ASC, id ASC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first;
+  }
+
   // ----------------------------------------------------------
   // WRITE
   // ----------------------------------------------------------
@@ -85,7 +110,11 @@ class TransactionLocalStore {
   /// Marca una transacción como eliminada (soft delete con LWW).
   /// Cuando [linkedId] no es null, elimina ambas transacciones en un batch
   /// atómico (usado para transferencias).
-  Future<void> softDelete(String id, DateTime deletedAt, {String? linkedId}) async {
+  Future<void> softDelete(
+    String id,
+    DateTime deletedAt, {
+    String? linkedId,
+  }) async {
     final db = await _db.database;
     final values = {
       'deleted_at': deletedAt.toIso8601String(),
@@ -97,10 +126,20 @@ class TransactionLocalStore {
     if (linkedId != null) {
       final batch = db.batch();
       batch.update('transactions', values, where: where, whereArgs: [id, ts]);
-      batch.update('transactions', values, where: where, whereArgs: [linkedId, ts]);
+      batch.update(
+        'transactions',
+        values,
+        where: where,
+        whereArgs: [linkedId, ts],
+      );
       await batch.commit(noResult: true);
     } else {
-      await db.update('transactions', values, where: where, whereArgs: [id, ts]);
+      await db.update(
+        'transactions',
+        values,
+        where: where,
+        whereArgs: [id, ts],
+      );
     }
   }
 }

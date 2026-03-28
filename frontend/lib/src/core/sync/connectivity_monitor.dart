@@ -7,7 +7,7 @@ class ConnectivityMonitor {
   bool _wasOffline = false;
 
   ConnectivityMonitor({required SyncService syncService})
-      : _syncService = syncService;
+    : _syncService = syncService;
 
   void startMonitoring() {
     Connectivity().onConnectivityChanged.listen(_onConnectivityChanged);

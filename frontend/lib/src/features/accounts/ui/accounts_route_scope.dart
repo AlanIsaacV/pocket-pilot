@@ -7,11 +7,13 @@
 //
 // Árbol de dependencias que monta este scope:
 //   context.read<DatabaseHelper>()
-//     └─ AccountLocalStore(db)          ← DAO, solo SQL
+//     ├─ AccountLocalStore(db)              ← DAO, solo SQL
+//     └─ TransactionLocalStore(db)          ← DAO, solo SQL
 //   context.read<SyncOutbox>()          ← compartido con SyncService
 //   AccountRepository(local, outbox)    ← local-first + encola en outbox
+//   TransactionRepository(local, outbox) ← local-first + encola en outbox
 //   context.read<SyncService>()         ← singleton global de sync
-//   AccountsViewModel(repository, sync) ← estado de la UI
+//   AccountsViewModel(accountsRepo, txRepo, sync) ← estado de la UI
 //
 // Nota: AccountRepository ya no habla directamente con el servidor.
 // SyncService (provisto desde main.dart) gestiona todas las operaciones remotas.
@@ -25,6 +27,8 @@ import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_repository.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
+import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
+import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
 
 class AccountsRouteScope extends StatelessWidget {
   final Widget child;
@@ -40,13 +44,15 @@ class AccountsRouteScope extends StatelessWidget {
         final syncService = ctx.read<SyncService>();
 
         final localStore = AccountLocalStore(db: db);
-        final repository = AccountRepository(
-          local: localStore,
+        final repository = AccountRepository(local: localStore, outbox: outbox);
+        final transactionRepository = TransactionRepository(
+          local: TransactionLocalStore(db: db),
           outbox: outbox,
         );
 
         return AccountsViewModel(
           repository: repository,
+          transactionRepository: transactionRepository,
           syncService: syncService,
         )..loadOnAppear();
       },

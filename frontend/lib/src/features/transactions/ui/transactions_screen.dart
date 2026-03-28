@@ -7,6 +7,9 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/core/db/database_helper.dart';
+import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
+import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
@@ -43,7 +46,10 @@ class TransactionsScreen extends StatelessWidget {
                   emptyLabel: 'No hay transacciones aún',
                   emptySubLabel: 'Presiona + para registrar una',
                   onRefresh: vm.refresh,
-                  child: _TransactionList(transactions: vm.transactions, vm: vm),
+                  child: _TransactionList(
+                    transactions: vm.transactions,
+                    vm: vm,
+                  ),
                 ),
               ),
             ],
@@ -77,7 +83,9 @@ class TransactionsScreen extends StatelessWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: AppTheme.radiusFull,
                   ),
                 ),
@@ -185,17 +193,7 @@ class _TransactionList extends StatelessWidget {
               child: _TransactionTile(
                 transaction: t,
                 onTap: () {
-                  if (t.isTransfer) {
-                    _openTransferEdit(context, t);
-                  } else {
-                    context
-                        .push('/transactions/${t.id}/edit', extra: t)
-                        .then((result) {
-                      if (result == true && context.mounted) {
-                        vm.loadOnAppear();
-                      }
-                    });
-                  }
+                  _handleTransactionTap(context, t);
                 },
               ),
             );
@@ -205,6 +203,54 @@ class _TransactionList extends StatelessWidget {
         return const SizedBox.shrink();
       },
     );
+  }
+
+  Future<void> _handleTransactionTap(
+    BuildContext context,
+    TransactionModel transaction,
+  ) async {
+    if (transaction.isTransfer) {
+      _openTransferEdit(context, transaction);
+      return;
+    }
+
+    final account = await _findAccountById(context, transaction.accountId);
+    if (!context.mounted) return;
+
+    if (account != null) {
+      final isInitial = await vm.isInitialBalanceTransaction(
+        transaction: transaction,
+        accountType: account.type,
+      );
+      if (!context.mounted) return;
+
+      if (isInitial) {
+        context.push('/accounts/${account.id}/edit', extra: account).then((
+          result,
+        ) {
+          if (result == true && context.mounted) {
+            vm.loadOnAppear();
+          }
+        });
+        return;
+      }
+    }
+
+    context
+        .push('/transactions/${transaction.id}/edit', extra: transaction)
+        .then((result) {
+          if (result == true && context.mounted) {
+            vm.loadOnAppear();
+          }
+        });
+  }
+
+  Future<AccountModel?> _findAccountById(
+    BuildContext context,
+    String id,
+  ) async {
+    final db = context.read<DatabaseHelper>();
+    return AccountLocalStore(db: db).getById(id);
   }
 
   void _openTransferEdit(BuildContext context, TransactionModel t) {
@@ -230,10 +276,10 @@ class _TransactionList extends StatelessWidget {
             extra: {'out': outLeg, 'in': inLeg},
           )
           .then((result) {
-        if (result == true && context.mounted) {
-          vm.loadOnAppear();
-        }
-      });
+            if (result == true && context.mounted) {
+              vm.loadOnAppear();
+            }
+          });
     }
   }
 }
@@ -270,8 +316,18 @@ class _MonthHeader extends StatelessWidget {
 
   String _monthName(int month) {
     const names = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
     ];
     return names[month - 1];
   }
@@ -371,8 +427,18 @@ class _TransactionTile extends StatelessWidget {
 
   String _monthAbbr(int month) {
     const months = [
-      'ene', 'feb', 'mar', 'abr', 'may', 'jun',
-      'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+      'jul',
+      'ago',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
     ];
     return months[month - 1];
   }
@@ -384,11 +450,15 @@ class _TransactionTile extends StatelessWidget {
 
 Future<bool?> _confirmDelete(BuildContext context, TransactionModel t) {
   final isTransfer = t.isTransfer;
-  final label = t.description.isNotEmpty ? '"${t.description}"' : 'esta transacción';
+  final label = t.description.isNotEmpty
+      ? '"${t.description}"'
+      : 'esta transacción';
   return showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: Text(isTransfer ? 'Eliminar transferencia' : 'Eliminar transacción'),
+      title: Text(
+        isTransfer ? 'Eliminar transferencia' : 'Eliminar transacción',
+      ),
       content: Text(
         isTransfer
             ? 'Se eliminará esta transferencia completa (ambos movimientos).'

@@ -19,12 +19,15 @@ import 'package:flutter/foundation.dart';
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_repository.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
+import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
 import 'package:uuid/uuid.dart';
 
 class AccountsViewModel extends ChangeNotifier {
   static const _uuid = Uuid();
+  static const _initialBalanceDescription = 'Monto inicial';
 
   final AccountRepository _repository;
+  final TransactionRepository _transactionRepository;
   final SyncService _syncService;
 
   List<AccountModel> accounts = [];
@@ -36,8 +39,10 @@ class AccountsViewModel extends ChangeNotifier {
 
   AccountsViewModel({
     required AccountRepository repository,
+    required TransactionRepository transactionRepository,
     required SyncService syncService,
   }) : _repository = repository,
+       _transactionRepository = transactionRepository,
        _syncService = syncService;
 
   // ----------------------------------------------------------
@@ -59,6 +64,7 @@ class AccountsViewModel extends ChangeNotifier {
     int? paymentDueDay,
     int? interestRateApr,
     int? termMonths,
+    int? initialAmountCents,
   }) async {
     final id = _uuid.v4();
 
@@ -74,6 +80,20 @@ class AccountsViewModel extends ChangeNotifier {
       termMonths: termMonths,
     );
 
+    if (initialAmountCents != null) {
+      await _transactionRepository.createTransaction(
+        id: _uuid.v4(),
+        accountId: id,
+        categoryId: null,
+        amountMinor: initialAmountCents,
+        currencyCode: currencyCode,
+        description: _initialBalanceDescription,
+        date: _toDateString(DateTime.now()),
+        type: _initialBalanceTransactionType(type),
+        status: 'cleared',
+      );
+    }
+
     accounts = await _repository.getAccounts();
     notifyListeners();
   }
@@ -87,6 +107,7 @@ class AccountsViewModel extends ChangeNotifier {
     int? paymentDueDay,
     int? interestRateApr,
     int? termMonths,
+    int? initialAmountCents,
   }) async {
     await _repository.updateAccount(
       current: current,
@@ -98,8 +119,54 @@ class AccountsViewModel extends ChangeNotifier {
       interestRateApr: interestRateApr,
       termMonths: termMonths,
     );
+
+    final initialBalanceType = _initialBalanceTransactionType(current.type);
+    final existingInitial = await _transactionRepository
+        .getInitialBalanceTransaction(
+          accountId: current.id,
+          type: initialBalanceType,
+        );
+
+    if (existingInitial != null && initialAmountCents == null) {
+      await _transactionRepository.deleteTransaction(existingInitial.id);
+    } else if (existingInitial != null && initialAmountCents != null) {
+      await _transactionRepository.updateTransaction(
+        id: existingInitial.id,
+        accountId: current.id,
+        categoryId: null,
+        amountMinor: initialAmountCents,
+        currencyCode: currencyCode,
+        description: _initialBalanceDescription,
+        date: existingInitial.date,
+        type: existingInitial.type,
+        status: existingInitial.status,
+        createdAt: existingInitial.createdAt,
+      );
+    } else if (existingInitial == null && initialAmountCents != null) {
+      await _transactionRepository.createTransaction(
+        id: _uuid.v4(),
+        accountId: current.id,
+        categoryId: null,
+        amountMinor: initialAmountCents,
+        currencyCode: currencyCode,
+        description: _initialBalanceDescription,
+        date: _toDateString(DateTime.now()),
+        type: initialBalanceType,
+        status: 'cleared',
+      );
+    }
+
     accounts = await _repository.getAccounts();
     notifyListeners();
+  }
+
+  Future<int?> getInitialBalanceCents(AccountModel account) async {
+    final transaction = await _transactionRepository
+        .getInitialBalanceTransaction(
+          accountId: account.id,
+          type: _initialBalanceTransactionType(account.type),
+        );
+    return transaction?.amount;
   }
 
   Future<void> deleteAccount(String id) async {
@@ -144,5 +211,21 @@ class AccountsViewModel extends ChangeNotifier {
       isSyncing = false;
       notifyListeners();
     }
+  }
+
+  String _initialBalanceTransactionType(String accountType) {
+    switch (accountType) {
+      case 'credit_card':
+      case 'loan':
+        return 'expense';
+      default:
+        return 'income';
+    }
+  }
+
+  String _toDateString(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
   }
 }

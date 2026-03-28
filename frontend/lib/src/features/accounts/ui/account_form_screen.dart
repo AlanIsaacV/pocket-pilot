@@ -30,6 +30,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _creditLimitController = TextEditingController();
+  final _initialAmountController = TextEditingController();
   final _statementDayController = TextEditingController();
   final _paymentDueDayController = TextEditingController();
   final _interestRateController = TextEditingController();
@@ -41,6 +42,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     kInitialAllowedCurrencies,
   );
   bool _isSaving = false;
+  bool _isLoadingInitialBalance = false;
 
   static const _accountTypes = [
     ('cash', 'Efectivo', Icons.payments_outlined),
@@ -88,12 +90,14 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadCurrencyOptions());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadInitialBalance());
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _creditLimitController.dispose();
+    _initialAmountController.dispose();
     _statementDayController.dispose();
     _paymentDueDayController.dispose();
     _interestRateController.dispose();
@@ -172,8 +176,29 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     await _loadCurrencyOptions();
   }
 
+  Future<void> _loadInitialBalance() async {
+    if (!_isEditMode) return;
+
+    setState(() => _isLoadingInitialBalance = true);
+    try {
+      final amountCents = await context
+          .read<AccountsViewModel>()
+          .getInitialBalanceCents(widget.account!);
+      if (!mounted || amountCents == null) return;
+
+      final amount = amountCents / 100;
+      _initialAmountController.text = amount == amount.truncateToDouble()
+          ? amount.toInt().toString()
+          : amount.toStringAsFixed(2);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingInitialBalance = false);
+      }
+    }
+  }
+
   Future<void> _onSave() async {
-    if (_isSaving) return;
+    if (_isSaving || _isLoadingInitialBalance) return;
     final form = _formKey.currentState;
     if (form == null || !form.validate()) return;
 
@@ -192,6 +217,12 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     int? paymentDueDay;
     int? interestRateApr;
     int? termMonths;
+    int? initialAmountCents;
+
+    final initialAmountText = _initialAmountController.text.trim();
+    if (initialAmountText.isNotEmpty) {
+      initialAmountCents = _parseMoneyToCents(initialAmountText);
+    }
 
     if (_requiresSpecialFields) {
       creditLimitCents = _parseMoneyToCents(_creditLimitController.text.trim());
@@ -219,6 +250,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
           paymentDueDay: paymentDueDay,
           interestRateApr: interestRateApr,
           termMonths: termMonths,
+          initialAmountCents: initialAmountCents,
         );
       } else {
         await vm.createAccount(
@@ -230,6 +262,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
           paymentDueDay: paymentDueDay,
           interestRateApr: interestRateApr,
           termMonths: termMonths,
+          initialAmountCents: initialAmountCents,
         );
       }
       if (!mounted) return;
@@ -262,6 +295,14 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     final requiredError = _requiredText(value, fieldName: fieldName);
     if (requiredError != null) return requiredError;
     final cents = _parseMoneyToCents(value!.trim());
+    if (cents <= 0) return '$fieldName debe ser mayor a 0';
+    return null;
+  }
+
+  String? _validateOptionalMoney(String? value, {required String fieldName}) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return null;
+    final cents = _parseMoneyToCents(text);
     if (cents <= 0) return '$fieldName debe ser mayor a 0';
     return null;
   }
@@ -364,6 +405,30 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
+              _SectionLabel('Monto inicial (opcional)'),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _initialAmountController,
+                enabled: !_isLoadingInitialBalance,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                ],
+                decoration: InputDecoration(
+                  hintText: '0.00',
+                  prefixText: '$_selectedCurrencyCode ',
+                  helperText: _isLoadingInitialBalance
+                      ? 'Cargando monto inicial...'
+                      : 'Se guardará como transacción sin categoría',
+                ),
+                validator: (value) => _validateOptionalMoney(
+                  value,
+                  fieldName: 'El monto inicial',
+                ),
+              ),
               if (_requiresSpecialFields) ...[
                 const SizedBox(height: 24),
                 _SectionLabel(
@@ -452,7 +517,9 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isSaving ? null : _onSave,
+                  onPressed: (_isSaving || _isLoadingInitialBalance)
+                      ? null
+                      : _onSave,
                   child: Text(
                     _isSaving
                         ? 'Guardando...'

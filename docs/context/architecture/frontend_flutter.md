@@ -59,7 +59,12 @@ Transfers are modeled as two linked `Transaction` rows (`transfer_out` + `transf
 ### Shared Form Widgets
 Reusable widgets shared between `TransactionFormScreen` and `TransferFormScreen` are extracted to `form_widgets.dart`:
 - `NumPad`, `TagsSection`, `NoteField`, `DetailRow`, `ScrollableBottomSheet`, `SheetItem`.
-- The original transaction form uses `typedef _NumPad = NumPad;` etc. to preserve private naming internally.
+
+### Shared Form AppBar Actions
+- Form screens use shared AppBar actions from `ui/widgets/form_app_bar_actions.dart` to keep behavior consistent.
+- `FormAppBarActions` handles Save action rendering/loading and optional secondary action (`Eliminar`/`Ocultar`) in edit mode.
+- Action order in edit mode is secondary action first, Save last.
+- Validation, confirm dialogs, and save/delete/hide business logic remain in each screen; the shared widget is UI-only orchestration.
 
 ### Transfer Form (`TransferFormScreen`)
 - DESDE/HACIA cards with account + currency selectors.
@@ -90,8 +95,8 @@ Reusable widgets shared between `TransactionFormScreen` and `TransferFormScreen`
 ### Custom Numpad + System Keyboard
 - Screens with a custom numpad (e.g., `TransactionFormScreen`) must handle coexistence with the system keyboard (for text fields like notes/tags).
 - Pattern: `resizeToAvoidBottomInset: false` + `MediaQuery.of(context).viewInsets.bottom > 0` to detect keyboard.
-- When keyboard visible: hide numpad/save button, add `bottomInset` padding to the scroll area.
-- When keyboard hidden: show numpad, remove extra padding.
+- When keyboard visible: hide custom numpad; primary save remains available in `AppBar.actions`.
+- When keyboard hidden: show custom numpad.
 
 ## Category Seeder
 - `CategorySeeder.seedIfNeeded()` runs in `main()` before `runApp()`. Skips if `app_metadata['categories_seeded']` already exists.

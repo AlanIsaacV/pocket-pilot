@@ -24,6 +24,7 @@ import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
 // ----------------------------------------------------------
 // Enum privado para el campo activo del numpad
@@ -668,6 +669,54 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
     }
   }
 
+  Future<void> _onDelete() async {
+    if (!_isEditMode || _isSaving) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar transferencia'),
+        content: const Text(
+          'Se eliminará esta transferencia completa (ambos movimientos).',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    setState(() => _isSaving = true);
+    try {
+      final repo = context.read<TransactionRepository>();
+      final sync = context.read<SyncService>();
+      await repo.deleteTransaction(
+        widget.transferOut!.id,
+        linkedTransactionId: widget.transferIn!.id,
+      );
+      unawaited(sync.sync());
+      if (mounted) context.pop(true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
   // ----------------------------------------------------------
   // Helpers
   // ----------------------------------------------------------
@@ -728,6 +777,22 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
+        actions: [
+          FormAppBarActions(
+            canSave: _canSave,
+            isSaving: _isSaving,
+            onSave: _onSave,
+            saveTooltip: 'Guardar transferencia',
+            secondaryAction: _isEditMode
+                ? FormAppBarSecondaryAction(
+                    icon: Icons.delete_outline_rounded,
+                    tooltip: 'Eliminar transferencia',
+                    onPressed: _onDelete,
+                    isDestructive: true,
+                  )
+                : null,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -897,26 +962,8 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
                   ),
           ),
 
-          // --- Numpad + guardar (ocultar cuando el teclado está abierto) ---
-          if (!keyboardOpen && !_isLoading) ...[
-            NumPad(onKey: _onNumKey),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _canSave ? _onSave : null,
-                  child: _isSaving
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Confirmar transferencia'),
-                ),
-              ),
-            ),
-          ],
+          // --- Numpad (ocultar cuando el teclado está abierto) ---
+          if (!keyboardOpen && !_isLoading) ...[NumPad(onKey: _onNumKey)],
         ],
       ),
     );

@@ -15,6 +15,7 @@ import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_view_model.dart';
 import 'package:pocket_pilot/src/features/categories/ui/category_icon_data.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
 class CategoryFormScreen extends StatefulWidget {
   /// Categoría a editar. null = modo creación.
@@ -163,6 +164,22 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
+        actions: [
+          FormAppBarActions(
+            canSave: !_isSaving,
+            isSaving: _isSaving,
+            onSave: _onSave,
+            saveTooltip: _isEditMode ? 'Guardar cambios' : 'Guardar categoría',
+            secondaryAction: _isEditMode
+                ? FormAppBarSecondaryAction(
+                    icon: Icons.visibility_off_outlined,
+                    tooltip: 'Ocultar categoría',
+                    onPressed: _onHide,
+                    isDestructive: true,
+                  )
+                : null,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -226,40 +243,7 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
                     setState(() => _showExtendedIcons = !_showExtendedIcons),
               ),
 
-              const SizedBox(height: 40),
-
-              // --- Guardar ---
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _onSave,
-                  child: Text(
-                    _isSaving
-                        ? 'Guardando...'
-                        : _isEditMode
-                        ? 'Guardar cambios'
-                        : 'Guardar categoría',
-                  ),
-                ),
-              ),
-
-              // --- Ocultar (solo en edición) ---
-              if (_isEditMode) ...[
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: _onHide,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.error,
-                      side: BorderSide(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                    child: const Text('Ocultar categoría'),
-                  ),
-                ),
-              ],
+              const SizedBox(height: 24),
             ],
           ),
         ),

@@ -16,6 +16,7 @@ import 'package:pocket_pilot/src/features/user_preferences/data/currency_prefere
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
 class AccountFormScreen extends StatefulWidget {
   final AccountModel? account;
@@ -279,6 +280,49 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     }
   }
 
+  Future<void> _onDelete() async {
+    if (!_isEditMode || _isSaving || _isLoadingInitialBalance) return;
+
+    final account = widget.account!;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar cuenta'),
+        content: Text('Se eliminará la cuenta "${account.name}".'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    setState(() => _isSaving = true);
+    try {
+      await context.read<AccountsViewModel>().deleteAccount(account.id);
+      if (!mounted) return;
+      context.pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo eliminar la cuenta: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
   int _parseMoneyToCents(String input) {
     final normalized = input.replaceAll(',', '.');
     final value = double.tryParse(normalized) ?? 0;
@@ -346,6 +390,22 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
+        actions: [
+          FormAppBarActions(
+            canSave: !_isSaving && !_isLoadingInitialBalance,
+            isSaving: _isSaving,
+            onSave: _onSave,
+            saveTooltip: _isEditMode ? 'Guardar cambios' : 'Guardar cuenta',
+            secondaryAction: _isEditMode
+                ? FormAppBarSecondaryAction(
+                    icon: Icons.delete_outline_rounded,
+                    tooltip: 'Eliminar cuenta',
+                    onPressed: _onDelete,
+                    isDestructive: true,
+                  )
+                : null,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -513,22 +573,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
                       _validatePositiveInt(value, fieldName: 'El plazo'),
                 ),
               ],
-              const SizedBox(height: 40),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: (_isSaving || _isLoadingInitialBalance)
-                      ? null
-                      : _onSave,
-                  child: Text(
-                    _isSaving
-                        ? 'Guardando...'
-                        : _isEditMode
-                        ? 'Guardar cambios'
-                        : 'Guardar cuenta',
-                  ),
-                ),
-              ),
+              const SizedBox(height: 24),
             ],
           ),
         ),

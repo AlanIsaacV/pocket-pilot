@@ -28,6 +28,7 @@ import 'package:pocket_pilot/src/features/user_preferences/domain/currency_prefe
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_amount_calculator.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
 // ----------------------------------------------------------
 // Helpers
@@ -543,6 +544,57 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     }
   }
 
+  Future<void> _onDelete() async {
+    if (!_isEditMode || _isSaving) return;
+
+    final transaction = widget.transaction!;
+    final label = transaction.description.isNotEmpty
+        ? 'la transacción "${transaction.description}"'
+        : 'esta transacción';
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar transacción'),
+        content: Text('Se eliminará $label.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    setState(() => _isSaving = true);
+    try {
+      final repo = context.read<TransactionRepository>();
+      final sync = context.read<SyncService>();
+      await repo.deleteTransaction(
+        transaction.id,
+        linkedTransactionId: transaction.linkedTransactionId,
+      );
+      unawaited(sync.sync());
+      if (mounted) context.pop(true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
   // ----------------------------------------------------------
   // Helpers
   // ----------------------------------------------------------
@@ -595,6 +647,22 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
+        actions: [
+          FormAppBarActions(
+            canSave: _canSave,
+            isSaving: _isSaving,
+            onSave: _onSave,
+            saveTooltip: 'Guardar transacción',
+            secondaryAction: _isEditMode
+                ? FormAppBarSecondaryAction(
+                    icon: Icons.delete_outline_rounded,
+                    tooltip: 'Eliminar transacción',
+                    onPressed: _onDelete,
+                    isDestructive: true,
+                  )
+                : null,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -776,28 +844,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
             ),
           ),
 
-          // --- Numpad + guardar (ocultar cuando el teclado está abierto) ---
+          // --- Numpad (ocultar cuando el teclado está abierto) ---
           if (!keyboardOpen) ...[
             NumPad(
               mode: NumPadMode.calculator,
               onKey: _onNumpad,
               onOperation: _onNumpadOperation,
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _canSave ? _onSave : null,
-                  child: _isSaving
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Guardar transacción'),
-                ),
-              ),
             ),
           ],
         ],

@@ -17,6 +17,7 @@ This document outlines the dependencies between internal modules and external li
     - Account form additionally depends on `UserPreferenceLocalStore` adapters (`CurrencyPreferencesLocalStore`) to resolve currency options.
     - Transfer form (`TransferFormRouteScope`) depends on `AccountLocalStore`, `TagLocalStore`, `TagRepository`, `TransactionRepository`, `CurrencyPreferencesLocalStore`, and `SyncService`. Does **not** depend on `CategoryLocalStore` (transfers have no category).
     - Shared form widgets (`form_widgets.dart`) are imported by both `TransactionFormScreen` and `TransferFormScreen`.
+    - Shared AppBar form actions (`ui/widgets/form_app_bar_actions.dart`) are imported by `TransactionFormScreen`, `TransferFormScreen`, `AccountFormScreen`, `CategoryFormScreen`, and `CurrencyPreferencesScreen`.
 
 ## Key External Libraries
 ### Backend (Go)

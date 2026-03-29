@@ -6,6 +6,7 @@ import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
 import 'package:pocket_pilot/src/features/user_preferences/ui/user_preferences_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 class CurrencyPreferencesScreen extends StatefulWidget {
@@ -37,7 +38,17 @@ class _CurrencyPreferencesScreenState extends State<CurrencyPreferencesScreen> {
         _syncDraftFromVm(vm);
 
         return Scaffold(
-          appBar: AppBar(title: const Text('Monedas')),
+          appBar: AppBar(
+            title: const Text('Monedas'),
+            actions: [
+              FormAppBarActions(
+                canSave: !_isSaving,
+                isSaving: _isSaving,
+                onSave: () => _save(vm),
+                saveTooltip: 'Guardar preferencias',
+              ),
+            ],
+          ),
           body: Column(
             children: [
               if (vm.isSyncing && !vm.isLoading)
@@ -58,7 +69,7 @@ class _CurrencyPreferencesScreenState extends State<CurrencyPreferencesScreen> {
                   onRefresh: vm.refresh,
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                     children: [
                       const SizedBox(height: 12),
                       _SectionCard(
@@ -146,22 +157,6 @@ class _CurrencyPreferencesScreenState extends State<CurrencyPreferencesScreen> {
                 ),
               ),
             ],
-          ),
-          bottomNavigationBar: SafeArea(
-            minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : () => _save(vm),
-                child: _isSaving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Guardar preferencias'),
-              ),
-            ),
           ),
         );
       },

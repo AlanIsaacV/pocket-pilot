@@ -13,7 +13,9 @@ import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/transaction_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_view_model.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/widgets/filter_sheet.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 class TransactionsScreen extends StatelessWidget {
@@ -25,33 +27,49 @@ class TransactionsScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Transacciones')),
       body: Consumer<TransactionsViewModel>(
         builder: (context, vm, _) {
-          return Column(
+          final filterVM = context.watch<TransactionFilterViewModel>();
+          final hasFilters = filterVM.resolvedFilter.hasAdvancedFilters ||
+              filterVM.activePageIndex != 0 ||
+              filterVM.quickSelection != QuickRange.d30;
+
+          return Stack(
             children: [
-              if (vm.isSyncing && !vm.isLoading)
-                LinearProgressIndicator(
-                  color: Theme.of(context).colorScheme.primary,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainer,
-                  minHeight: 2,
-                ),
-              Expanded(
-                child: PpScreenState(
-                  isLoading: vm.isLoading,
-                  errorMessage: vm.transactions.isEmpty
-                      ? vm.errorMessage
-                      : null,
-                  isEmpty: vm.transactions.isEmpty,
-                  emptyIcon: Icons.receipt_long_outlined,
-                  emptyLabel: 'No hay transacciones aún',
-                  emptySubLabel: 'Presiona + para registrar una',
-                  onRefresh: vm.refresh,
-                  child: _TransactionList(
-                    transactions: vm.transactions,
-                    vm: vm,
+              Column(
+                children: [
+                  if (vm.isSyncing && !vm.isLoading)
+                    LinearProgressIndicator(
+                      color: Theme.of(context).colorScheme.primary,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainer,
+                      minHeight: 2,
+                    ),
+                  Expanded(
+                    child: PpScreenState(
+                      isLoading: vm.isLoading,
+                      errorMessage: vm.transactions.isEmpty
+                          ? vm.errorMessage
+                          : null,
+                      isEmpty: vm.transactions.isEmpty,
+                      emptyIcon: hasFilters
+                          ? Icons.filter_list_off_rounded
+                          : Icons.receipt_long_outlined,
+                      emptyLabel: hasFilters
+                          ? 'No hay transacciones con estos filtros'
+                          : 'No hay transacciones aún',
+                      emptySubLabel: hasFilters
+                          ? 'Intenta cambiar los filtros'
+                          : 'Presiona + para registrar una',
+                      onRefresh: vm.refresh,
+                      child: _TransactionList(
+                        transactions: vm.transactions,
+                        vm: vm,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
+              const FilterSheet(),
             ],
           );
         },
@@ -148,7 +166,7 @@ class _TransactionList extends StatelessWidget {
 
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 96),
+      padding: const EdgeInsets.only(bottom: 160),
       itemCount: sections.fold<int>(0, (sum, e) => sum + 1 + e.value.length),
       itemBuilder: (context, index) {
         int offset = 0;

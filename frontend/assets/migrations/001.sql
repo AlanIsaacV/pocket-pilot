@@ -85,6 +85,9 @@ CREATE TABLE transactions
     updated_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at            DATETIME
 );
+CREATE INDEX idx_transactions_date
+  ON transactions(date) WHERE deleted_at IS NULL;
+
 CREATE TRIGGER set_updated_at_transactions
     AFTER UPDATE
     ON transactions

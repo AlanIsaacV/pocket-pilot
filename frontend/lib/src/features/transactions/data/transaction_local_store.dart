@@ -12,6 +12,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
+import 'package:pocket_pilot/src/features/transactions/domain/transaction_filter.dart';
 
 class TransactionLocalStore {
   final DatabaseHelper _db;
@@ -108,6 +109,75 @@ class TransactionLocalStore {
     if (toAccountId == null) return null;
 
     return (fromAccountId: fromAccountId, toAccountId: toAccountId);
+  }
+
+  /// Queries transactions matching [filter] with a dynamic WHERE clause.
+  /// Returns raw maps (repository enriches with category type).
+  Future<List<Map<String, dynamic>>> queryRowsFiltered(
+    TransactionFilter filter,
+  ) async {
+    final db = await _db.database;
+    final where = StringBuffer('deleted_at IS NULL');
+    final args = <dynamic>[];
+
+    // Date range (always present)
+    where.write(' AND date BETWEEN ? AND ?');
+    args.addAll([filter.dateFrom, filter.dateTo]);
+
+    // Account
+    if (filter.accountId != null) {
+      where.write(' AND account_id = ?');
+      args.add(filter.accountId);
+    }
+
+    // Categories
+    if (filter.categoryIds.isNotEmpty) {
+      final placeholders = List.filled(filter.categoryIds.length, '?').join(',');
+      where.write(' AND category_id IN ($placeholders)');
+      args.addAll(filter.categoryIds);
+    }
+
+    // Type
+    final typeValues = filter.typeValues;
+    if (typeValues != null) {
+      final placeholders = List.filled(typeValues.length, '?').join(',');
+      where.write(' AND type IN ($placeholders)');
+      args.addAll(typeValues);
+    }
+
+    // Status
+    if (filter.status != null) {
+      where.write(' AND status = ?');
+      args.add(filter.status);
+    }
+
+    // Currency
+    if (filter.currencyCode != null) {
+      where.write(' AND currency_code = ?');
+      args.add(filter.currencyCode);
+    }
+
+    return db.query(
+      'transactions',
+      where: where.toString(),
+      whereArgs: args,
+      orderBy: 'date DESC',
+    );
+  }
+
+  /// Returns the IDs of the N most frequently used categories.
+  Future<List<String>> queryTopCategoryIds({int limit = 5}) async {
+    final db = await _db.database;
+    final rows = await db.rawQuery(
+      'SELECT category_id, COUNT(*) as cnt '
+      'FROM transactions '
+      'WHERE deleted_at IS NULL AND category_id IS NOT NULL '
+      'GROUP BY category_id '
+      'ORDER BY cnt DESC '
+      'LIMIT ?',
+      [limit],
+    );
+    return rows.map((r) => r['category_id'] as String).toList();
   }
 
   // ----------------------------------------------------------

@@ -11,10 +11,12 @@ import 'package:flutter/foundation.dart';
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/transaction_filter_view_model.dart';
 
 class TransactionsViewModel extends ChangeNotifier {
   final TransactionRepository _repository;
   final SyncService _syncService;
+  final TransactionFilterViewModel _filterViewModel;
 
   List<TransactionModel> transactions = [];
   bool isLoading = false;
@@ -26,8 +28,22 @@ class TransactionsViewModel extends ChangeNotifier {
   TransactionsViewModel({
     required TransactionRepository repository,
     required SyncService syncService,
+    required TransactionFilterViewModel filterViewModel,
   }) : _repository = repository,
-       _syncService = syncService;
+       _syncService = syncService,
+       _filterViewModel = filterViewModel {
+    _filterViewModel.addListener(_onFilterChanged);
+  }
+
+  void _onFilterChanged() {
+    _loadLocal();
+  }
+
+  @override
+  void dispose() {
+    _filterViewModel.removeListener(_onFilterChanged);
+    super.dispose();
+  }
 
   // ----------------------------------------------------------
   // API pública
@@ -80,9 +96,15 @@ class TransactionsViewModel extends ChangeNotifier {
   // Implementación interna
   // ----------------------------------------------------------
 
-  Future<void> _loadLocalThenMaybeSync() async {
-    transactions = await _repository.getTransactions();
+  Future<void> _loadLocal() async {
+    transactions = await _repository.getTransactions(
+      filter: _filterViewModel.resolvedFilter,
+    );
     notifyListeners();
+  }
+
+  Future<void> _loadLocalThenMaybeSync() async {
+    await _loadLocal();
     await _maybeSyncRemote();
   }
 
@@ -102,7 +124,9 @@ class TransactionsViewModel extends ChangeNotifier {
 
     try {
       await _syncService.sync();
-      transactions = await _repository.getTransactions();
+      transactions = await _repository.getTransactions(
+        filter: _filterViewModel.resolvedFilter,
+      );
       _lastSyncAt = DateTime.now();
       errorMessage = null;
     } catch (e) {

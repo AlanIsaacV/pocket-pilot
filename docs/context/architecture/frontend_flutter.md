@@ -78,6 +78,29 @@ Reusable widgets shared between `TransactionFormScreen` and `TransferFormScreen`
 - `TransactionModel.categoryId` is `String?` — transfers set it to `null`.
 - Forms and list tiles check `isTransfer` to skip category-related UI.
 
+## Transaction Filters
+
+The transactions screen includes a persistent `DraggableScrollableSheet` at the bottom that provides temporal and advanced filtering. Transactions default to showing the last 30 days.
+
+### Filter Architecture
+- **`TransactionFilter`** (value object in `domain/transaction_filter.dart`): Immutable object with `dateFrom`/`dateTo` (YYYY-MM-DD strings), `accountId`, `categoryIds`, `type`, `status`, `currencyCode`. Static `defaultFilter()` returns last 30 days. `typeValues` getter expands `"transfer"` to `['transfer_out', 'transfer_in']` for SQL.
+- **`TransactionFilterViewModel`** (ChangeNotifier): Manages filter sheet UI state (active page, quick selection, period granularity/offset, custom dates, advanced filters). Exposes `resolvedFilter` computed from current UI state.
+- **`TransactionsViewModel`** listens to `TransactionFilterViewModel` via `addListener` and re-queries the repository on every filter change. Listener is removed in `dispose()`.
+- **`TransactionLocalStore.queryRowsFiltered(filter)`**: Builds dynamic SQL `WHERE` clause from the filter. Date range uses `BETWEEN ? AND ?` with YYYY-MM-DD strings. Type filter uses `IN (?)` to handle the transfer expansion.
+- **`TransactionLocalStore.queryTopCategoryIds()`**: Returns the N most frequently used category IDs (`GROUP BY category_id ORDER BY COUNT(*) DESC`).
+
+### Filter Sheet UI
+- **Collapsed state (~12% of screen)**: `TemporalPageView` with 3 swipeable pages and dot indicators:
+  - Page 1 (Quick): chips 7D, 30D, 6M, 1Y — relative date ranges from today.
+  - Page 2 (Period): dropdown (Week/Month/Year) with `←`/`→` arrows for navigation. Shows period name when navigated back.
+  - Page 3 (Custom): two date fields opening `showDatePicker`.
+- **Expanded state (~55%)**: `AdvancedFilters` with Account, Type, Status, Currency dropdowns (single-select) and Category multi-select chips (top 5 most used + `+ More` opening `CategoryMultiPicker`).
+- **`CategoryMultiPicker`**: Full-screen multi-select picker. Creates its own `CategoryLocalStore` via `DatabaseHelper` (not from Provider tree) since it's pushed as a new route.
+- **Empty state**: Filter-aware — shows "No hay transacciones con estos filtros" when filters produce zero results, distinct from the no-transactions-ever state.
+
+### DI Pattern
+`TransactionsRouteScope` uses `MultiProvider` with two `ChangeNotifierProvider`s. `TransactionFilterViewModel` is created first, then read by the second provider to inject into `TransactionsViewModel`. Order matters for `ctx.read` resolution.
+
 ## UI Conventions
 
 ### Category Icons

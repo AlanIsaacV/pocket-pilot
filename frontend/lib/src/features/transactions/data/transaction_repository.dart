@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/features/transactions/domain/transaction_filter.dart';
 
 class TransactionRepository {
   final TransactionLocalStore _local;
@@ -25,8 +26,12 @@ class TransactionRepository {
   // READ
   // ----------------------------------------------------------
 
-  Future<List<TransactionModel>> getTransactions() async {
-    final rows = await _local.queryRows();
+  Future<List<TransactionModel>> getTransactions({
+    TransactionFilter? filter,
+  }) async {
+    final rows = filter != null
+        ? await _local.queryRowsFiltered(filter)
+        : await _local.queryRows();
     return rows.map((r) => TransactionModel.fromMap(r)).toList();
   }
 

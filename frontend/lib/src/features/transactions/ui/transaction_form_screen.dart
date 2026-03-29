@@ -15,6 +15,7 @@ import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
+import 'package:pocket_pilot/src/features/accounts/ui/account_icon.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/categories/ui/category_icon_data.dart';
@@ -26,6 +27,7 @@ import 'package:pocket_pilot/src/features/user_preferences/data/currency_prefere
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/form_date_utils.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_amount_calculator.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
@@ -340,7 +342,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           ),
           ..._accounts.map(
             (a) => SheetItem(
-              icon: _accountIcon(a.type),
+              icon: accountIconForType(a.type),
               label: a.name,
               onTap: () => Navigator.pop(ctx, a),
             ),
@@ -501,8 +503,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       final sync = context.read<SyncService>();
 
       final amountCents = _amountCalculator.getAmountMinorForSaveRounded2();
-      final dateStr =
-          '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}';
+      final dateStr = formatDateISO(_date);
 
       if (_isEditMode) {
         await repo.updateTransaction(
@@ -610,26 +611,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       !_isSaving;
 
   bool _isDigit(int codeUnit) => codeUnit >= 48 && codeUnit <= 57;
-
-  IconData _accountIcon(String type) {
-    switch (type) {
-      case 'bank':
-        return Icons.account_balance_rounded;
-      case 'cash':
-        return Icons.payments_rounded;
-      case 'credit_card':
-        return Icons.credit_card_rounded;
-      case 'investment':
-        return Icons.trending_up_rounded;
-      case 'crypto':
-        return Icons.currency_bitcoin_rounded;
-      default:
-        return Icons.account_balance_wallet_outlined;
-    }
-  }
-
-  String _formatDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   // ----------------------------------------------------------
   // Build
@@ -806,7 +787,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   DetailRow(
                     icon: Icons.calendar_today_outlined,
                     label: 'Fecha',
-                    value: _formatDate(_date),
+                    value: formatDateDisplay(_date),
                     onTap: () async {
                       _commitPendingAmountIfAny();
 

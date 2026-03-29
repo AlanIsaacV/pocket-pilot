@@ -1,13 +1,14 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:pocket_pilot/src/core/sync/scheduled_generation_orchestrator.dart';
 import 'package:pocket_pilot/src/core/sync/sync_handler.dart';
 import 'package:pocket_pilot/src/core/sync/sync_metadata_store.dart';
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
 
 enum SyncStatus { idle, syncing, error }
 
-class SyncService {
+class SyncService implements SyncRunner {
   final SyncOutbox _outbox;
   final SyncMetadataStore _metadataStore;
   final Map<String, SyncHandler> _handlers;
@@ -28,6 +29,7 @@ class SyncService {
   /// Ejecuta un ciclo completo de sync: Pull -> Push para todas las entidades.
   /// Si llega otra petición mientras hay un sync en curso, se agenda una
   /// segunda pasada al terminar la actual (coalescing de solicitudes).
+  @override
   Future<void> sync() {
     _syncRequested = true;
     _activeSyncFuture ??= _runSyncLoop();

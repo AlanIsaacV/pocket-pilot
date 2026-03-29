@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import 'package:pocket_pilot/src/core/sync/sync_service.dart';
+import 'package:pocket_pilot/src/core/sync/scheduled_generation_orchestrator.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/core/theme/theme_preference_controller.dart';
 
@@ -39,7 +39,7 @@ class _PocketPilotAppState extends State<PocketPilotApp>
       if (_lastSyncTime == null ||
           now.difference(_lastSyncTime!) >= _syncThrottle) {
         _lastSyncTime = now;
-        context.read<SyncService>().sync();
+        context.read<ScheduledGenerationOrchestrator>().runCycle();
       }
     }
   }

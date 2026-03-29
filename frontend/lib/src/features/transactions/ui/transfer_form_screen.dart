@@ -209,6 +209,29 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
       }
 
       _noteController.text = out.description;
+
+      _selectedTags.clear();
+      final tagNames = out.tags.toSet();
+      final now = DateTime.now().toUtc();
+      for (final tagName in tagNames) {
+        TagModel? selected;
+        for (final tag in tags) {
+          if (tag.name == tagName) {
+            selected = tag;
+            break;
+          }
+        }
+
+        _selectedTags.add(
+          selected ??
+              TagModel(
+                id: 'temp-$tagName',
+                name: tagName,
+                createdAt: now,
+                updatedAt: now,
+              ),
+        );
+      }
     } else {
       final lastPair = await context
           .read<TransactionRepository>()
@@ -216,13 +239,13 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
 
       if (lastPair != null) {
         fromAccount = accounts.cast<AccountModel?>().firstWhere(
-              (a) => a!.id == lastPair.fromAccountId,
-              orElse: () => null,
-            );
+          (a) => a!.id == lastPair.fromAccountId,
+          orElse: () => null,
+        );
         toAccount = accounts.cast<AccountModel?>().firstWhere(
-              (a) => a!.id == lastPair.toAccountId,
-              orElse: () => null,
-            );
+          (a) => a!.id == lastPair.toAccountId,
+          orElse: () => null,
+        );
       }
 
       fromAccount ??= accounts.first;
@@ -877,7 +900,7 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
                           label: 'Fecha',
                           value: formatDateDisplay(_date),
                           onTap: () async {
-                            final picked = await pickDate(context,_date);
+                            final picked = await pickDate(context, _date);
                             if (picked != null) setState(() => _date = picked);
                           },
                         ),
@@ -892,7 +915,8 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
                                   label: 'Fecha destino',
                                   value: formatDateDisplay(_dateIn ?? _date),
                                   onTap: () async {
-                                    final picked = await pickDate(context,
+                                    final picked = await pickDate(
+                                      context,
                                       _dateIn ?? _date,
                                     );
                                     if (picked != null) {

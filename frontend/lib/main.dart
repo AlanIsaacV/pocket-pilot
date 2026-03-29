@@ -23,6 +23,7 @@ import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/sync/connectivity_monitor.dart';
 import 'package:pocket_pilot/src/core/sync/sync_metadata_store.dart';
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
+import 'package:pocket_pilot/src/core/sync/scheduled_generation_orchestrator.dart';
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/core/theme/theme_preference_controller.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
@@ -35,6 +36,11 @@ import 'package:pocket_pilot/src/features/categories/data/category_sync_handler.
 import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_remote_service.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_sync_handler.dart';
+import 'package:pocket_pilot/src/features/transaction_templates/data/transaction_template_local_store.dart';
+import 'package:pocket_pilot/src/features/transaction_templates/data/transaction_template_repository.dart';
+import 'package:pocket_pilot/src/features/transaction_templates/data/transaction_template_remote_service.dart';
+import 'package:pocket_pilot/src/features/transaction_templates/data/scheduled_transaction_generator.dart';
+import 'package:pocket_pilot/src/features/transaction_templates/data/transaction_template_sync_handler.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_remote_service.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_sync_handler.dart';
@@ -85,6 +91,11 @@ Future<void> main() async {
     remote: TagRemoteService(),
   );
 
+  final transactionTemplateSyncHandler = TransactionTemplateSyncHandler(
+    local: TransactionTemplateLocalStore(db: dbHelper),
+    remote: TransactionTemplateRemoteService(),
+  );
+
   final transactionSyncHandler = TransactionSyncHandler(
     local: TransactionLocalStore(db: dbHelper),
     remote: TransactionRemoteService(),
@@ -102,9 +113,30 @@ Future<void> main() async {
       accountSyncHandler,
       categorySyncHandler,
       tagSyncHandler,
+      transactionTemplateSyncHandler,
       transactionSyncHandler,
       userPreferenceSyncHandler,
     ],
+  );
+
+  final scheduledGenerator = ScheduledTransactionGenerator(
+    templates: TemplateScheduleStoreAdapter(
+      repository: TransactionTemplateRepository(
+        local: TransactionTemplateLocalStore(db: dbHelper),
+        outbox: syncOutbox,
+      ),
+    ),
+    transactions: TransactionOccurrenceStoreAdapter(
+      local: TransactionLocalStore(db: dbHelper),
+    ),
+    outbox: OutboxWriterAdapter(outbox: syncOutbox),
+    accounts: AccountLookupAdapter(local: AccountLocalStore(db: dbHelper)),
+    categories: CategoryLookupAdapter(local: CategoryLocalStore(db: dbHelper)),
+  );
+
+  final scheduledOrchestrator = ScheduledGenerationOrchestrator(
+    sync: syncService,
+    generator: scheduledGenerator,
   );
 
   // Insertar categorías por defecto si es la primera ejecución.
@@ -124,6 +156,9 @@ Future<void> main() async {
         Provider<DatabaseHelper>.value(value: dbHelper),
         Provider<SyncOutbox>.value(value: syncOutbox),
         Provider<SyncService>.value(value: syncService),
+        Provider<ScheduledGenerationOrchestrator>.value(
+          value: scheduledOrchestrator,
+        ),
         ChangeNotifierProvider<ThemePreferenceController>.value(
           value: themePreferenceController,
         ),
@@ -134,6 +169,6 @@ Future<void> main() async {
 
   // Iniciar monitoreo de conectividad y lanzar sync inicial si hay conexión.
   connectivityMonitor.startMonitoring();
-  await connectivityMonitor.checkAndSync();
+  await scheduledOrchestrator.runCycle();
   await themePreferenceController.loadFromLocal();
 }

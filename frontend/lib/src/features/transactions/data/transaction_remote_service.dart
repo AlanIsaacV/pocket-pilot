@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
@@ -43,6 +45,7 @@ class TransactionRemoteService {
         amountCents: Int64(map['amount_cents'] as int),
         currencyCode: map['currency_code'] as String,
         status: map['status'] as String? ?? 'cleared',
+        tags: _toTags(map['tags']),
         description: map['description'] as String,
         date: Timestamp.fromDateTime(
           DateTime.parse(map['date'] as String).toUtc(),
@@ -59,6 +62,9 @@ class TransactionRemoteService {
       if (map['linked_transaction_id'] != null) {
         transaction.linkedTransactionId =
             map['linked_transaction_id'] as String;
+      }
+      if (map['template_id'] != null) {
+        transaction.templateId = map['template_id'] as String;
       }
       return await _client.upsertTransaction(
         UpsertTransactionRequest(transaction: transaction),
@@ -82,5 +88,23 @@ class TransactionRemoteService {
     } on GrpcError catch (e) {
       throw Exception('gRPC deleteTransaction error: ${e.message}');
     }
+  }
+
+  static List<String> _toTags(Object? raw) {
+    if (raw == null) return const <String>[];
+    if (raw is List) {
+      return raw.map((e) => e.toString()).toList(growable: false);
+    }
+    if (raw is String && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return decoded.map((e) => e.toString()).toList(growable: false);
+        }
+      } catch (_) {
+        return const <String>[];
+      }
+    }
+    return const <String>[];
   }
 }

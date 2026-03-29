@@ -37,8 +37,8 @@ class TransactionRepository {
 
   Future<String?> getLastUsedAccountId() => _local.getLastUsedAccountId();
 
-  Future<({String fromAccountId, String toAccountId})?> getLastTransferAccountIds() =>
-      _local.queryLastTransferPair();
+  Future<({String fromAccountId, String toAccountId})?>
+  getLastTransferAccountIds() => _local.queryLastTransferPair();
 
   Future<TransactionModel?> getInitialBalanceTransaction({
     required String accountId,
@@ -60,24 +60,28 @@ class TransactionRepository {
     required String id,
     required String accountId,
     required String? categoryId,
+    String? templateId,
     required int amountMinor,
     required String currencyCode,
     required String description,
     required String date,
     required String type,
     required String status,
+    required List<String> tags,
   }) async {
     final now = DateTime.now().toUtc();
     final model = TransactionModel(
       id: id,
       accountId: accountId,
       categoryId: categoryId,
+      templateId: templateId,
       amount: amountMinor,
       currencyCode: currencyCode,
       description: description,
       date: date,
       type: type,
       status: status,
+      tags: tags,
       createdAt: now,
       updatedAt: now,
     );
@@ -95,24 +99,28 @@ class TransactionRepository {
     required String id,
     required String accountId,
     required String? categoryId,
+    String? templateId,
     required int amountMinor,
     required String currencyCode,
     required String description,
     required String date,
     required String type,
     required String status,
+    required List<String> tags,
     required DateTime createdAt,
   }) async {
     final model = TransactionModel(
       id: id,
       accountId: accountId,
       categoryId: categoryId,
+      templateId: templateId,
       amount: amountMinor,
       currencyCode: currencyCode,
       description: description,
       date: date,
       type: type,
       status: status,
+      tags: tags,
       createdAt: createdAt,
       updatedAt: DateTime.now().toUtc(),
     );
@@ -157,6 +165,7 @@ class TransactionRepository {
       date: date,
       type: 'transfer_out',
       status: 'cleared',
+      tags: tags,
       createdAt: now,
       updatedAt: now,
     );
@@ -171,6 +180,7 @@ class TransactionRepository {
       date: dateIn ?? date,
       type: 'transfer_in',
       status: 'cleared',
+      tags: tags,
       createdAt: now,
       updatedAt: now,
     );
@@ -219,6 +229,7 @@ class TransactionRepository {
       date: date,
       type: 'transfer_out',
       status: 'cleared',
+      tags: tags,
       createdAt: createdAt,
       updatedAt: now,
     );
@@ -233,6 +244,7 @@ class TransactionRepository {
       date: dateIn ?? date,
       type: 'transfer_in',
       status: 'cleared',
+      tags: tags,
       createdAt: createdAt,
       updatedAt: now,
     );

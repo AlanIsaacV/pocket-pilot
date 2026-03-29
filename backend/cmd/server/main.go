@@ -20,6 +20,7 @@ import (
 	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
 	"github.com/AlanIsaacV/pocket-pilot/internal/tag"
 	"github.com/AlanIsaacV/pocket-pilot/internal/transaction"
+	"github.com/AlanIsaacV/pocket-pilot/internal/transactiontemplate"
 	"github.com/AlanIsaacV/pocket-pilot/internal/userpreference"
 )
 
@@ -42,6 +43,7 @@ func main() {
 	accountHandler := account.NewHandler(account.NewRepository(pool))
 	categoryHandler := category.NewHandler(category.NewRepository(pool))
 	transactionHandler := transaction.NewHandler(transaction.NewRepository(pool))
+	transactionTemplateHandler := transactiontemplate.NewHandler(transactiontemplate.NewRepository(pool))
 	tagHandler := tag.NewHandler(tag.NewRepository(pool))
 	userPreferenceHandler := userpreference.NewHandler(userpreference.NewRepository(pool))
 
@@ -53,6 +55,7 @@ func main() {
 	pb.RegisterAccountServiceServer(srv, accountHandler)
 	pb.RegisterCategoryServiceServer(srv, categoryHandler)
 	pb.RegisterTransactionServiceServer(srv, transactionHandler)
+	pb.RegisterTransactionTemplateServiceServer(srv, transactionTemplateHandler)
 	pb.RegisterTagServiceServer(srv, tagHandler)
 	pb.RegisterUserPreferenceServiceServer(srv, userPreferenceHandler)
 

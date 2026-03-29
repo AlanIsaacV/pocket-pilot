@@ -34,6 +34,7 @@ protoc \
     pocket_pilot/v1/common.proto \
     pocket_pilot/v1/account_service.proto \
     pocket_pilot/v1/category_service.proto \
+    pocket_pilot/v1/transaction_template_service.proto \
     pocket_pilot/v1/transaction_service.proto \
     pocket_pilot/v1/tags_service.proto \
     pocket_pilot/v1/user_preferences_service.proto
@@ -50,6 +51,7 @@ protoc \
     pocket_pilot/v1/common.proto \
     pocket_pilot/v1/account_service.proto \
     pocket_pilot/v1/category_service.proto \
+    pocket_pilot/v1/transaction_template_service.proto \
     pocket_pilot/v1/transaction_service.proto \
     pocket_pilot/v1/tags_service.proto \
     pocket_pilot/v1/user_preferences_service.proto

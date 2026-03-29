@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "pocket_pilot/v1/common.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+message TransactionTemplate {
+  string id = 1;
+  string name = 2;
+  string account_id = 3;
+  optional string category_id = 4;
+  string type = 5;
+  optional int64 amount_cents = 6;
+  string currency_code = 7;
+  repeated string tags = 8;
+  string description = 9;
+  optional string frequency = 10;
+  optional string next_date = 11;
+  optional string end_date = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+  google.protobuf.Timestamp deleted_at = 15;
+  optional string to_account_id = 16;
+}
+
+service TransactionTemplateService {
+  rpc ListTransactionTemplates(ListTransactionTemplatesRequest) returns (ListTransactionTemplatesResponse);
+  rpc UpsertTransactionTemplate(UpsertTransactionTemplateRequest) returns (UpsertTransactionTemplateResponse);
+  rpc DeleteTransactionTemplate(DeleteTransactionTemplateRequest) returns (google.protobuf.Empty);
+}
+
+message ListTransactionTemplatesRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListTransactionTemplatesResponse {
+  repeated TransactionTemplate templates = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertTransactionTemplateRequest {
+  TransactionTemplate template = 1;
+}
+
+message UpsertTransactionTemplateResponse {
+  TransactionTemplate template = 1;
+  bool conflict_resolved = 2;
+}
+
+message DeleteTransactionTemplateRequest {
+  string id = 1;
+  google.protobuf.Timestamp deleted_at = 2;
+}

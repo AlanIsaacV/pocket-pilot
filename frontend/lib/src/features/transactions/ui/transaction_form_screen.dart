@@ -140,6 +140,29 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           break;
         }
       }
+
+      _selectedTags.clear();
+      final tagNames = t.tags.toSet();
+      final now = DateTime.now().toUtc();
+      for (final tagName in tagNames) {
+        TagModel? selected;
+        for (final tag in tags) {
+          if (tag.name == tagName) {
+            selected = tag;
+            break;
+          }
+        }
+
+        _selectedTags.add(
+          selected ??
+              TagModel(
+                id: 'temp-$tagName',
+                name: tagName,
+                createdAt: now,
+                updatedAt: now,
+              ),
+        );
+      }
       _noteController.text = t.description;
     } else {
       if (lastUsedAccountId != null) {
@@ -484,12 +507,14 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           id: widget.transaction!.id,
           accountId: _selectedAccount!.id,
           categoryId: _selectedCategory!.id,
+          templateId: widget.transaction!.templateId,
           type: _type,
           amountMinor: amountCents,
           currencyCode: _currencyCode,
           description: _noteController.text,
           date: dateStr,
           status: widget.transaction!.status,
+          tags: _selectedTags.map((t) => t.name).toList(),
           createdAt: widget.transaction!.createdAt,
         );
       } else {
@@ -503,6 +528,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           description: _noteController.text,
           date: dateStr,
           status: 'cleared',
+          tags: _selectedTags.map((t) => t.name).toList(),
         );
       }
 

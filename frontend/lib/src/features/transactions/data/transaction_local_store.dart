@@ -80,7 +80,8 @@ class TransactionLocalStore {
 
   /// Retorna los account IDs de la última transferencia realizada,
   /// o null si no existe ninguna.
-  Future<({String fromAccountId, String toAccountId})?> queryLastTransferPair() async {
+  Future<({String fromAccountId, String toAccountId})?>
+  queryLastTransferPair() async {
     final db = await _db.database;
 
     final outRows = await db.query(
@@ -132,7 +133,10 @@ class TransactionLocalStore {
 
     // Categories
     if (filter.categoryIds.isNotEmpty) {
-      final placeholders = List.filled(filter.categoryIds.length, '?').join(',');
+      final placeholders = List.filled(
+        filter.categoryIds.length,
+        '?',
+      ).join(',');
       where.write(' AND category_id IN ($placeholders)');
       args.addAll(filter.categoryIds);
     }
@@ -208,6 +212,31 @@ class TransactionLocalStore {
       row,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  /// Inserta una fila ignorando conflictos por PK.
+  ///
+  /// Retorna true si el registro fue insertado y false si ya existia.
+  Future<bool> insertRowIgnoreConflict(Map<String, dynamic> row) async {
+    final db = await _db.database;
+    final insertedId = await db.insert(
+      'transactions',
+      row,
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+    return insertedId > 0;
+  }
+
+  Future<Map<String, dynamic>?> findRowById(String id) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'transactions',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first;
   }
 
   /// Marca una transacción como eliminada (soft delete con LWW).

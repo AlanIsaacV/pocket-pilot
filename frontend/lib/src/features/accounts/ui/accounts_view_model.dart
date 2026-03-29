@@ -91,6 +91,7 @@ class AccountsViewModel extends ChangeNotifier {
         date: _toDateString(DateTime.now()),
         type: _initialBalanceTransactionType(type),
         status: 'cleared',
+        tags: const [],
       );
     }
 
@@ -140,6 +141,7 @@ class AccountsViewModel extends ChangeNotifier {
         date: existingInitial.date,
         type: existingInitial.type,
         status: existingInitial.status,
+        tags: const [],
         createdAt: existingInitial.createdAt,
       );
     } else if (existingInitial == null && initialAmountCents != null) {
@@ -153,6 +155,7 @@ class AccountsViewModel extends ChangeNotifier {
         date: _toDateString(DateTime.now()),
         type: initialBalanceType,
         status: 'cleared',
+        tags: const [],
       );
     }
 

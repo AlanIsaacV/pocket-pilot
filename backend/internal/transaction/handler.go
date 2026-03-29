@@ -112,6 +112,10 @@ func toProto(t *Transaction) *pb.Transaction {
 		s := t.LinkedTransactionID.String()
 		proto.LinkedTransactionId = &s
 	}
+	if t.TemplateID != nil {
+		s := t.TemplateID.String()
+		proto.TemplateId = &s
+	}
 	if t.DeletedAt != nil {
 		proto.DeletedAt = timestamppb.New(*t.DeletedAt)
 	}
@@ -146,6 +150,15 @@ func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
 		linkedID = &lid
 	}
 
+	var templateID *uuid.UUID
+	if p.TemplateId != nil && *p.TemplateId != "" {
+		tid, err := parseUUID(*p.TemplateId, "transaction.template_id")
+		if err != nil {
+			return nil, err
+		}
+		templateID = &tid
+	}
+
 	var date time.Time
 	if p.Date != nil {
 		date = p.Date.AsTime().UTC().Truncate(24 * time.Hour)
@@ -157,6 +170,7 @@ func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
 		AccountID:           accountID,
 		CategoryID:          categoryID,
 		LinkedTransactionID: linkedID,
+		TemplateID:          templateID,
 		Type:                transactionTypeToString(p.Type),
 		AmountCents:         p.AmountCents,
 		CurrencyCode:        p.CurrencyCode,
@@ -223,6 +237,9 @@ func (h *Handler) UpsertTransaction(ctx context.Context, req *pb.UpsertTransacti
 
 	result, conflictResolved, err := h.repo.Upsert(ctx, t)
 	if err != nil {
+		if err == ErrTemplateReferenceNotFound || err == ErrTemplateReferenceDateNotAllowed {
+			return nil, status.Errorf(codes.InvalidArgument, "upsert transaction: %v", err)
+		}
 		return nil, status.Errorf(codes.Internal, "upsert transaction: %v", err)
 	}
 

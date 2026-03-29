@@ -3,6 +3,8 @@
 // ============================================================
 
 // pbgrpc re-exporta transaction_service.pb.dart (Transaction).
+import 'dart:convert';
+
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/transaction_service.pbgrpc.dart';
 
 class TransactionModel {
@@ -10,6 +12,7 @@ class TransactionModel {
   final String accountId;
   final String? categoryId;
   final String? linkedTransactionId;
+  final String? templateId;
 
   /// Monto en unidades menores (centavos).
   final int amount;
@@ -21,6 +24,7 @@ class TransactionModel {
   final String date;
   final String type;
   final String status;
+  final List<String> tags;
 
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -30,12 +34,14 @@ class TransactionModel {
     required this.accountId,
     this.categoryId,
     this.linkedTransactionId,
+    this.templateId,
     required this.amount,
     required this.currencyCode,
     required this.description,
     required this.date,
     required this.type,
     required this.status,
+    required this.tags,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -48,14 +54,17 @@ class TransactionModel {
       id: proto.id,
       accountId: proto.accountId,
       categoryId: proto.hasCategoryId() ? proto.categoryId : null,
-      linkedTransactionId:
-          proto.hasLinkedTransactionId() ? proto.linkedTransactionId : null,
+      linkedTransactionId: proto.hasLinkedTransactionId()
+          ? proto.linkedTransactionId
+          : null,
+      templateId: proto.hasTemplateId() ? proto.templateId : null,
       amount: proto.amountCents.toInt(),
       currencyCode: proto.currencyCode,
       description: proto.description,
       date: proto.date.toDateTime().toIso8601String().substring(0, 10),
       type: _transactionTypeToString(proto.type),
       status: proto.status,
+      tags: List<String>.from(proto.tags),
       createdAt: proto.createdAt.toDateTime(),
       updatedAt: proto.updatedAt.toDateTime(),
     );
@@ -70,12 +79,14 @@ class TransactionModel {
       accountId: map['account_id'] as String,
       categoryId: map['category_id'] as String?,
       linkedTransactionId: map['linked_transaction_id'] as String?,
+      templateId: map['template_id'] as String?,
       amount: map['amount_cents'] as int,
       currencyCode: map['currency_code'] as String,
       description: map['description'] as String,
       date: map['date'] as String,
       type: map['type'] as String,
       status: map['status'] as String,
+      tags: _decodeTags(map['tags']),
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
@@ -90,8 +101,10 @@ class TransactionModel {
       'account_id': accountId,
       'category_id': categoryId,
       'linked_transaction_id': linkedTransactionId,
+      'template_id': templateId,
       'amount_cents': amount,
       'currency_code': currencyCode,
+      'tags': jsonEncode(tags),
       'description': description,
       'date': date,
       'type': type,
@@ -103,7 +116,24 @@ class TransactionModel {
 
   /// Payload para el outbox. Incluye type y status que el servidor necesita.
   /// No incluye user_id: el servidor lo lee del token.
-  Map<String, dynamic> toServerMap() => toMap();
+  Map<String, dynamic> toServerMap() {
+    return {
+      'id': id,
+      'account_id': accountId,
+      'category_id': categoryId,
+      'linked_transaction_id': linkedTransactionId,
+      'template_id': templateId,
+      'amount_cents': amount,
+      'currency_code': currencyCode,
+      'tags': tags,
+      'description': description,
+      'date': date,
+      'type': type,
+      'status': status,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
 
   // ----------------------------------------------------------
   // Helpers para la UI
@@ -124,6 +154,27 @@ class TransactionModel {
 
   /// Parsea [date] (YYYY-MM-DD) a un objeto DateTime para formatear en la UI.
   DateTime get parsedDate => DateTime.parse(date);
+
+  static List<String> _decodeTags(Object? raw) {
+    if (raw == null) return const <String>[];
+
+    if (raw is String && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return decoded.map((e) => e.toString()).toList(growable: false);
+        }
+      } catch (_) {
+        return const <String>[];
+      }
+    }
+
+    if (raw is List) {
+      return raw.map((e) => e.toString()).toList(growable: false);
+    }
+
+    return const <String>[];
+  }
 
   static String _transactionTypeToString(TransactionType type) {
     switch (type) {

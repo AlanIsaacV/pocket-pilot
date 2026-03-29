@@ -12,14 +12,14 @@ class TransactionSyncHandler implements SyncHandler {
   TransactionSyncHandler({
     required TransactionLocalStore local,
     required TransactionRemoteService remote,
-  })  : _local = local,
-        _remote = remote;
+  }) : _local = local,
+       _remote = remote;
 
   @override
   String get entityType => 'transaction';
 
   @override
-  int get syncOrder => 4;
+  int get syncOrder => 5;
 
   @override
   Future<SyncPullResult> pull(DateTime? updatedSince) async {
@@ -61,7 +61,12 @@ class TransactionSyncHandler implements SyncHandler {
       final model = TransactionModel.fromProto(response.transaction);
       final serverRow = <String, dynamic>{
         ...model.toMap(),
-        'deleted_at': null,
+        'deleted_at': response.transaction.hasDeletedAt()
+            ? response.transaction.deletedAt
+                  .toDateTime()
+                  .toUtc()
+                  .toIso8601String()
+            : null,
       };
       return SyncPushResult(conflictResolved: true, serverData: serverRow);
     }

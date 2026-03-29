@@ -11,6 +11,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:go_router/go_router.dart';
+
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -19,6 +21,11 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.go('/transactions/new'),
+        tooltip: 'Nueva transacción',
+        child: const Icon(Icons.add),
+      ),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(

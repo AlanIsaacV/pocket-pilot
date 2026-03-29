@@ -32,6 +32,9 @@ class TransactionRepository {
 
   Future<String?> getLastUsedAccountId() => _local.getLastUsedAccountId();
 
+  Future<({String fromAccountId, String toAccountId})?> getLastTransferAccountIds() =>
+      _local.queryLastTransferPair();
+
   Future<TransactionModel?> getInitialBalanceTransaction({
     required String accountId,
     required String type,
@@ -133,7 +136,8 @@ class TransactionRepository {
     required String currencyIn,
     required String date,
     String? dateIn,
-    required String description,
+    required String descriptionOut,
+    required String descriptionIn,
     required List<String> tags,
   }) async {
     final now = DateTime.now().toUtc();
@@ -144,7 +148,7 @@ class TransactionRepository {
       linkedTransactionId: inId,
       amount: amountOutCents,
       currencyCode: currencyOut,
-      description: description,
+      description: descriptionOut,
       date: date,
       type: 'transfer_out',
       status: 'cleared',
@@ -158,7 +162,7 @@ class TransactionRepository {
       linkedTransactionId: outId,
       amount: amountInCents,
       currencyCode: currencyIn,
-      description: description,
+      description: descriptionIn,
       date: dateIn ?? date,
       type: 'transfer_in',
       status: 'cleared',
@@ -193,7 +197,8 @@ class TransactionRepository {
     required String currencyIn,
     required String date,
     String? dateIn,
-    required String description,
+    required String descriptionOut,
+    required String descriptionIn,
     required List<String> tags,
     required DateTime createdAt,
   }) async {
@@ -205,7 +210,7 @@ class TransactionRepository {
       linkedTransactionId: inId,
       amount: amountOutCents,
       currencyCode: currencyOut,
-      description: description,
+      description: descriptionOut,
       date: date,
       type: 'transfer_out',
       status: 'cleared',
@@ -219,7 +224,7 @@ class TransactionRepository {
       linkedTransactionId: outId,
       amount: amountInCents,
       currencyCode: currencyIn,
-      description: description,
+      description: descriptionIn,
       date: dateIn ?? date,
       type: 'transfer_in',
       status: 'cleared',

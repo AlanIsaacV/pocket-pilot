@@ -209,8 +209,23 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
 
       _noteController.text = out.description;
     } else {
-      fromAccount = accounts.first;
-      toAccount = accounts.length > 1 ? accounts[1] : accounts.first;
+      final lastPair = await context
+          .read<TransactionRepository>()
+          .getLastTransferAccountIds();
+
+      if (lastPair != null) {
+        fromAccount = accounts.cast<AccountModel?>().firstWhere(
+              (a) => a!.id == lastPair.fromAccountId,
+              orElse: () => null,
+            );
+        toAccount = accounts.cast<AccountModel?>().firstWhere(
+              (a) => a!.id == lastPair.toAccountId,
+              orElse: () => null,
+            );
+      }
+
+      fromAccount ??= accounts.first;
+      toAccount ??= accounts.length > 1 ? accounts[1] : accounts.first;
       currencyOut = fromAccount.currencyCode;
       currencyIn = toAccount.currencyCode;
     }
@@ -623,6 +638,12 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
           ? _formatDateISO(_dateIn!)
           : null;
 
+      final note = _noteController.text;
+      final fromName = _fromAccount!.name;
+      final toName = _toAccount!.name;
+      final descOut = note.isEmpty ? '$fromName -> $toName' : note;
+      final descIn = note.isEmpty ? '$toName <- $fromName' : note;
+
       if (_isEditMode) {
         await repo.updateTransfer(
           outId: widget.transferOut!.id,
@@ -635,7 +656,8 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
           currencyIn: _currencyIn,
           date: dateStr,
           dateIn: dateInStr,
-          description: _noteController.text,
+          descriptionOut: descOut,
+          descriptionIn: descIn,
           tags: _selectedTags.map((t) => t.name).toList(),
           createdAt: widget.transferOut!.createdAt,
         );
@@ -651,7 +673,8 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
           currencyIn: _currencyIn,
           date: dateStr,
           dateIn: dateInStr,
-          description: _noteController.text,
+          descriptionOut: descOut,
+          descriptionIn: descIn,
           tags: _selectedTags.map((t) => t.name).toList(),
         );
       }

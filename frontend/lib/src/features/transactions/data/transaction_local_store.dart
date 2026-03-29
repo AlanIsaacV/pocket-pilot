@@ -77,6 +77,39 @@ class TransactionLocalStore {
     return rows.first;
   }
 
+  /// Retorna los account IDs de la última transferencia realizada,
+  /// o null si no existe ninguna.
+  Future<({String fromAccountId, String toAccountId})?> queryLastTransferPair() async {
+    final db = await _db.database;
+
+    final outRows = await db.query(
+      'transactions',
+      columns: ['account_id', 'linked_transaction_id'],
+      where: "type = 'transfer_out' AND deleted_at IS NULL",
+      orderBy: 'date DESC, created_at DESC',
+      limit: 1,
+    );
+    if (outRows.isEmpty) return null;
+
+    final fromAccountId = outRows.first['account_id'] as String?;
+    final linkedId = outRows.first['linked_transaction_id'] as String?;
+    if (fromAccountId == null || linkedId == null) return null;
+
+    final inRows = await db.query(
+      'transactions',
+      columns: ['account_id'],
+      where: "id = ? AND deleted_at IS NULL",
+      whereArgs: [linkedId],
+      limit: 1,
+    );
+    if (inRows.isEmpty) return null;
+
+    final toAccountId = inRows.first['account_id'] as String?;
+    if (toAccountId == null) return null;
+
+    return (fromAccountId: fromAccountId, toAccountId: toAccountId);
+  }
+
   // ----------------------------------------------------------
   // WRITE
   // ----------------------------------------------------------

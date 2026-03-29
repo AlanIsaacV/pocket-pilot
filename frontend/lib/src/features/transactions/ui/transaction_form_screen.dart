@@ -11,14 +11,12 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
-import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/account_icon.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
-import 'package:pocket_pilot/src/features/categories/ui/category_icon_data.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_repository.dart';
 import 'package:pocket_pilot/src/features/tags/domain/tag.dart';
@@ -29,23 +27,9 @@ import 'package:pocket_pilot/src/features/user_preferences/domain/currency_prefe
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_date_utils.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/widgets/transaction_form_widgets.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_amount_calculator.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
-
-// ----------------------------------------------------------
-// Helpers
-// ----------------------------------------------------------
-
-Color _hexToColor(String hex) {
-  if (hex.isEmpty) return AppColors.primary;
-  try {
-    final sanitized = hex.replaceFirst('#', '');
-    if (sanitized.length != 6) return AppColors.primary;
-    return Color(int.parse('FF$sanitized', radix: 16));
-  } catch (_) {
-    return AppColors.primary;
-  }
-}
 
 class TransactionFormScreen extends StatefulWidget {
   final TransactionModel? transaction;
@@ -325,13 +309,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   void _showAccountSheet() {
     _commitPendingAmountIfAny();
 
-    showModalBottomSheet<Object>(
+    showFormBottomSheet<Object>(
       context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       builder: (ctx) => ScrollableBottomSheet(
         title: 'Seleccionar cuenta',
         children: [
@@ -372,13 +351,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   void _showCurrencySheet() {
     _commitPendingAmountIfAny();
 
-    showModalBottomSheet<Object>(
+    showFormBottomSheet<Object>(
       context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       builder: (ctx) => ScrollableBottomSheet(
         title: 'Seleccionar moneda',
         children: [
@@ -651,7 +625,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           // --- Toggle tipo ---
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: _TypeToggle(
+            child: TransactionTypeToggle(
               value: _type,
               onChanged: (t) {
                 _commitPendingAmountIfAny();
@@ -767,7 +741,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   ),
 
                   // Categoría
-                  _CategorySection(
+                  TransactionCategorySection(
                     selectedCategory: _selectedCategory,
                     recentCategories: _recentCategories,
                     onSelect: (c) {
@@ -841,234 +815,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           ],
         ],
       ),
-    );
-  }
-}
-
-// ============================================================
-// Toggle Gasto / Ingreso
-// ============================================================
-
-class _TypeToggle extends StatelessWidget {
-  final String value;
-  final ValueChanged<String> onChanged;
-
-  const _TypeToggle({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-        borderRadius: AppTheme.radiusFull,
-      ),
-      child: Row(
-        children: [
-          _Option(
-            label: 'Gasto',
-            icon: Icons.arrow_upward_rounded,
-            isSelected: value == 'expense',
-            activeColor: Theme.of(context).colorScheme.error,
-            onTap: () => onChanged('expense'),
-          ),
-          _Option(
-            label: 'Ingreso',
-            icon: Icons.arrow_downward_rounded,
-            isSelected: value == 'income',
-            activeColor: Theme.of(context).colorScheme.onTertiary,
-            onTap: () => onChanged('income'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Option extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final Color activeColor;
-  final VoidCallback onTap;
-
-  const _Option({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.activeColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? activeColor.withValues(alpha: 0.15)
-                : Colors.transparent,
-            borderRadius: AppTheme.radiusFull,
-            border: Border.all(
-              color: isSelected ? activeColor : Colors.transparent,
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: isSelected
-                    ? activeColor
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: GoogleFonts.ibmPlexSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected
-                      ? activeColor
-                      : Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// Sección de categoría (recientes inline + botón picker)
-// ============================================================
-
-class _CategorySection extends StatelessWidget {
-  final CategoryModel? selectedCategory;
-  final List<CategoryModel> recentCategories;
-  final ValueChanged<CategoryModel> onSelect;
-  final VoidCallback onOpenPicker;
-
-  const _CategorySection({
-    required this.selectedCategory,
-    required this.recentCategories,
-    required this.onSelect,
-    required this.onOpenPicker,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          onTap: onOpenPicker,
-          borderRadius: AppTheme.radiusSmall,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.category_outlined,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Categoría',
-                  style: GoogleFonts.ibmPlexSans(
-                    fontSize: 14,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  selectedCategory?.name ?? 'Sin categoría',
-                  style: GoogleFonts.ibmPlexSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 16,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (recentCategories.isNotEmpty)
-          SizedBox(
-            height: 34,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: recentCategories.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final cat = recentCategories[i];
-                final isActive = selectedCategory?.id == cat.id;
-                final chipColor = cat.color.isNotEmpty
-                    ? _hexToColor(cat.color)
-                    : Theme.of(context).colorScheme.primary;
-
-                return GestureDetector(
-                  onTap: () => onSelect(cat),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isActive
-                          ? chipColor.withValues(alpha: 0.2)
-                          : Theme.of(context).colorScheme.surfaceContainerHigh,
-                      borderRadius: AppTheme.radiusFull,
-                      border: isActive
-                          ? Border.all(color: chipColor.withValues(alpha: 0.5))
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (cat.icon.isNotEmpty) ...[
-                          Icon(
-                            CategoryIconData.iconFromHex(cat.icon),
-                            size: 14,
-                            color: isActive
-                                ? chipColor
-                                : Theme.of(context).colorScheme.onSurface,
-                          ),
-                          const SizedBox(width: 4),
-                        ],
-                        Text(
-                          cat.name,
-                          style: GoogleFonts.ibmPlexSans(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: isActive
-                                ? chipColor
-                                : Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        if (recentCategories.isNotEmpty) const SizedBox(height: 4),
-      ],
     );
   }
 }

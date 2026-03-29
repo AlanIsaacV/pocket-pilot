@@ -528,3 +528,25 @@ class _OperationKey extends StatelessWidget {
     );
   }
 }
+
+// ============================================================
+// Bottom sheet helper
+// ============================================================
+
+/// Displays a modal bottom sheet with consistent styling across form screens.
+///
+/// Applies standard theme colors, scroll behavior, and shape. The [builder]
+/// receives the bottom sheet context.
+Future<T?> showFormBottomSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+}) =>
+    showModalBottomSheet<T>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: builder,
+    );

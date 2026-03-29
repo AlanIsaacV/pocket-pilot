@@ -385,13 +385,8 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
   // ----------------------------------------------------------
 
   void _showAccountSheet({required bool isSource}) {
-    showModalBottomSheet<Object>(
+    showFormBottomSheet<Object>(
       context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       builder: (ctx) => ScrollableBottomSheet(
         title: isSource ? 'Cuenta origen' : 'Cuenta destino',
         children: [
@@ -482,13 +477,8 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
   // ----------------------------------------------------------
 
   void _showCurrencySheet({required bool isSource}) {
-    showModalBottomSheet<Object>(
+    showFormBottomSheet<Object>(
       context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       builder: (ctx) => ScrollableBottomSheet(
         title: isSource ? 'Moneda origen' : 'Moneda destino',
         children: [

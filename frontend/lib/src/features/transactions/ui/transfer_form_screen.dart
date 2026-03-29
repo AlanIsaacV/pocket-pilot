@@ -765,7 +765,8 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+    final keyboardOpen = keyboardInset > 0;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -801,7 +802,12 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      0,
+                      20,
+                      keyboardOpen ? keyboardInset + 24 : 0,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

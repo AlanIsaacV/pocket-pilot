@@ -141,3 +141,24 @@ The transactions screen includes a persistent `DraggableScrollableSheet` at the 
 - Shows: status indicator (green/yellow/purple/red dot), last sync timestamp, pending changes count, and manual sync button.
 - Listens to `SyncService.status` via `ValueListenableBuilder` for reactive updates.
 - Button is disabled during active sync; label changes per state.
+
+## Transaction Templates and Scheduled Generation
+
+- Feature module path: `features/transaction_templates/` with the standard `domain/data` split.
+- `TransactionTemplateSyncHandler` participates in sync with `syncOrder = 4` (before transactions).
+- `ScheduledTransactionGenerator` runs on client and is deterministic:
+  - uses UUIDv5 namespace constant (`core/ids/deterministic_namespace.dart`)
+  - computes occurrences by date-only rules and 30-day horizon
+  - inserts with ignore-on-conflict semantics to preserve idempotency
+  - supports transfer templates by generating/reconciling out+in legs
+- `ScheduledGenerationOrchestrator` runs app cycle `sync -> generate -> sync` and coalesces overlapping requests.
+- App wiring:
+  - generator and orchestrator are created in `main.dart`
+  - resume lifecycle trigger in `PocketPilotApp` calls orchestrator instead of direct sync
+
+### Transaction Tags + Template Linkage
+
+- `TransactionModel` includes `tags` and optional `templateId`.
+- Local persistence stores tags as JSON string (`TEXT`); gRPC payload sends tags as repeated strings.
+- Transaction and transfer form flows preload and persist tags by tag name.
+- Transfer create/update propagates the same tags to both legs.

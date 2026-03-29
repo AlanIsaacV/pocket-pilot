@@ -36,3 +36,18 @@ The `Handler` struct implements the gRPC server interface generated from Protobu
 ### Account Currency Requirement
 - Account domain structs, repository scans, and upsert SQL must map `currency_code` as a required column.
 - Account handlers must validate `account.currency_code` as required input before calling repository upsert.
+
+## Transaction Templates Module
+
+- New backend module: `internal/transactiontemplate`.
+- Follows the same handler/repository pattern as other syncable entities.
+- Exposes `TransactionTemplateService` RPCs for list/upsert/delete.
+- Validation is centralized in `validation.go` and enforced in handler before repository upsert.
+
+### Transaction Template Linkage
+
+- `transactions` now support optional `template_id`.
+- Transaction handler maps proto `template_id` in both directions.
+- Transaction repository validates template references:
+  - template exists for same user
+  - soft-deleted template is only allowed for historical transaction date (`transaction.date <= template.deleted_at::date`)

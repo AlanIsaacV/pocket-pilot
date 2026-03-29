@@ -40,5 +40,12 @@ This document outlines the conventions for defining database schemas and migrati
 - Some foreign keys may be nullable when a relationship is conditional by type. For example, `transactions.category_id` is nullable because transfer-type transactions have no category.
 - Self-referencing foreign keys (e.g., `transactions.linked_transaction_id REFERENCES transactions(id)`) are used to pair related rows without a join table. Use a partial index (`WHERE column IS NOT NULL`) for efficient lookups.
 
+## Templates and Schedule Fields
+
+- `transaction_templates` is a syncable table in both PostgreSQL and SQLite.
+- `transactions.template_id` is nullable and references `transaction_templates(id)`.
+- Schedule fields (`frequency`, `next_date`, `end_date`) are nullable and must support manual templates (`frequency`/dates null) and scheduled templates (`frequency` + `next_date`).
+- For SQLite, tags arrays are persisted as JSON string (`TEXT`) and decoded in domain/data mappers.
+
 ## MVP Baseline Exception
 - While the project is in MVP stage and no production data exists, it is acceptable to modify the original baseline schema files (`001_*.sql`) directly to introduce new required columns (for example, `accounts.currency_code`).

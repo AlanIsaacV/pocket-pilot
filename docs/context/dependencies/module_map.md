@@ -16,6 +16,9 @@ This document outlines the dependencies between internal modules and external li
     - App-level controllers (e.g., theme preference) may depend on a feature `Repository` and are provided from app root.
     - Account form additionally depends on `UserPreferenceLocalStore` adapters (`CurrencyPreferencesLocalStore`) to resolve currency options.
     - Transfer form (`TransferFormRouteScope`) depends on `AccountLocalStore`, `TagLocalStore`, `TagRepository`, `TransactionRepository`, `CurrencyPreferencesLocalStore`, and `SyncService`. Does **not** depend on `CategoryLocalStore` (transfers have no category).
+    - Transaction templates module (`features/transaction_templates`) depends on `SyncOutbox`, generated gRPC stubs, and local stores for template sync.
+    - Scheduled generator depends on template repository/store, transaction local store, account/category local stores, and `SyncOutbox` (for generated upsert events).
+    - Scheduled generation orchestrator depends on `SyncService` and scheduled generator; app lifecycle calls orchestrator (not direct sync) for resume/start scheduled cycles.
     - Shared form widgets (`form_widgets.dart`) are imported by both `TransactionFormScreen` and `TransferFormScreen`.
     - Shared AppBar form actions (`ui/widgets/form_app_bar_actions.dart`) are imported by `TransactionFormScreen`, `TransferFormScreen`, `AccountFormScreen`, `CategoryFormScreen`, and `CurrencyPreferencesScreen`.
 

@@ -12,6 +12,7 @@ Before starting any task, identify the relevant domain (Backend, Frontend, or Pr
 - [architecture/sync_protocol.md](architecture/sync_protocol.md) - Detailed Offline-First protocol (Delta Pull, Outbox, LWW).
 - [architecture/backend_go.md](architecture/backend_go.md) - Go gRPC server structure, Repository patterns, and PostgreSQL rules.
 - [architecture/frontend_flutter.md](architecture/frontend_flutter.md) - Flutter app structure, State Management (Provider), and SQLite patterns.
+- [architecture/transaction_templates_and_scheduled_generation.md](architecture/transaction_templates_and_scheduled_generation.md) - Transaction templates, scheduled generator (`sync -> generate -> sync`), deterministic UUIDv5 occurrences, transfer-pair reconciliation, and tags/template linkage behavior.
 
 ### Development Conventions
 - [conventions/coding_standards.md](conventions/coding_standards.md) - Naming conventions, error handling, and style guides for Go and Dart.

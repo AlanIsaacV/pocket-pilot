@@ -45,6 +45,11 @@ abstract class SyncHandler {
   /// 'transaction', 'user_preference'.
   String get entityType;
 
+  /// Orden de push para respetar dependencias de FK.
+  /// Entidades sin dependencias van primero (1-3),
+  /// entidades con FK van después (4+).
+  int get syncOrder;
+
   /// Pull delta: trae registros del servidor.
   ///
   /// Si [updatedSince] es null → primer sync (trae todos los registros activos).

@@ -133,8 +133,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _SettingsItem(
                 icon: Icons.sync_rounded,
                 label: 'Sincronización',
-                // TODO: navegar a pantalla de estado de sync
-                onTap: () {},
+                onTap: () => context.push('/settings/sync'),
               ),
             ],
           ),

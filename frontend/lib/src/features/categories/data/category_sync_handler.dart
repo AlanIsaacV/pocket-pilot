@@ -19,6 +19,9 @@ class CategorySyncHandler implements SyncHandler {
   String get entityType => 'category';
 
   @override
+  int get syncOrder => 2;
+
+  @override
   Future<SyncPullResult> pull(DateTime? updatedSince) async {
     final response = await _remote.listCategories(updatedSince: updatedSince);
 

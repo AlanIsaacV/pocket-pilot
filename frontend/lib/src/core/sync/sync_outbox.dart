@@ -100,6 +100,24 @@ class SyncOutbox {
     );
   }
 
+  /// Resetea retry_count y last_error de todas las entradas.
+  /// Se llama al inicio de cada ciclo de sync para que entradas
+  /// previamente fallidas vuelvan a ser elegibles.
+  Future<void> resetAllRetries() async {
+    final db = await _db.database;
+    await db.rawUpdate(
+      'UPDATE sync_outbox SET retry_count = 0, last_error = NULL',
+    );
+  }
+
+  /// Retorna el conteo total de entradas en el outbox.
+  /// Usado por la UI para mostrar cuántos cambios están pendientes.
+  Future<int> countPending() async {
+    final db = await _db.database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM sync_outbox');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
   // ----------------------------------------------------------
   // READ
   // ----------------------------------------------------------

@@ -19,6 +19,9 @@ class TransactionSyncHandler implements SyncHandler {
   String get entityType => 'transaction';
 
   @override
+  int get syncOrder => 4;
+
+  @override
   Future<SyncPullResult> pull(DateTime? updatedSince) async {
     final response = await _remote.listTransactions(updatedSince: updatedSince);
 

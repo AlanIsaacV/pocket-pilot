@@ -43,6 +43,7 @@ import 'package:pocket_pilot/src/features/user_preferences/ui/user_preferences_r
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/settings/settings_screen.dart';
+import 'screens/settings/sync_status_screen.dart';
 
 GoRouter buildRouter() {
   return GoRouter(
@@ -173,6 +174,10 @@ GoRouter buildRouter() {
         path: '/settings/currency',
         builder: (context, state) =>
             const UserPreferencesRouteScope(child: CurrencyPreferencesScreen()),
+      ),
+      GoRoute(
+        path: '/settings/sync',
+        builder: (context, state) => const SyncStatusScreen(),
       ),
     ],
   );

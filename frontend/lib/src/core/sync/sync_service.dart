@@ -1,13 +1,18 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:pocket_pilot/src/core/sync/sync_handler.dart';
 import 'package:pocket_pilot/src/core/sync/sync_metadata_store.dart';
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
+
+enum SyncStatus { idle, syncing, error }
 
 class SyncService {
   final SyncOutbox _outbox;
   final SyncMetadataStore _metadataStore;
   final Map<String, SyncHandler> _handlers;
+
+  final ValueNotifier<SyncStatus> status = ValueNotifier(SyncStatus.idle);
 
   bool _syncRequested = false;
   Future<void>? _activeSyncFuture;
@@ -29,16 +34,30 @@ class SyncService {
     return _activeSyncFuture!;
   }
 
+  /// Conteo de entradas pendientes en el outbox (para la UI).
+  Future<int> pendingCount() => _outbox.countPending();
+
+  /// Timestamp del último sync exitoso global (para la UI).
+  Future<DateTime?> lastSyncedAt() => _metadataStore.getLastSyncedAtGlobal();
+
   Future<void> _runSyncLoop() async {
+    status.value = SyncStatus.syncing;
+    bool hadError = false;
     try {
+      await _outbox.resetAllRetries();
+      final sorted = _handlers.values.toList()
+        ..sort((a, b) => a.syncOrder.compareTo(b.syncOrder));
       while (_syncRequested) {
         _syncRequested = false;
-        for (final handler in _handlers.values) {
+        for (final handler in sorted) {
           await _pullEntity(handler);
           await _pushEntity(handler);
         }
       }
+    } catch (_) {
+      hadError = true;
     } finally {
+      status.value = hadError ? SyncStatus.error : SyncStatus.idle;
       _activeSyncFuture = null;
     }
   }

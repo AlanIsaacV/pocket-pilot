@@ -46,4 +46,17 @@ class SyncMetadataStore {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
+
+  /// Retorna el timestamp más reciente de last_synced_at entre todas
+  /// las entidades. Usado por la pantalla de sync para mostrar
+  /// "Última sincronización". Retorna null si nunca se sincronizó.
+  Future<DateTime?> getLastSyncedAtGlobal() async {
+    final db = await _db.database;
+    final result = await db.rawQuery(
+      'SELECT MAX(last_synced_at) as latest FROM sync_metadata',
+    );
+    final latest = result.first['latest'] as String?;
+    if (latest == null) return null;
+    return DateTime.parse(latest);
+  }
 }

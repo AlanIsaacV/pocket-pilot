@@ -19,6 +19,9 @@ class AccountSyncHandler implements SyncHandler {
   String get entityType => 'account';
 
   @override
+  int get syncOrder => 1;
+
+  @override
   Future<SyncPullResult> pull(DateTime? updatedSince) async {
     final response = await _remote.listAccounts(updatedSince: updatedSince);
 

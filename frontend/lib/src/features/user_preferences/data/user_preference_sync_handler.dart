@@ -19,6 +19,9 @@ class UserPreferenceSyncHandler implements SyncHandler {
   String get entityType => 'user_preference';
 
   @override
+  int get syncOrder => 5;
+
+  @override
   Future<SyncPullResult> pull(DateTime? updatedSince) async {
     final response = await _remote.listPreferences(updatedSince: updatedSince);
 

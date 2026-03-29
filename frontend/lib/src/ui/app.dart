@@ -1,26 +1,48 @@
-// ============================================================
-// PocketPilotApp — Widget raíz de la aplicación
-// ============================================================
-//
-// MaterialApp.router integra go_router con el sistema de navegación
-// de Flutter. La diferencia con MaterialApp normal:
-//   MaterialApp       → usa Navigator con rutas anónimas
-//   MaterialApp.router → usa un Router declarativo (go_router) que
-//                        sincroniza con la URL del sistema operativo
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/core/theme/theme_preference_controller.dart';
 
-class PocketPilotApp extends StatelessWidget {
-  /// El router se inyecta desde main.dart para facilitar el testing
-  /// (en tests podemos pasar un router diferente con rutas mock).
+class PocketPilotApp extends StatefulWidget {
   final GoRouter router;
 
   const PocketPilotApp({super.key, required this.router});
+
+  @override
+  State<PocketPilotApp> createState() => _PocketPilotAppState();
+}
+
+class _PocketPilotAppState extends State<PocketPilotApp>
+    with WidgetsBindingObserver {
+  DateTime? _lastSyncTime;
+  static const _syncThrottle = Duration(seconds: 30);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final now = DateTime.now();
+      if (_lastSyncTime == null ||
+          now.difference(_lastSyncTime!) >= _syncThrottle) {
+        _lastSyncTime = now;
+        context.read<SyncService>().sync();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,18 +51,10 @@ class PocketPilotApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'Pocket Pilot',
       debugShowCheckedModeBanner: false,
-
-      // Tema claro y oscuro — el sistema operativo decide cuál usar
-      // según la configuración del usuario.
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-
-      // ThemeMode se controla por preferencia sincronizable del usuario.
       themeMode: themePreference.themeMode,
-
-      // routerConfig le dice a MaterialApp que delegue toda la navegación
-      // a nuestro GoRouter.
-      routerConfig: router,
+      routerConfig: widget.router,
     );
   }
 }

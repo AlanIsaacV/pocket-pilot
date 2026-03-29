@@ -19,6 +19,9 @@ class TagSyncHandler implements SyncHandler {
   String get entityType => 'tag';
 
   @override
+  int get syncOrder => 3;
+
+  @override
   Future<SyncPullResult> pull(DateTime? updatedSince) async {
     final response = await _remote.listTags(updatedSince: updatedSince);
 

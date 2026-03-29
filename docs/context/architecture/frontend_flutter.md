@@ -106,6 +106,15 @@ Reusable widgets shared between `TransactionFormScreen` and `TransferFormScreen`
 - After local insert, all categories are enqueued to `SyncOutbox` so they sync to the server on the next cycle.
 
 ## Synchronization Flow
-1. **Pull:** `SyncService` iterates through all registered `SyncHandlers`. Each handler's `pull` method is called to fetch and save server-side changes.
-2. **Push:** The `SyncService` flushes the `SyncOutbox` by calling each handler's `pushUpsert` or `pushDelete` methods.
+1. **Pull:** `SyncService` iterates through all registered `SyncHandlers` (sorted by `syncOrder`). Each handler's `pull` method is called to fetch and save server-side changes.
+2. **Push:** The `SyncService` flushes the `SyncOutbox` by calling each handler's `pushUpsert` or `pushDelete` methods, respecting FK dependency order via `syncOrder`.
 3. **Conflict Resolution:** If `pushUpsert` returns `conflict_resolved: true`, the handler's `saveLocally()` method is called with the server-side version of the data.
+4. **Retry Resilience:** At the start of each sync cycle, `resetAllRetries()` resets all failed outbox entries. The `_maxRetries` (3) limit only applies within a single cycle to prevent infinite loops.
+5. **Sync Triggers:** Sync is triggered automatically on: connectivity recovery (`ConnectivityMonitor`), app resume (`WidgetsBindingObserver` with 30s throttle), and manually from the Sync Status screen.
+6. **Status Notifier:** `SyncService` exposes a `ValueNotifier<SyncStatus>` (`idle`, `syncing`, `error`) for reactive UI updates.
+
+### Sync Status Screen
+- Accessible from Settings → Sincronización (`/settings/sync`, top-level route outside `ShellRoute`).
+- Shows: status indicator (green/yellow/purple/red dot), last sync timestamp, pending changes count, and manual sync button.
+- Listens to `SyncService.status` via `ValueListenableBuilder` for reactive updates.
+- Button is disabled during active sync; label changes per state.

@@ -142,6 +142,14 @@ class TransactionsScreen extends StatelessWidget {
                   context.push('/templates/new');
                 },
               ),
+              SheetItem(
+                icon: Icons.trending_up_rounded,
+                label: 'Nuevo rendimiento',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.push('/yields/new');
+                },
+              ),
             ],
           ),
         ),

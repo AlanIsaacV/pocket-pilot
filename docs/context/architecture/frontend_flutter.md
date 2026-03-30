@@ -201,3 +201,40 @@ UI files live in `features/transaction_templates/ui/`:
 - Local persistence stores tags as JSON string (`TEXT`); gRPC payload sends tags as repeated strings.
 - Transaction and transfer form flows preload and persist tags by tag name.
 - Transfer create/update propagates the same tags to both legs.
+
+## Yield Configs UI Layer
+
+UI files live in `features/yield_configs/ui/`:
+
+- `YieldConfigViewModel` — ChangeNotifier with `configs`, `isLoading`, `isSyncing`, `errorMessage`. Local-first with 5-second throttle before remote sync. Exposes `deleteConfig(id)`.
+- `YieldConfigRouteScope` — `ChangeNotifierProvider` for the list screen. Wires `DatabaseHelper → YieldConfigLocalStore → YieldConfigRepository + SyncService → ViewModel`.
+- `YieldConfigFormRouteScope` — `MultiProvider` for the form screen. Provides `AccountLocalStore`, `YieldConfigRepository`, `SyncService`.
+- `YieldConfigsScreen` — list with status badge (active/paused/completed), APY percentage and payout frequency subtitle. Tap→edit, swipe end-to-start→delete (with confirmation dialog).
+- `YieldConfigFormScreen` — scrollable form with fields: name, account, amount (capital), APY rate, payout frequency (daily/weekly/monthly/at_maturity), next payment date, maturity date (optional), term days (conditional on at_maturity), auto-renew toggle, status selector. Uses `FormAppBarActions` with delete secondary action in edit mode.
+
+### Routes (outside `ShellRoute`)
+
+| Path | Scope | Screen |
+|------|-------|--------|
+| `/yields` | `YieldConfigRouteScope` | `YieldConfigsScreen` |
+| `/yields/new` | `YieldConfigFormRouteScope` | `YieldConfigFormScreen` |
+| `/yields/:yieldId/edit` | `YieldConfigFormRouteScope` | `YieldConfigFormScreen` |
+
+### Entry points
+
+1. **Settings → Preferencias → Rendimientos** — navigates to `/yields` list screen.
+2. **FAB menu on `TransactionsScreen`** — "Nuevo rendimiento" option in `_showAddOptions()` bottom sheet navigates to `/yields/new`.
+3. **FAB on `YieldConfigsScreen`** — navigates to `/yields/new`.
+
+### Form validation rules
+
+- `name`: required.
+- `account`: required (bottom sheet from loaded accounts).
+- `amount`: required, must be > 0 (decimal → cents conversion).
+- `apy_rate`: required, must be > 0.
+- `next_date`: required.
+- `payout_frequency`: required (default `monthly`). When `at_maturity`: `term_days > 0` and `maturity_date` are also required.
+- `maturity_date`: optional (clearable). Required for `at_maturity` frequency.
+- `term_days`: optional. Required for `at_maturity` frequency.
+- `auto_renew`: boolean toggle (default false).
+- `status`: active / paused / completed (default `active`). All values stored lowercase.

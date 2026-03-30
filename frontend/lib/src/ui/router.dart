@@ -45,6 +45,11 @@ import 'package:pocket_pilot/src/features/transactions/ui/transfer_form_route_sc
 import 'package:pocket_pilot/src/features/transactions/ui/transfer_form_screen.dart';
 import 'package:pocket_pilot/src/features/user_preferences/ui/currency_preferences_screen.dart';
 import 'package:pocket_pilot/src/features/user_preferences/ui/user_preferences_route_scope.dart';
+import 'package:pocket_pilot/src/features/yield_configs/domain/yield_config.dart';
+import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_form_route_scope.dart';
+import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_form_screen.dart';
+import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_route_scope.dart';
+import 'package:pocket_pilot/src/features/yield_configs/ui/yield_configs_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/settings/settings_screen.dart';
@@ -223,6 +228,26 @@ GoRouter buildRouter() {
             },
           ),
         ],
+      ),
+      GoRoute(
+        path: '/yields',
+        builder: (context, state) => const YieldConfigRouteScope(
+          child: YieldConfigsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/yields/new',
+        builder: (context, state) => const YieldConfigFormRouteScope(
+          child: YieldConfigFormScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/yields/:yieldId/edit',
+        builder: (context, state) => YieldConfigFormRouteScope(
+          child: YieldConfigFormScreen(
+            config: state.extra as YieldConfigModel?,
+          ),
+        ),
       ),
       GoRoute(
         path: '/settings/currency',

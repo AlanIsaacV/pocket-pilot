@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "pocket_pilot/v1/common.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+message YieldConfig {
+  string id = 1;
+  string account_id = 2;
+  string name = 3;
+
+  int64 amount_cents = 4;
+  double apy_rate = 5;
+
+  string payout_frequency = 6;
+  string next_date = 7;
+  optional string maturity_date = 8;
+
+  bool auto_renew = 9;
+  string status = 10;
+
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  google.protobuf.Timestamp deleted_at = 13;
+  optional int32 term_days = 14;
+}
+
+service YieldConfigService {
+  rpc ListYieldConfigs(ListYieldConfigsRequest) returns (ListYieldConfigsResponse);
+  rpc UpsertYieldConfig(UpsertYieldConfigRequest) returns (UpsertYieldConfigResponse);
+  rpc DeleteYieldConfig(DeleteYieldConfigRequest) returns (google.protobuf.Empty);
+}
+
+message ListYieldConfigsRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListYieldConfigsResponse {
+  repeated YieldConfig configs = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertYieldConfigRequest {
+  YieldConfig config = 1;
+}
+
+message UpsertYieldConfigResponse {
+  YieldConfig config = 1;
+  bool conflict_resolved = 2;
+}
+
+message DeleteYieldConfigRequest {
+  string id = 1;
+  google.protobuf.Timestamp deleted_at = 2;
+}

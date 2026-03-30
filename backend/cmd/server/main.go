@@ -22,6 +22,7 @@ import (
 	"github.com/AlanIsaacV/pocket-pilot/internal/transaction"
 	"github.com/AlanIsaacV/pocket-pilot/internal/transactiontemplate"
 	"github.com/AlanIsaacV/pocket-pilot/internal/userpreference"
+	"github.com/AlanIsaacV/pocket-pilot/internal/yieldconfig"
 )
 
 func main() {
@@ -44,6 +45,7 @@ func main() {
 	categoryHandler := category.NewHandler(category.NewRepository(pool))
 	transactionHandler := transaction.NewHandler(transaction.NewRepository(pool))
 	transactionTemplateHandler := transactiontemplate.NewHandler(transactiontemplate.NewRepository(pool))
+	yieldConfigHandler := yieldconfig.NewHandler(yieldconfig.NewRepository(pool))
 	tagHandler := tag.NewHandler(tag.NewRepository(pool))
 	userPreferenceHandler := userpreference.NewHandler(userpreference.NewRepository(pool))
 
@@ -56,6 +58,7 @@ func main() {
 	pb.RegisterCategoryServiceServer(srv, categoryHandler)
 	pb.RegisterTransactionServiceServer(srv, transactionHandler)
 	pb.RegisterTransactionTemplateServiceServer(srv, transactionTemplateHandler)
+	pb.RegisterYieldConfigServiceServer(srv, yieldConfigHandler)
 	pb.RegisterTagServiceServer(srv, tagHandler)
 	pb.RegisterUserPreferenceServiceServer(srv, userPreferenceHandler)
 

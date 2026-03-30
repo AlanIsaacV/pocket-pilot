@@ -13,6 +13,7 @@ class TransactionModel {
   final String? categoryId;
   final String? linkedTransactionId;
   final String? templateId;
+  final String? yieldId;
 
   /// Monto en unidades menores (centavos).
   final int amount;
@@ -35,6 +36,7 @@ class TransactionModel {
     this.categoryId,
     this.linkedTransactionId,
     this.templateId,
+    this.yieldId,
     required this.amount,
     required this.currencyCode,
     required this.description,
@@ -58,6 +60,7 @@ class TransactionModel {
           ? proto.linkedTransactionId
           : null,
       templateId: proto.hasTemplateId() ? proto.templateId : null,
+      yieldId: proto.hasYieldId() ? proto.yieldId : null,
       amount: proto.amountCents.toInt(),
       currencyCode: proto.currencyCode,
       description: proto.description,
@@ -80,6 +83,7 @@ class TransactionModel {
       categoryId: map['category_id'] as String?,
       linkedTransactionId: map['linked_transaction_id'] as String?,
       templateId: map['template_id'] as String?,
+      yieldId: map['yield_id'] as String?,
       amount: map['amount_cents'] as int,
       currencyCode: map['currency_code'] as String,
       description: map['description'] as String,
@@ -102,6 +106,7 @@ class TransactionModel {
       'category_id': categoryId,
       'linked_transaction_id': linkedTransactionId,
       'template_id': templateId,
+      'yield_id': yieldId,
       'amount_cents': amount,
       'currency_code': currencyCode,
       'tags': jsonEncode(tags),
@@ -123,6 +128,7 @@ class TransactionModel {
       'category_id': categoryId,
       'linked_transaction_id': linkedTransactionId,
       'template_id': templateId,
+      'yield_id': yieldId,
       'amount_cents': amount,
       'currency_code': currencyCode,
       'tags': tags,

@@ -66,6 +66,9 @@ class TransactionRemoteService {
       if (map['template_id'] != null) {
         transaction.templateId = map['template_id'] as String;
       }
+      if (map['yield_id'] != null) {
+        transaction.yieldId = map['yield_id'] as String;
+      }
       return await _client.upsertTransaction(
         UpsertTransactionRequest(transaction: transaction),
       );

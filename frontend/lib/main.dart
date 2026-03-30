@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
+import 'package:pocket_pilot/src/core/sync/composite_scheduled_generator_runner.dart';
 import 'package:pocket_pilot/src/core/sync/connectivity_monitor.dart';
 import 'package:pocket_pilot/src/core/sync/sync_metadata_store.dart';
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
@@ -44,6 +45,11 @@ import 'package:pocket_pilot/src/features/transaction_templates/data/transaction
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_remote_service.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_sync_handler.dart';
+import 'package:pocket_pilot/src/features/yield_configs/data/yield_config_local_store.dart';
+import 'package:pocket_pilot/src/features/yield_configs/data/yield_config_remote_service.dart';
+import 'package:pocket_pilot/src/features/yield_configs/data/yield_config_repository.dart';
+import 'package:pocket_pilot/src/features/yield_configs/data/yield_config_sync_handler.dart';
+import 'package:pocket_pilot/src/features/yield_configs/data/yield_transaction_generator.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/theme_preferences_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_remote_service.dart';
@@ -101,6 +107,11 @@ Future<void> main() async {
     remote: TransactionRemoteService(),
   );
 
+  final yieldConfigSyncHandler = YieldConfigSyncHandler(
+    local: YieldConfigLocalStore(db: dbHelper),
+    remote: YieldConfigRemoteService(),
+  );
+
   final userPreferenceSyncHandler = UserPreferenceSyncHandler(
     local: userPreferenceLocalStore,
     remote: UserPreferenceRemoteService(),
@@ -114,6 +125,7 @@ Future<void> main() async {
       categorySyncHandler,
       tagSyncHandler,
       transactionTemplateSyncHandler,
+      yieldConfigSyncHandler,
       transactionSyncHandler,
       userPreferenceSyncHandler,
     ],
@@ -134,9 +146,27 @@ Future<void> main() async {
     categories: CategoryLookupAdapter(local: CategoryLocalStore(db: dbHelper)),
   );
 
+  final yieldGenerator = YieldTransactionGenerator(
+    configs: YieldScheduleStoreAdapter(
+      repository: YieldConfigRepository(
+        local: YieldConfigLocalStore(db: dbHelper),
+        outbox: syncOutbox,
+      ),
+    ),
+    transactions: YieldTransactionStoreAdapter(
+      local: TransactionLocalStore(db: dbHelper),
+    ),
+    outbox: YieldOutboxWriterAdapter(outbox: syncOutbox),
+    accounts: YieldAccountLookupAdapter(local: AccountLocalStore(db: dbHelper)),
+  );
+
+  final compositeGenerator = CompositeScheduledGeneratorRunner(
+    runners: [scheduledGenerator, yieldGenerator],
+  );
+
   final scheduledOrchestrator = ScheduledGenerationOrchestrator(
     sync: syncService,
-    generator: scheduledGenerator,
+    generator: compositeGenerator,
   );
 
   // Insertar categorías por defecto si es la primera ejecución.

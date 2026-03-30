@@ -13,6 +13,7 @@ Before starting any task, identify the relevant domain (Backend, Frontend, or Pr
 - [architecture/backend_go.md](architecture/backend_go.md) - Go gRPC server structure, Repository patterns, and PostgreSQL rules.
 - [architecture/frontend_flutter.md](architecture/frontend_flutter.md) - Flutter app structure, State Management (Provider), and SQLite patterns.
 - [architecture/transaction_templates_and_scheduled_generation.md](architecture/transaction_templates_and_scheduled_generation.md) - Transaction templates, scheduled generator (`sync -> generate -> sync`), deterministic UUIDv5 occurrences, transfer-pair reconciliation, and tags/template linkage behavior.
+- [architecture/yield_configs_and_interest_generation.md](architecture/yield_configs_and_interest_generation.md) - Yield config schema/contracts, local interest generation with deterministic UUIDv5, maturity/auto-renew behavior, `transactions.yield_id` linkage, and sync order integration.
 
 ### Development Conventions
 - [conventions/coding_standards.md](conventions/coding_standards.md) - Naming conventions, error handling, and style guides for Go and Dart.

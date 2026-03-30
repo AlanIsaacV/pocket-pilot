@@ -18,6 +18,7 @@ type Transaction struct {
 	CategoryID          *uuid.UUID // nullable — transfers have no category
 	LinkedTransactionID *uuid.UUID // pairs TRANSFER_OUT ↔ TRANSFER_IN
 	TemplateID          *uuid.UUID // optional reference to transaction_templates
+	YieldID             *uuid.UUID // optional reference to yield_configs
 	Type                string     // "income" | "expense" | "transfer_out" | "transfer_in"
 	AmountCents         int64
 	CurrencyCode        string
@@ -38,7 +39,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-const scanColumns = `id, user_id, account_id, category_id, linked_transaction_id, template_id, type, amount_cents, currency_code, status, tags, description, date, created_at, updated_at, deleted_at`
+const scanColumns = `id, user_id, account_id, category_id, linked_transaction_id, template_id, yield_id, type, amount_cents, currency_code, status, tags, description, date, created_at, updated_at, deleted_at`
 
 var (
 	ErrTemplateReferenceNotFound       = errors.New("template reference does not exist for user")
@@ -55,6 +56,7 @@ func (r *Repository) scan(row pgx.Row) (*Transaction, error) {
 	err := row.Scan(
 		&t.ID, &t.UserID, &t.AccountID, &t.CategoryID, &t.LinkedTransactionID,
 		&t.TemplateID,
+		&t.YieldID,
 		&t.Type, &t.AmountCents, &t.CurrencyCode, &t.Status,
 		&t.Tags, &t.Description, &t.Date,
 		&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt,
@@ -118,6 +120,7 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 		if err := rows.Scan(
 			&t.ID, &t.UserID, &t.AccountID, &t.CategoryID, &t.LinkedTransactionID,
 			&t.TemplateID,
+			&t.YieldID,
 			&t.Type, &t.AmountCents, &t.CurrencyCode, &t.Status,
 			&t.Tags, &t.Description, &t.Date,
 			&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt,
@@ -135,18 +138,15 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 //   - conflictResolved=false: incoming version was accepted.
 //   - conflictResolved=true:  server had a newer version; returned transaction is the server's.
 func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, bool, error) {
-	if err := r.validateTemplateReference(ctx, t); err != nil {
-		return nil, false, err
-	}
-
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO transactions (id, user_id, account_id, category_id, linked_transaction_id, template_id, type, amount_cents, currency_code, status, tags, description, date, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		INSERT INTO transactions (id, user_id, account_id, category_id, linked_transaction_id, template_id, yield_id, type, amount_cents, currency_code, status, tags, description, date, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		ON CONFLICT (id) DO UPDATE SET
 			account_id              = EXCLUDED.account_id,
 			category_id             = EXCLUDED.category_id,
 			linked_transaction_id   = EXCLUDED.linked_transaction_id,
 			template_id             = EXCLUDED.template_id,
+			yield_id                = EXCLUDED.yield_id,
 			type                    = EXCLUDED.type,
 			amount_cents            = EXCLUDED.amount_cents,
 			currency_code           = EXCLUDED.currency_code,
@@ -159,6 +159,7 @@ func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, 
 		RETURNING `+scanColumns,
 		t.ID, t.UserID, t.AccountID, t.CategoryID, t.LinkedTransactionID,
 		t.TemplateID,
+		t.YieldID,
 		t.Type, t.AmountCents, t.CurrencyCode, t.Status,
 		t.Tags, t.Description, t.Date,
 		t.CreatedAt, t.UpdatedAt,
@@ -178,30 +179,6 @@ func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, 
 		return nil, false, err
 	}
 	return current, true, nil
-}
-
-func (r *Repository) validateTemplateReference(ctx context.Context, t *Transaction) error {
-	if t.TemplateID == nil {
-		return nil
-	}
-
-	var deletedAt *time.Time
-	err := r.pool.QueryRow(ctx,
-		`SELECT deleted_at FROM transaction_templates WHERE id = $1 AND user_id = $2`,
-		*t.TemplateID, t.UserID,
-	).Scan(&deletedAt)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return ErrTemplateReferenceNotFound
-		}
-		return err
-	}
-
-	if deletedAt != nil && dateOnlyUTC(t.Date).After(dateOnlyUTC(*deletedAt)) {
-		return ErrTemplateReferenceDateNotAllowed
-	}
-
-	return nil
 }
 
 // SoftDelete sets deleted_at on a transaction, applying LWW by comparing timestamps.

@@ -116,6 +116,10 @@ func toProto(t *Transaction) *pb.Transaction {
 		s := t.TemplateID.String()
 		proto.TemplateId = &s
 	}
+	if t.YieldID != nil {
+		s := t.YieldID.String()
+		proto.YieldId = &s
+	}
 	if t.DeletedAt != nil {
 		proto.DeletedAt = timestamppb.New(*t.DeletedAt)
 	}
@@ -159,6 +163,15 @@ func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
 		templateID = &tid
 	}
 
+	var yieldID *uuid.UUID
+	if p.YieldId != nil && *p.YieldId != "" {
+		yid, err := parseUUID(*p.YieldId, "transaction.yield_id")
+		if err != nil {
+			return nil, err
+		}
+		yieldID = &yid
+	}
+
 	var date time.Time
 	if p.Date != nil {
 		date = p.Date.AsTime().UTC().Truncate(24 * time.Hour)
@@ -171,6 +184,7 @@ func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
 		CategoryID:          categoryID,
 		LinkedTransactionID: linkedID,
 		TemplateID:          templateID,
+		YieldID:             yieldID,
 		Type:                transactionTypeToString(p.Type),
 		AmountCents:         p.AmountCents,
 		CurrencyCode:        p.CurrencyCode,

@@ -85,6 +85,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () => context.push('/categories'),
               ),
               _SettingsItem(
+                icon: Icons.schedule_outlined,
+                label: 'Plantillas',
+                onTap: () => context.push('/templates'),
+              ),
+              _SettingsItem(
                 icon: Icons.currency_exchange_rounded,
                 label: 'Moneda',
                 trailing: Text(

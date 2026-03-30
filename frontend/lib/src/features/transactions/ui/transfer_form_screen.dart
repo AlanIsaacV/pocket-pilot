@@ -706,6 +706,30 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
     }
   }
 
+  Future<void> _onSaveAsTemplate() async {
+    if (_fromAccount == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Selecciona las cuentas antes de guardar como plantilla',
+          ),
+        ),
+      );
+      return;
+    }
+    final parsedAmount = double.tryParse(_amountOutInput) ?? 0;
+    final amountCents = parsedAmount > 0 ? (parsedAmount * 100).round() : null;
+    await context.push<bool>('/templates/new', extra: {
+      'type': 'transfer_out',
+      'accountId': _fromAccount!.id,
+      'toAccountId': _toAccount?.id,
+      'amountCents': amountCents,
+      'currencyCode': _currencyOut,
+      'description': _noteController.text,
+      'tags': _selectedTags.map((t) => t.name).toList(),
+    });
+  }
+
   Future<void> _onDelete() async {
     if (!_isEditMode || _isSaving) return;
 
@@ -778,6 +802,11 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bookmark_add_outlined),
+            tooltip: 'Guardar como plantilla',
+            onPressed: _onSaveAsTemplate,
+          ),
           FormAppBarActions(
             canSave: _canSave,
             isSaving: _isSaving,

@@ -31,6 +31,11 @@ import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_route_scope.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_screen.dart';
 import 'package:pocket_pilot/src/features/categories/ui/category_form_screen.dart';
+import 'package:pocket_pilot/src/features/transaction_templates/domain/transaction_template.dart';
+import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_form_route_scope.dart';
+import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_form_screen.dart';
+import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_route_scope.dart';
+import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_templates_screen.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/category_picker_screen.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_form_route_scope.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_form_screen.dart';
@@ -167,6 +172,55 @@ GoRouter buildRouter() {
                 category: state.extra as CategoryModel?,
               ),
             ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/templates',
+        builder: (context, state) => const TransactionTemplateRouteScope(
+          child: TransactionTemplatesScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/templates/new',
+        builder: (context, state) {
+          final prefill = state.extra as Map<String, dynamic>?;
+          return TransactionTemplateFormRouteScope(
+            child: TransactionTemplateFormScreen(prefill: prefill),
+          );
+        },
+        routes: [
+          GoRoute(
+            path: 'category',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return TransactionTemplateFormRouteScope(
+                child: CategoryPickerScreen(
+                  type: extra?['type'] as String? ?? 'expense',
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/templates/:templateId/edit',
+        builder: (context, state) => TransactionTemplateFormRouteScope(
+          child: TransactionTemplateFormScreen(
+            template: state.extra as TransactionTemplateModel?,
+          ),
+        ),
+        routes: [
+          GoRoute(
+            path: 'category',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return TransactionTemplateFormRouteScope(
+                child: CategoryPickerScreen(
+                  type: extra?['type'] as String? ?? 'expense',
+                ),
+              );
+            },
           ),
         ],
       ),

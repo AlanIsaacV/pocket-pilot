@@ -120,7 +120,7 @@ class TagsSection extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
-                        vertical: 4,
+                        vertical: 6,
                       ),
                       decoration: BoxDecoration(
                         color: Theme.of(
@@ -540,13 +540,12 @@ class _OperationKey extends StatelessWidget {
 Future<T?> showFormBottomSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
-}) =>
-    showModalBottomSheet<T>(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: builder,
-    );
+}) => showModalBottomSheet<T>(
+  context: context,
+  backgroundColor: Theme.of(context).colorScheme.surface,
+  isScrollControlled: true,
+  shape: const RoundedRectangleBorder(
+    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+  ),
+  builder: builder,
+);

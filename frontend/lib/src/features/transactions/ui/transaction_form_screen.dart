@@ -545,6 +545,29 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     }
   }
 
+  Future<void> _onSaveAsTemplate() async {
+    if (_selectedAccount == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Selecciona una cuenta antes de guardar como plantilla',
+          ),
+        ),
+      );
+      return;
+    }
+    final amountCents = _amountCalculator.getAmountMinorForSaveRounded2();
+    await context.push<bool>('/templates/new', extra: {
+      'type': _type,
+      'accountId': _selectedAccount!.id,
+      'categoryId': _selectedCategory?.id,
+      'amountCents': amountCents > 0 ? amountCents : null,
+      'currencyCode': _currencyCode,
+      'description': _noteController.text,
+      'tags': _selectedTags.map((t) => t.name).toList(),
+    });
+  }
+
   Future<void> _onDelete() async {
     if (!_isEditMode || _isSaving) return;
 
@@ -630,6 +653,11 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bookmark_add_outlined),
+            tooltip: 'Guardar como plantilla',
+            onPressed: _onSaveAsTemplate,
+          ),
           FormAppBarActions(
             canSave: _canSave,
             isSaving: _isSaving,

@@ -144,7 +144,7 @@ The transactions screen includes a persistent `DraggableScrollableSheet` at the 
 
 ## Transaction Templates and Scheduled Generation
 
-- Feature module path: `features/transaction_templates/` with the standard `domain/data` split.
+- Feature module path: `features/transaction_templates/` with the standard `domain/data/ui` split.
 - `TransactionTemplateSyncHandler` participates in sync with `syncOrder = 4` (before transactions).
 - `ScheduledTransactionGenerator` runs on client and is deterministic:
   - uses UUIDv5 namespace constant (`core/ids/deterministic_namespace.dart`)
@@ -155,6 +155,45 @@ The transactions screen includes a persistent `DraggableScrollableSheet` at the 
 - App wiring:
   - generator and orchestrator are created in `main.dart`
   - resume lifecycle trigger in `PocketPilotApp` calls orchestrator instead of direct sync
+
+### Transaction Templates UI Layer
+
+UI files live in `features/transaction_templates/ui/`:
+
+- `TransactionTemplateViewModel` — ChangeNotifier with `templates`, `isLoading`, `isSyncing`, `errorMessage`. Local-first with 5-second throttle before remote sync. Exposes `deleteTemplate(id)`.
+- `TransactionTemplateRouteScope` — `ChangeNotifierProvider` for the list screen. Wires `DatabaseHelper → TransactionTemplateLocalStore → TransactionTemplateRepository + SyncService → ViewModel`.
+- `TransactionTemplateFormRouteScope` — `MultiProvider` for the form screen. Provides `AccountLocalStore`, `CategoryLocalStore`, `TagLocalStore`, `TagRepository`, `CurrencyPreferencesLocalStore`, `TransactionTemplateRepository`, `SyncService`.
+- `TransactionTemplatesScreen` — list with type badge, schedule label and optional amount. Tap→edit, swipe end-to-start→delete (with confirmation dialog).
+- `TransactionTemplateFormScreen` — scrollable form (no numpad; amount via system keyboard). Supports create, edit, and prefill (from "save as template" flow). Category selection uses `CategoryPickerScreen` (full-screen, hierarchical drill-down) via sub-route navigation.
+
+#### Routes (outside `ShellRoute`)
+
+| Path | Scope | Screen |
+|------|-------|--------|
+| `/templates` | `TransactionTemplateRouteScope` | `TransactionTemplatesScreen` |
+| `/templates/new` | `TransactionTemplateFormRouteScope` | `TransactionTemplateFormScreen` |
+| `/templates/new/category` | `TransactionTemplateFormRouteScope` | `CategoryPickerScreen` |
+| `/templates/:id/edit` | `TransactionTemplateFormRouteScope` | `TransactionTemplateFormScreen` |
+| `/templates/:id/edit/category` | `TransactionTemplateFormRouteScope` | `CategoryPickerScreen` |
+
+#### Three entry points for template creation
+
+1. **AppBar of `TransactionFormScreen`** — `bookmark_add_outlined` icon calls `_onSaveAsTemplate()`, validates account selected, then pushes `/templates/new` with prefill map `{type, accountId, categoryId, amountCents, currencyCode, description, tags}`.
+2. **AppBar of `TransferFormScreen`** — same icon/method, prefill map includes `{type: 'transfer_out', accountId, toAccountId, amountCents, currencyCode, description, tags}`.
+3. **FAB menu on `TransactionsScreen`** — "Nueva plantilla" option in `_showAddOptions()` bottom sheet navigates to `/templates/new`.
+4. **Settings → Preferencias → Plantillas** — navigates to `/templates` list screen.
+
+#### Template form field rules (mirrors domain validation)
+
+- `name`: required.
+- `type`: income / expense / transfer_out toggle.
+- `account`: required (bottom sheet with "Agregar cuenta" → `/accounts/new`).
+- `toAccount`: required only if `transfer_out`; excludes from-account.
+- `category`: optional for income/expense; hidden for transfer_out. Opens `CategoryPickerScreen`.
+- `amount`: optional for manual templates; required for scheduled (`frequency != null`). Text field (system keyboard).
+- `currency`: bottom sheet with "Configurar monedas" → `/settings/currency`.
+- `frequency`: none / DAILY / WEEKLY / MONTHLY / YEARLY. When set, `nextDate` becomes required.
+- `nextDate`, `endDate`: date pickers; `endDate` optional, clearable.
 
 ### Transaction Tags + Template Linkage
 

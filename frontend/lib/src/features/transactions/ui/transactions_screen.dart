@@ -134,6 +134,14 @@ class TransactionsScreen extends StatelessWidget {
                   context.go('/transactions/transfer');
                 },
               ),
+              SheetItem(
+                icon: Icons.schedule_outlined,
+                label: 'Nueva plantilla',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.push('/templates/new');
+                },
+              ),
             ],
           ),
         ),

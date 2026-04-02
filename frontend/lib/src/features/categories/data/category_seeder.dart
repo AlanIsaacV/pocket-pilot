@@ -5,6 +5,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
+import 'package:pocket_pilot/src/core/ids/deterministic_namespace.dart';
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
@@ -30,7 +31,8 @@ class CategorySeeder {
 
   /// Inserta las categorías por defecto si no se ha hecho antes.
   /// Lee la definición desde assets/categories/defaults.json.
-  /// Los IDs se derivan de forma determinista: UUIDv5(userId, canonicalId),
+  /// Los IDs se derivan de forma determinista:
+  ///   UUIDv5(kDeterministicCategoryDefaultsNamespace, "$userId/$canonicalId")
   /// donde canonicalId es el UUID fijo definido en el JSON.
   /// Para un mismo usuario, los IDs serán siempre los mismos en cualquier dispositivo.
   Future<void> seedIfNeeded() async {
@@ -90,8 +92,8 @@ class CategorySeeder {
 
   /// Aplana recursivamente un nodo del árbol JSON en CategoryModels.
   /// Pre-order traversal: padres siempre preceden a sus hijos.
-  /// El ID se deriva como UUIDv5(userId, canonicalId) donde canonicalId
-  /// es el campo "id" del JSON — estable entre versiones de la app.
+  /// El ID se deriva como UUIDv5(kDeterministicCategoryDefaultsNamespace, "$userId/$canonicalId")
+  /// donde canonicalId es el campo "id" del JSON — estable entre versiones de la app.
   void _flattenNode({
     required Map<String, dynamic> node,
     required String? parentId,
@@ -101,7 +103,7 @@ class CategorySeeder {
     required List<CategoryModel> models,
   }) {
     final canonicalId = node['id'] as String;
-    final id = _uuid.v5(_userId, canonicalId);
+    final id = _uuid.v5(kDeterministicCategoryDefaultsNamespace, '$_userId/$canonicalId');
     final type = node['type'] as String? ?? inheritedType!;
     final rawColor = node['color'] as String? ?? inheritedColor;
     final color = rawColor.replaceAll('#', '');

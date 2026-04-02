@@ -36,6 +36,7 @@ class AccountsViewModel extends ChangeNotifier {
   String? errorMessage;
 
   DateTime? _lastSyncAt;
+  bool _disposed = false;
 
   AccountsViewModel({
     required AccountRepository repository,
@@ -96,7 +97,7 @@ class AccountsViewModel extends ChangeNotifier {
     }
 
     accounts = await _repository.getAccounts();
-    notifyListeners();
+    _safeNotify();
   }
 
   Future<void> updateAccount({
@@ -160,7 +161,7 @@ class AccountsViewModel extends ChangeNotifier {
     }
 
     accounts = await _repository.getAccounts();
-    notifyListeners();
+    _safeNotify();
   }
 
   Future<int?> getInitialBalanceCents(AccountModel account) async {
@@ -175,16 +176,26 @@ class AccountsViewModel extends ChangeNotifier {
   Future<void> deleteAccount(String id) async {
     await _repository.deleteAccount(id);
     accounts = await _repository.getAccounts();
-    notifyListeners();
+    _safeNotify();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 
   // ----------------------------------------------------------
   // Implementación interna
   // ----------------------------------------------------------
 
+  void _safeNotify() {
+    if (!_disposed) notifyListeners();
+  }
+
   Future<void> _loadLocalThenMaybeSync() async {
     accounts = await _repository.getAccounts();
-    notifyListeners();
+    _safeNotify();
     await _maybeSyncRemote();
   }
 
@@ -200,7 +211,7 @@ class AccountsViewModel extends ChangeNotifier {
   Future<void> _runSync() async {
     isLoading = accounts.isEmpty;
     isSyncing = true;
-    notifyListeners();
+    _safeNotify();
 
     try {
       await _syncService.sync();
@@ -212,7 +223,7 @@ class AccountsViewModel extends ChangeNotifier {
     } finally {
       isLoading = false;
       isSyncing = false;
-      notifyListeners();
+      _safeNotify();
     }
   }
 

@@ -83,6 +83,7 @@ class TransactionsScreen extends StatelessWidget {
   }
 
   void _showAddOptions(BuildContext context) {
+    final vm = context.read<TransactionsViewModel>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -123,7 +124,9 @@ class TransactionsScreen extends StatelessWidget {
                 label: 'Nueva transacción',
                 onTap: () {
                   Navigator.of(context).pop();
-                  context.go('/transactions/new');
+                  context.push('/transactions/new').then((_) {
+                    if (context.mounted) vm.loadOnAppear();
+                  });
                 },
               ),
               SheetItem(
@@ -131,7 +134,9 @@ class TransactionsScreen extends StatelessWidget {
                 label: 'Nueva transferencia',
                 onTap: () {
                   Navigator.of(context).pop();
-                  context.go('/transactions/transfer');
+                  context.push('/transactions/transfer').then((_) {
+                    if (context.mounted) vm.loadOnAppear();
+                  });
                 },
               ),
               SheetItem(

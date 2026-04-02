@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
+import 'package:pocket_pilot/src/core/grpc/auth_interceptor.dart';
 import 'package:pocket_pilot/src/core/sync/composite_scheduled_generator_runner.dart';
 import 'package:pocket_pilot/src/core/sync/connectivity_monitor.dart';
 import 'package:pocket_pilot/src/core/sync/sync_metadata_store.dart';
@@ -183,7 +184,23 @@ Future<void> main() async {
     local: CategoryLocalStore(db: dbHelper),
     db: dbHelper,
     outbox: syncOutbox,
+    userId: kMvpUserId,
   );
+
+  // Pre-seed pull: intentar traer categorías del servidor antes de sembrar defaults.
+  // Si tiene éxito, seedIfNeeded() detectará rows existentes y no sembrará.
+  // Fallo silencioso: sin red, error de auth o timeout → seedIfNeeded() siembra localmente.
+  try {
+    final pullResult = await categorySyncHandler
+        .pull(null)
+        .timeout(const Duration(seconds: 5));
+    for (final item in pullResult.items) {
+      try {
+        await categorySyncHandler.saveLocally(item.data);
+      } catch (_) {}
+    }
+  } catch (_) {}
+
   await categorySeeder.seedIfNeeded();
 
   // ConnectivityMonitor: lanza sync automático al recuperar conexión.

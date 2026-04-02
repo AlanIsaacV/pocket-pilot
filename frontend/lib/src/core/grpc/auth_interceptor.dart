@@ -6,6 +6,10 @@ import 'package:grpc/grpc.dart';
 /// Para el MVP, usamos un token hardcodeado que el servidor valida.
 const _kMvpToken = 'Bearer MVP-TOKEN-123';
 
+/// MVP user ID that the backend maps to 'Bearer MVP-TOKEN-123'.
+/// Replace with the real authenticated user ID when auth is implemented.
+const kMvpUserId = '00000000-0000-0000-0000-000000000001';
+
 class AuthInterceptor implements ClientInterceptor {
   const AuthInterceptor();
 

@@ -1,132 +1,143 @@
 [
   {
+    "id": "3a0816fa-e89b-4da0-8d39-2dc97eebcd29",
     "name": "Alimentación",
     "type": "expense",
     "color": "#FF5722",
     "icon": "restaurant",
     "children": [
-      { "name": "Despensa", "icon": "shopping_cart" },
-      { "name": "Restaurante", "icon": "restaurant" }
+      { "id": "2db4fe8b-274f-48b3-b4b2-963f0f19cd7b", "name": "Despensa", "icon": "shopping_cart" },
+      { "id": "2c83588e-7acb-45e1-9e45-3f896dbf62ce", "name": "Restaurante", "icon": "restaurant" }
     ]
   },
   {
+    "id": "83cc267e-fa11-43fa-897d-d07b0c7f03d5",
     "name": "Hogar",
     "type": "expense",
     "color": "#9C27B0",
     "icon": "home",
     "children": [
-      { "name": "Renta / Hipoteca", "icon": "home" },
-      { "name": "Mantenimiento", "icon": "build" },
-      { "name": "Decoracion", "icon": "weekend" },
-      { "name": "Muebles", "icon": "chair" },
-      { "name": "Herramientas", "icon": "handyman" },
-      { "name": "Jardin", "icon": "yard" },
+      { "id": "dfa6900f-6e1f-47c2-b3c2-d729c767d7ce", "name": "Renta / Hipoteca", "icon": "home" },
+      { "id": "18ef60e6-ce3f-43ee-9ca6-cd0f315d63cb", "name": "Mantenimiento", "icon": "build" },
+      { "id": "41aed56a-2aff-4c4d-9919-b88eabf709ad", "name": "Decoracion", "icon": "weekend" },
+      { "id": "8fa65ff0-99f3-439f-a5df-8938921a93cc", "name": "Muebles", "icon": "chair" },
+      { "id": "14e6ad0d-a510-4c04-acb5-1beaea3f652d", "name": "Herramientas", "icon": "handyman" },
+      { "id": "c3c0d186-baf6-4651-b05d-d515825ad0ba", "name": "Jardin", "icon": "yard" },
       {
+        "id": "e6d46868-b66c-425f-a409-4ac672605ada",
         "name": "Servicios",
         "icon": "receipt_long",
         "children": [
-          { "name": "Electricidad", "icon": "electric_bolt" },
-          { "name": "Agua", "icon": "water_drop" },
-          { "name": "Gas", "icon": "local_gas_station" },
-          { "name": "Internet", "icon": "wifi" }
+          { "id": "238efea1-4e5f-4ef0-b282-205a16668d15", "name": "Electricidad", "icon": "electric_bolt" },
+          { "id": "9452f948-d0c0-413d-8d5b-a8d073268711", "name": "Agua", "icon": "water_drop" },
+          { "id": "1a4b8638-2eb1-4e4f-b48d-be637adcc281", "name": "Gas", "icon": "local_gas_station" },
+          { "id": "ebfd9dd8-58ce-4264-8865-0e7f97e6df91", "name": "Internet", "icon": "wifi" }
         ]
       }
     ]
   },
   {
+    "id": "0450de7b-0204-4b36-9710-bf4bc5bfa219",
     "name": "Transporte",
     "type": "expense",
     "color": "#3F51B5",
     "icon": "directions_car",
     "children": [
-      { "name": "Taxi / Uber", "icon": "local_taxi" },
-      { "name": "Transporte público", "icon": "train" },
-      { "name": "Larga distancia", "icon": "flight" },
+      { "id": "685b8104-c944-4f49-a0a5-c231489ef95c", "name": "Taxi / Uber", "icon": "local_taxi" },
+      { "id": "0a35ef77-68d4-4e33-95e1-741708af0695", "name": "Transporte público", "icon": "train" },
+      { "id": "ad053ab7-1cfa-4311-bbdf-8dcdb5a352d0", "name": "Larga distancia", "icon": "flight" },
       {
+        "id": "85edb58d-ab94-4b68-86fc-2ab0890dfcdc",
         "name": "Vehículo",
         "icon": "directions_car",
         "children": [
-          { "name": "Seguro de vehículo", "icon": "receipt_long" },
-          { "name": "Estacionamiento", "icon": "local_parking" },
-          { "name": "Mantenimiento", "icon": "build" },
-          { "name": "Combustible", "icon": "local_gas_station" }
+          { "id": "2c52a836-7a9a-4695-8a16-18217053ebfa", "name": "Seguro de vehículo", "icon": "receipt_long" },
+          { "id": "d699a69c-9b52-40d0-9616-65868c70bf69", "name": "Estacionamiento", "icon": "local_parking" },
+          { "id": "5c34a2eb-adaa-4425-815d-660783682532", "name": "Mantenimiento", "icon": "build" },
+          { "id": "1b493352-e360-4e02-845b-514ecf247c4f", "name": "Combustible", "icon": "local_gas_station" }
         ]
       }
     ]
   },
   {
+    "id": "c85421c3-5746-4e4c-afb3-5f4ba2b513e0",
     "name": "Compras",
     "type": "expense",
     "color": "#2196F3",
     "icon": "shopping_cart",
     "children": [
-      { "name": "Gasolina", "icon": "local_gas_station" },
-      { "name": "Taxi / Uber", "icon": "local_taxi" },
-      { "name": "Transporte público", "icon": "train" }
+      { "id": "0104dd3f-cfe5-4d9d-aaca-c0e46fd6c8aa", "name": "Gasolina", "icon": "local_gas_station" },
+      { "id": "f58e2906-f2f4-47b5-a61e-5caca535c1cc", "name": "Taxi / Uber", "icon": "local_taxi" },
+      { "id": "4c9f50f9-a7d1-4b31-9214-3c7e7999297a", "name": "Transporte público", "icon": "train" }
     ]
   },
   {
+    "id": "611e4c04-5594-4eef-9ed1-25d6c387ec66",
     "name": "Salud",
     "type": "expense",
     "color": "#F44336",
     "icon": "local_hospital",
     "children": [
-      { "name": "Médico", "icon": "local_hospital" },
-      { "name": "Farmacia", "icon": "local_pharmacy" },
-      { "name": "Gimnasio", "icon": "fitness_center" },
-      { "name": "Seguros", "icon": "receipt_long" },
-      { "name": "Belleza", "icon": "spa" }
+      { "id": "9cf62090-0d53-4526-9d69-a5e0c1a0db21", "name": "Médico", "icon": "local_hospital" },
+      { "id": "92b34fad-8167-46a0-a339-3dd686119c39", "name": "Farmacia", "icon": "local_pharmacy" },
+      { "id": "f0b6cf87-03f2-40d8-bfe3-8968bcef8ee1", "name": "Gimnasio", "icon": "fitness_center" },
+      { "id": "df137ee2-d409-4f65-b354-8373f915f474", "name": "Seguros", "icon": "receipt_long" },
+      { "id": "eeb6b760-0c36-4b02-90ae-9bdb5479356c", "name": "Belleza", "icon": "spa" }
     ]
   },
   {
+    "id": "e3dee2c7-d799-4751-8987-5ef76286e20b",
     "name": "Entretenimiento",
     "type": "expense",
     "color": "#FF9800",
     "icon": "movie",
     "children": [
-      { "name": "Streaming", "icon": "movie" },
-      { "name": "Cine / Teatro", "icon": "theaters" },
-      { "name": "Eventos", "icon": "event" }
+      { "id": "095bb5fc-3817-41dc-ad3f-a8c3a50213d8", "name": "Streaming", "icon": "movie" },
+      { "id": "4f4d5340-ba41-43f8-b887-57053b59bd08", "name": "Cine / Teatro", "icon": "theaters" },
+      { "id": "d88751f1-e20f-4646-9f51-f6aebdcc6b61", "name": "Eventos", "icon": "event" }
     ]
   },
   {
+    "id": "c1d67d62-3f39-4269-8649-d5cf16338f2f",
     "name": "Tecnología",
     "type": "expense",
     "color": "#9E9E9E",
     "icon": "laptop",
     "children": [
-      { "name": "Software / Apps", "icon": "phone_android" },
-      { "name": "Phone", "icon": "phone_android" },
-      { "name": "Electrónicos", "icon": "laptop" }
+      { "id": "2ea7030a-df36-4ed1-93b3-f4ee0578b81b", "name": "Software / Apps", "icon": "phone_android" },
+      { "id": "e9a78087-a9b5-40f7-9ed0-4cff72fe1279", "name": "Phone", "icon": "phone_android" },
+      { "id": "96ff8cef-54bd-4702-aec0-2a7823f69177", "name": "Electrónicos", "icon": "laptop" }
     ]
   },
   {
+    "id": "07f9f2c7-49f3-4f15-9af6-183e313fd918",
     "name": "Ropa y accesorios",
     "type": "expense",
     "color": "#00BCD4",
     "icon": "checkroom",
     "children": [
-      { "name": "Ropa", "icon": "checkroom" },
-      { "name": "Zapatos", "icon": "checkroom" },
-      { "name": "Accesorios", "icon": "inventory" }
+      { "id": "5eeae0a7-0fe4-4372-8949-03722353caf4", "name": "Ropa", "icon": "checkroom" },
+      { "id": "86702876-11f2-4c36-b1c3-7a3a89f84595", "name": "Zapatos", "icon": "checkroom" },
+      { "id": "2bdb8a84-a28b-4d3f-8827-9693c089e42a", "name": "Accesorios", "icon": "inventory" }
     ]
   },
   {
+    "id": "4168cbc9-c689-42a6-aba3-9ebf73bbd8c7",
     "name": "Educación",
     "type": "expense",
     "color": "#3F51B5",
     "icon": "school",
     "children": [
-      { "name": "Libros", "icon": "menu_book" },
-      { "name": "Cursos", "icon": "school" },
-      { "name": "Material escolar", "icon": "book" },
-      { "name": "Colegiatura", "icon": "school" },
-      { "name": "Eventos", "icon": "event" }
+      { "id": "50f39f4f-8a94-4f1a-b027-2229845d5cd2", "name": "Libros", "icon": "menu_book" },
+      { "id": "ada8aad1-79c7-4199-9969-24f72197a8c8", "name": "Cursos", "icon": "school" },
+      { "id": "09bfc111-5a02-4969-94cd-2f73dba95b6a", "name": "Material escolar", "icon": "book" },
+      { "id": "607658c5-4e34-45a7-a945-223d9c6d4cf2", "name": "Colegiatura", "icon": "school" },
+      { "id": "846f270f-620c-4526-a8aa-45d0bc62876b", "name": "Eventos", "icon": "event" }
     ]
   },
-  { "name": "Viajes", "type": "expense", "color": "#009688", "icon": "flight" },
-  { "name": "Ventas", "type": "income", "color": "#4CAF50", "icon": "storefront" },
-  { "name": "Regalos", "type": "income", "color": "#81C784", "icon": "card_giftcard" },
-  { "name": "Salario", "type": "income", "color": "#4CAF50", "icon": "work" },
-  { "name": "Inversiones", "type": "income", "color": "#81C784", "icon": "savings" }
+  { "id": "4605c7da-a316-4f15-b084-5235971d19a2", "name": "Viajes", "type": "expense", "color": "#009688", "icon": "flight" },
+  { "id": "25d4f449-a018-4701-8200-4a71e431cd72", "name": "Ventas", "type": "income", "color": "#4CAF50", "icon": "storefront" },
+  { "id": "be93d0db-28cb-41da-ae1b-a25e9dd66bc4", "name": "Regalos", "type": "income", "color": "#81C784", "icon": "card_giftcard" },
+  { "id": "c18cad1b-ee0c-4945-a3db-9b4afb92b046", "name": "Salario", "type": "income", "color": "#4CAF50", "icon": "work" },
+  { "id": "f77ca198-66d7-4669-921a-986665f3b41e", "name": "Inversiones", "type": "income", "color": "#81C784", "icon": "savings" }
 ]

@@ -43,6 +43,34 @@ CREATE TABLE tags (
 );
 CREATE INDEX idx_tags_user_id ON tags (user_id) WHERE deleted_at IS NULL;
 
+CREATE TABLE yield_configs (
+    id               uuid PRIMARY KEY       DEFAULT gen_random_uuid(),
+    user_id          uuid          NOT NULL,
+    account_id       uuid          NOT NULL REFERENCES accounts (id),
+    name             TEXT          NOT NULL,
+    amount_cents     BIGINT        NOT NULL,
+    apy_rate         NUMERIC(7, 4) NOT NULL,
+    payout_frequency TEXT          NOT NULL,
+    next_date        DATE          NOT NULL,
+    maturity_date    DATE,
+    term_days        INTEGER,
+    auto_renew       BOOLEAN       NOT NULL DEFAULT FALSE,
+    status           TEXT          NOT NULL,
+    created_at       timestamptz   NOT NULL DEFAULT NOW(),
+    updated_at       timestamptz   NOT NULL DEFAULT NOW(),
+    deleted_at       timestamptz
+);
+
+CREATE INDEX idx_yield_configs_user_updated_at
+    ON yield_configs (user_id, updated_at);
+
+CREATE INDEX idx_yield_configs_user_next_date_active
+    ON yield_configs (user_id, next_date)
+    WHERE deleted_at IS NULL
+        AND status = 'active';
+
+
+CREATE TYPE transaction_type AS ENUM ('income', 'expense', 'transfer_out', 'transfer_in');
 
 CREATE TABLE transaction_templates (
     id            uuid PRIMARY KEY          DEFAULT gen_random_uuid(),
@@ -74,35 +102,6 @@ CREATE INDEX idx_transaction_templates_user_updated_at
     ON transaction_templates (user_id, updated_at);
 
 
-CREATE TABLE yield_configs (
-    id               uuid PRIMARY KEY       DEFAULT gen_random_uuid(),
-    user_id          uuid          NOT NULL,
-    account_id       uuid          NOT NULL REFERENCES accounts (id),
-    name             TEXT          NOT NULL,
-    amount_cents     BIGINT        NOT NULL,
-    apy_rate         NUMERIC(7, 4) NOT NULL,
-    payout_frequency TEXT          NOT NULL,
-    next_date        DATE          NOT NULL,
-    maturity_date    DATE,
-    term_days        INTEGER,
-    auto_renew       BOOLEAN       NOT NULL DEFAULT FALSE,
-    status           TEXT          NOT NULL,
-    created_at       timestamptz   NOT NULL DEFAULT NOW(),
-    updated_at       timestamptz   NOT NULL DEFAULT NOW(),
-    deleted_at       timestamptz
-);
-
-CREATE INDEX idx_yield_configs_user_updated_at
-    ON yield_configs (user_id, updated_at);
-
-CREATE INDEX idx_yield_configs_user_next_date_active
-    ON yield_configs (user_id, next_date)
-    WHERE deleted_at IS NULL
-        AND status = 'active';
-
-
-
-CREATE TYPE transaction_type AS ENUM ('income', 'expense', 'transfer_out', 'transfer_in');
 CREATE TABLE transactions (
     id                    uuid PRIMARY KEY          DEFAULT gen_random_uuid(),
     user_id               uuid             NOT NULL,

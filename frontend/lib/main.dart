@@ -34,6 +34,9 @@ import 'package:pocket_pilot/src/features/categories/data/category_local_store.d
 import 'package:pocket_pilot/src/features/categories/data/category_remote_service.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_seeder.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_sync_handler.dart';
+import 'package:pocket_pilot/src/features/goals/data/goal_local_store.dart';
+import 'package:pocket_pilot/src/features/goals/data/goal_remote_service.dart';
+import 'package:pocket_pilot/src/features/goals/data/goal_sync_handler.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_remote_service.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_sync_handler.dart';
@@ -117,6 +120,11 @@ Future<void> main() async {
     remote: UserPreferenceRemoteService(),
   );
 
+  final goalSyncHandler = GoalSyncHandler(
+    local: GoalLocalStore(db: dbHelper),
+    remote: GoalRemoteService(),
+  );
+
   final syncService = SyncService(
     outbox: syncOutbox,
     metadataStore: syncMetadataStore,
@@ -128,6 +136,7 @@ Future<void> main() async {
       yieldConfigSyncHandler,
       transactionSyncHandler,
       userPreferenceSyncHandler,
+      goalSyncHandler,
     ],
   );
 

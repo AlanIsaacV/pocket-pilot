@@ -17,6 +17,7 @@ import (
 	"github.com/AlanIsaacV/pocket-pilot/internal/config"
 	"github.com/AlanIsaacV/pocket-pilot/internal/database"
 	pb "github.com/AlanIsaacV/pocket-pilot/internal/gen/proto/pocket_pilot/v1/pocket_pilot/v1"
+	"github.com/AlanIsaacV/pocket-pilot/internal/goal"
 	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
 	"github.com/AlanIsaacV/pocket-pilot/internal/tag"
 	"github.com/AlanIsaacV/pocket-pilot/internal/transaction"
@@ -46,6 +47,7 @@ func main() {
 	transactionHandler := transaction.NewHandler(transaction.NewRepository(pool))
 	transactionTemplateHandler := transactiontemplate.NewHandler(transactiontemplate.NewRepository(pool))
 	yieldConfigHandler := yieldconfig.NewHandler(yieldconfig.NewRepository(pool))
+	goalHandler := goal.NewHandler(goal.NewRepository(pool))
 	tagHandler := tag.NewHandler(tag.NewRepository(pool))
 	userPreferenceHandler := userpreference.NewHandler(userpreference.NewRepository(pool))
 
@@ -59,6 +61,7 @@ func main() {
 	pb.RegisterTransactionServiceServer(srv, transactionHandler)
 	pb.RegisterTransactionTemplateServiceServer(srv, transactionTemplateHandler)
 	pb.RegisterYieldConfigServiceServer(srv, yieldConfigHandler)
+	pb.RegisterGoalServiceServer(srv, goalHandler)
 	pb.RegisterTagServiceServer(srv, tagHandler)
 	pb.RegisterUserPreferenceServiceServer(srv, userPreferenceHandler)
 

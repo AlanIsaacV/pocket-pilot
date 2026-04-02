@@ -1,5 +1,5 @@
 // ============================================================
-// AccountsScreen — Lista de cuentas bancarias / carteras
+// AccountsScreen — Cuentas y Metas con tabs superiores
 // ============================================================
 
 import 'package:flutter/material.dart';
@@ -10,101 +10,221 @@ import 'package:provider/provider.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
+import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
+import 'package:pocket_pilot/src/features/goals/ui/goals_list_tab.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
-class AccountsScreen extends StatelessWidget {
+class AccountsScreen extends StatefulWidget {
   const AccountsScreen({super.key});
+
+  @override
+  State<AccountsScreen> createState() => _AccountsScreenState();
+}
+
+class _AccountsScreenState extends State<AccountsScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Cuentas')),
-      body: Consumer<AccountsViewModel>(
-        builder: (context, vm, _) {
-          return Column(
-            children: [
-              if (vm.isSyncing && !vm.isLoading)
-                LinearProgressIndicator(
-                  color: Theme.of(context).colorScheme.primary,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHigh,
-                  minHeight: 2,
-                ),
-              Expanded(
-                child: PpScreenState(
-                  isLoading: vm.isLoading,
-                  errorMessage: vm.accounts.isEmpty ? vm.errorMessage : null,
-                  isEmpty: vm.accounts.isEmpty,
-                  emptyIcon: Icons.account_balance_wallet_outlined,
-                  emptyLabel: 'No tienes cuentas aún',
-                  emptySubLabel: 'Presiona + para agregar una',
-                  onRefresh: vm.refresh,
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                    itemCount: vm.accounts.length,
-                    itemBuilder: (context, index) {
-                      final account = vm.accounts[index];
-                      return Dismissible(
-                        key: ValueKey(account.id),
-                        direction: DismissDirection.endToStart,
-                        background: _DeleteBackground(),
-                        confirmDismiss: (_) =>
-                            _confirmDelete(context, account.name),
-                        onDismissed: (_) async {
-                          try {
-                            await vm.deleteAccount(account.id);
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Cuenta "${account.name}" eliminada',
-                                ),
-                              ),
-                            );
-                          } catch (e) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'No se pudo eliminar la cuenta: $e',
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                        child: _AccountCard(
-                          account: account,
-                          onTap: () => _onAccountTap(context, account),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+      appBar: AppBar(
+        title: const Text('Cuentas'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Cuentas'),
+            Tab(text: 'Metas'),
+          ],
+          labelStyle: GoogleFonts.ibmPlexSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: GoogleFonts.ibmPlexSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+          ),
+          indicatorSize: TabBarIndicatorSize.label,
+          dividerColor: Colors.transparent,
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _AccountsListTab(),
+          const GoalsListTab(),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _onAddTap(context),
-        tooltip: 'Agregar cuenta',
+        onPressed: () => _showAddOptions(context),
+        tooltip: 'Agregar',
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  void _onAddTap(BuildContext context) {
-    context.push('/accounts/new').then((result) {
-      if (result == true && context.mounted) {
-        context.read<AccountsViewModel>().loadOnAppear();
-      }
-    });
+  void _showAddOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    borderRadius: AppTheme.radiusFull,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Nuevo registro',
+                style: GoogleFonts.ibmPlexSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SheetItem(
+                icon: Icons.account_balance_wallet_outlined,
+                label: 'Nueva cuenta',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.push('/accounts/new').then((result) {
+                    if (result == true && context.mounted) {
+                      context.read<AccountsViewModel>().loadOnAppear();
+                    }
+                  });
+                },
+              ),
+              SheetItem(
+                icon: Icons.flag_outlined,
+                label: 'Nueva meta',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.push('/accounts/goals/new').then((result) {
+                    if (result == true && context.mounted) {
+                      context.read<GoalViewModel>().loadOnAppear();
+                    }
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Tab de listado de cuentas (contenido original)
+// ============================================================
+
+class _AccountsListTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AccountsViewModel>(
+      builder: (context, vm, _) {
+        return Column(
+          children: [
+            if (vm.isSyncing && !vm.isLoading)
+              LinearProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHigh,
+                minHeight: 2,
+              ),
+            Expanded(
+              child: PpScreenState(
+                isLoading: vm.isLoading,
+                errorMessage: vm.accounts.isEmpty ? vm.errorMessage : null,
+                isEmpty: vm.accounts.isEmpty,
+                emptyIcon: Icons.account_balance_wallet_outlined,
+                emptyLabel: 'No tienes cuentas aun',
+                emptySubLabel: 'Presiona + para agregar una',
+                onRefresh: vm.refresh,
+                child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                  itemCount: vm.accounts.length,
+                  itemBuilder: (context, index) {
+                    final account = vm.accounts[index];
+                    return Dismissible(
+                      key: ValueKey(account.id),
+                      direction: DismissDirection.endToStart,
+                      background: _DeleteBackground(),
+                      confirmDismiss: (_) =>
+                          _confirmDelete(context, account.name),
+                      onDismissed: (_) async {
+                        try {
+                          await vm.deleteAccount(account.id);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Cuenta "${account.name}" eliminada',
+                              ),
+                            ),
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'No se pudo eliminar la cuenta: $e',
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      child: _AccountCard(
+                        account: account,
+                        onTap: () => _onAccountTap(context, account),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _onAccountTap(BuildContext context, AccountModel account) {
-    context.push('/accounts/${account.id}/edit', extra: account).then((result) {
+    context
+        .push('/accounts/${account.id}/edit', extra: account)
+        .then((result) {
       if (result == true && context.mounted) {
         context.read<AccountsViewModel>().loadOnAppear();
       }
@@ -116,7 +236,7 @@ class AccountsScreen extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Eliminar cuenta'),
-        content: Text('Se eliminará la cuenta "$accountName".'),
+        content: Text('Se eliminara la cuenta "$accountName".'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -231,13 +351,13 @@ class _AccountCard extends StatelessWidget {
       case 'bank':
         return 'Banco';
       case 'credit_card':
-        return 'Tarjeta de crédito';
+        return 'Tarjeta de credito';
       case 'cash':
         return 'Efectivo';
       case 'investment':
-        return 'Inversión';
+        return 'Inversion';
       case 'loan':
-        return 'Préstamo';
+        return 'Prestamo';
       case 'crypto':
         return 'Criptomonedas';
       default:

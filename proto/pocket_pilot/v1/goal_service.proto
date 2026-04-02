@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "pocket_pilot/v1/common.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+message Goal {
+  string id = 1;
+  string name = 2;
+
+  int64 target_amount_cents = 3;
+  int64 saved_amount_cents = 4;
+
+  string target_date = 5; // YYYY-MM-DD
+
+  reserved 6;
+  reserved "category_id";
+
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  google.protobuf.Timestamp deleted_at = 9;
+}
+
+service GoalService {
+  rpc ListGoals(ListGoalsRequest) returns (ListGoalsResponse);
+  rpc UpsertGoal(UpsertGoalRequest) returns (UpsertGoalResponse);
+  rpc DeleteGoal(DeleteGoalRequest) returns (google.protobuf.Empty);
+}
+
+message ListGoalsRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListGoalsResponse {
+  repeated Goal goals = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertGoalRequest {
+  Goal goal = 1;
+}
+
+message UpsertGoalResponse {
+  Goal goal = 1;
+  bool conflict_resolved = 2;
+}
+
+message DeleteGoalRequest {
+  string id = 1;
+  google.protobuf.Timestamp deleted_at = 2;
+}

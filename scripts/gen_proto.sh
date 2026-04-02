@@ -38,6 +38,7 @@ protoc \
     pocket_pilot/v1/yield_config_service.proto \
     pocket_pilot/v1/transaction_service.proto \
     pocket_pilot/v1/tags_service.proto \
+    pocket_pilot/v1/goal_service.proto \
     pocket_pilot/v1/user_preferences_service.proto
 
 echo "→ Generating Dart code..."
@@ -56,6 +57,7 @@ protoc \
     pocket_pilot/v1/yield_config_service.proto \
     pocket_pilot/v1/transaction_service.proto \
     pocket_pilot/v1/tags_service.proto \
+    pocket_pilot/v1/goal_service.proto \
     pocket_pilot/v1/user_preferences_service.proto
 
 echo "✓ Done. Generated files:"

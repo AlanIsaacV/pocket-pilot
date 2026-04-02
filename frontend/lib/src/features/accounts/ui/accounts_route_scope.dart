@@ -27,6 +27,9 @@ import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_repository.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
+import 'package:pocket_pilot/src/features/goals/data/goal_local_store.dart';
+import 'package:pocket_pilot/src/features/goals/data/goal_repository.dart';
+import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
 
@@ -37,25 +40,50 @@ class AccountsRouteScope extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (ctx) {
-        final db = ctx.read<DatabaseHelper>();
-        final outbox = ctx.read<SyncOutbox>();
-        final syncService = ctx.read<SyncService>();
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (ctx) {
+            final db = ctx.read<DatabaseHelper>();
+            final outbox = ctx.read<SyncOutbox>();
+            final syncService = ctx.read<SyncService>();
 
-        final localStore = AccountLocalStore(db: db);
-        final repository = AccountRepository(local: localStore, outbox: outbox);
-        final transactionRepository = TransactionRepository(
-          local: TransactionLocalStore(db: db),
-          outbox: outbox,
-        );
+            final localStore = AccountLocalStore(db: db);
+            final repository = AccountRepository(
+              local: localStore,
+              outbox: outbox,
+            );
+            final transactionRepository = TransactionRepository(
+              local: TransactionLocalStore(db: db),
+              outbox: outbox,
+            );
 
-        return AccountsViewModel(
-          repository: repository,
-          transactionRepository: transactionRepository,
-          syncService: syncService,
-        )..loadOnAppear();
-      },
+            return AccountsViewModel(
+              repository: repository,
+              transactionRepository: transactionRepository,
+              syncService: syncService,
+            )..loadOnAppear();
+          },
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) {
+            final db = ctx.read<DatabaseHelper>();
+            final outbox = ctx.read<SyncOutbox>();
+            final syncService = ctx.read<SyncService>();
+
+            final localStore = GoalLocalStore(db: db);
+            final repository = GoalRepository(
+              local: localStore,
+              outbox: outbox,
+            );
+
+            return GoalViewModel(
+              repository: repository,
+              syncService: syncService,
+            )..loadOnAppear();
+          },
+        ),
+      ],
       child: child,
     );
   }

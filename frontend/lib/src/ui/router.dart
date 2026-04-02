@@ -27,6 +27,8 @@ import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/account_form_screen.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_route_scope.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_screen.dart';
+import 'package:pocket_pilot/src/features/goals/domain/goal.dart';
+import 'package:pocket_pilot/src/features/goals/ui/goal_form_screen.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_route_scope.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_screen.dart';
@@ -143,6 +145,19 @@ GoRouter buildRouter() {
                 builder: (context, state) => AccountsRouteScope(
                   child: AccountFormScreen(
                     account: state.extra as AccountModel?,
+                  ),
+                ),
+              ),
+              GoRoute(
+                path: 'goals/new',
+                builder: (context, state) =>
+                    const AccountsRouteScope(child: GoalFormScreen()),
+              ),
+              GoRoute(
+                path: 'goals/:goalId/edit',
+                builder: (context, state) => AccountsRouteScope(
+                  child: GoalFormScreen(
+                    goal: state.extra as GoalModel?,
                   ),
                 ),
               ),

@@ -17,7 +17,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-const scanColumns = `id, user_id, name, target_amount_cents, saved_amount_cents, target_date, created_at, updated_at, deleted_at`
+const scanColumns = `id, user_id, name, target_amount_cents, target_date, currency_code, created_at, updated_at, deleted_at`
 
 func (r *Repository) scan(row pgx.Row) (*Goal, error) {
 	g := &Goal{}
@@ -26,8 +26,8 @@ func (r *Repository) scan(row pgx.Row) (*Goal, error) {
 		&g.UserID,
 		&g.Name,
 		&g.TargetAmountCents,
-		&g.SavedAmountCents,
 		&g.TargetDate,
+		&g.CurrencyCode,
 		&g.CreatedAt,
 		&g.UpdatedAt,
 		&g.DeletedAt,
@@ -105,8 +105,8 @@ func (r *Repository) Upsert(ctx context.Context, g *Goal) (*Goal, bool, error) {
 			user_id,
 			name,
 			target_amount_cents,
-			saved_amount_cents,
 			target_date,
+			currency_code,
 			created_at,
 			updated_at,
 			deleted_at
@@ -115,8 +115,8 @@ func (r *Repository) Upsert(ctx context.Context, g *Goal) (*Goal, bool, error) {
 		ON CONFLICT (id) DO UPDATE SET
 			name                = EXCLUDED.name,
 			target_amount_cents = EXCLUDED.target_amount_cents,
-			saved_amount_cents  = EXCLUDED.saved_amount_cents,
 			target_date         = EXCLUDED.target_date,
+			currency_code       = EXCLUDED.currency_code,
 			updated_at          = EXCLUDED.updated_at,
 			deleted_at          = EXCLUDED.deleted_at
 		WHERE goals.updated_at < EXCLUDED.updated_at
@@ -125,8 +125,8 @@ func (r *Repository) Upsert(ctx context.Context, g *Goal) (*Goal, bool, error) {
 		g.UserID,
 		g.Name,
 		g.TargetAmountCents,
-		g.SavedAmountCents,
 		g.TargetDate,
+		g.CurrencyCode,
 		g.CreatedAt,
 		g.UpdatedAt,
 		g.DeletedAt,

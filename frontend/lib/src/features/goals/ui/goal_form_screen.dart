@@ -2,8 +2,6 @@
 // GoalFormScreen — Formulario de meta financiera (crear/editar)
 // ============================================================
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -11,9 +9,15 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:pocket_pilot/src/core/db/database_helper.dart';
+import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/goals/domain/goal.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_date_utils.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
+import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
+import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
 class GoalFormScreen extends StatefulWidget {
@@ -31,9 +35,12 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _targetAmountController = TextEditingController();
-  final _savedAmountController = TextEditingController();
 
   DateTime? _targetDate;
+  String _selectedCurrencyCode = kInitialDefaultCurrency;
+  List<String> _allowedCurrencies = List<String>.from(
+    kInitialAllowedCurrencies,
+  );
   bool _isSaving = false;
 
   bool get _isEditMode => widget.goal != null;
@@ -46,17 +53,16 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
       _nameController.text = goal.name;
       final target = goal.targetAmountCents / 100;
       _targetAmountController.text = _formatInitial(target);
-      final saved = goal.savedAmountCents / 100;
-      _savedAmountController.text = _formatInitial(saved);
       _targetDate = DateTime.tryParse(goal.targetDate);
+      _selectedCurrencyCode = goal.currencyCode;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCurrencyOptions());
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _targetAmountController.dispose();
-    _savedAmountController.dispose();
     super.dispose();
   }
 
@@ -87,18 +93,68 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
     return null;
   }
 
-  String? _validateSavedAmount(String? value) {
-    final error = _requiredText(value, fieldName: 'El monto ahorrado');
-    if (error != null) return error;
-    final savedCents = _parseMoneyToCents(value!.trim());
-    if (savedCents < 0) return 'El monto ahorrado no puede ser negativo';
-    final targetCents = _parseMoneyToCents(
-      _targetAmountController.text.trim(),
+  Future<void> _loadCurrencyOptions() async {
+    final db = context.read<DatabaseHelper>();
+    final userPreferenceStore = UserPreferenceLocalStore(db: db);
+    final currencyPreferenceStore = CurrencyPreferencesLocalStore(
+      preferences: userPreferenceStore,
     );
-    if (targetCents > 0 && savedCents > targetCents) {
-      return 'El monto ahorrado no puede superar el objetivo';
+    final snapshot = await currencyPreferenceStore.getSnapshot();
+    if (!mounted) return;
+
+    final allowed = List<String>.from(snapshot.allowedCodes);
+    if (!allowed.contains(_selectedCurrencyCode)) {
+      allowed.add(_selectedCurrencyCode);
     }
-    return null;
+    allowed.sort(compareCurrencyCodes);
+
+    setState(() {
+      _allowedCurrencies = allowed;
+      if (!_isEditMode) {
+        _selectedCurrencyCode = snapshot.defaultCode;
+      }
+    });
+  }
+
+  void _showCurrencySheet() {
+    showModalBottomSheet<Object>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _ScrollableBottomSheet(
+        title: 'Seleccionar moneda',
+        children: [
+          _SheetItem(
+            label: 'Configurar monedas',
+            icon: Icons.tune_rounded,
+            onTap: () => Navigator.pop(ctx, '__preferences__'),
+          ),
+          ..._allowedCurrencies.map(
+            (code) => _SheetItem(
+              label: '$code - ${currencyNameForCode(code)}',
+              onTap: () => Navigator.pop(ctx, code),
+            ),
+          ),
+        ],
+      ),
+    ).then((selection) async {
+      if (selection == null) return;
+
+      if (selection is String && selection == '__preferences__') {
+        if (!mounted) return;
+        await context.push<bool>('/settings/currency');
+        if (!mounted) return;
+        await _loadCurrencyOptions();
+        return;
+      }
+
+      if (selection is String) {
+        setState(() => _selectedCurrencyCode = selection);
+      }
+    });
   }
 
   Future<void> _pickTargetDate() async {
@@ -132,9 +188,7 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
         targetAmountCents: _parseMoneyToCents(
           _targetAmountController.text.trim(),
         ),
-        savedAmountCents: _parseMoneyToCents(
-          _savedAmountController.text.trim(),
-        ),
+        currencyCode: _selectedCurrencyCode,
         targetDate: formatDateISO(_targetDate!),
         createdAt: _isEditMode ? widget.goal!.createdAt : now,
         updatedAt: now,
@@ -250,37 +304,47 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
                     RegExp(r'^\d*\.?\d{0,2}'),
                   ),
                 ],
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: '0.00',
-                  prefixText: '\$ ',
+                  prefixText: '$_selectedCurrencyCode ',
                 ),
                 validator: _validateTargetAmount,
               ),
               const SizedBox(height: 24),
-              _SectionLabel('Monto ahorrado'),
+              _SectionLabel('Moneda'),
               const SizedBox(height: 8),
-              TextFormField(
-                controller: _savedAmountController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                    RegExp(r'^\d*\.?\d{0,2}'),
+              InkWell(
+                onTap: _showCurrencySheet,
+                borderRadius: AppTheme.radiusSmall,
+                child: InputDecorator(
+                  decoration: const InputDecoration(),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '$_selectedCurrencyCode - ${currencyNameForCode(_selectedCurrencyCode)}',
+                          style: GoogleFonts.ibmPlexSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.unfold_more_rounded,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ],
                   ),
-                ],
-                decoration: const InputDecoration(
-                  hintText: '0.00',
-                  prefixText: '\$ ',
                 ),
-                validator: _validateSavedAmount,
               ),
               const SizedBox(height: 24),
               _SectionLabel('Fecha objetivo'),
               const SizedBox(height: 8),
               InkWell(
                 onTap: _pickTargetDate,
-                borderRadius: const BorderRadius.all(Radius.circular(8)),
+                borderRadius: AppTheme.radiusSmall,
                 child: InputDecorator(
                   decoration: const InputDecoration(),
                   child: Row(
@@ -333,6 +397,101 @@ class _SectionLabel extends StatelessWidget {
         fontWeight: FontWeight.w600,
         color: Theme.of(context).colorScheme.onSurfaceVariant,
         letterSpacing: 0.3,
+      ),
+    );
+  }
+}
+
+class _ScrollableBottomSheet extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+
+  const _ScrollableBottomSheet({required this.title, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.5,
+      minChildSize: 0.3,
+      maxChildSize: 0.85,
+      expand: false,
+      builder: (context, scrollController) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    borderRadius: AppTheme.radiusFull,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: GoogleFonts.ibmPlexSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  children: children,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SheetItem extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final VoidCallback onTap;
+
+  const _SheetItem({required this.label, this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: AppTheme.radiusMedium,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        child: Row(
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 20,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 12),
+            ],
+            Text(
+              label,
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

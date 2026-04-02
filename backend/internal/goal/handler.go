@@ -3,6 +3,7 @@ package goal
 import (
 	"context"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -72,7 +73,7 @@ func toProto(g *Goal) *pb.Goal {
 		Id:                g.ID.String(),
 		Name:              g.Name,
 		TargetAmountCents: g.TargetAmountCents,
-		SavedAmountCents:  g.SavedAmountCents,
+		CurrencyCode:      g.CurrencyCode,
 		TargetDate:        dateOnly(g.TargetDate).Format("2006-01-02"),
 		CreatedAt:         timestamppb.New(g.CreatedAt),
 		UpdatedAt:         timestamppb.New(g.UpdatedAt),
@@ -92,6 +93,11 @@ func fromProto(p *pb.Goal, userID uuid.UUID) (*Goal, error) {
 	targetDate, err := parseDateOnly(p.TargetDate)
 	if err != nil {
 		return nil, err
+	}
+
+	currencyCode := strings.ToUpper(strings.TrimSpace(p.CurrencyCode))
+	if currencyCode == "" {
+		return nil, status.Error(codes.InvalidArgument, "goal.currency_code is required")
 	}
 
 	createdAt := time.Now().UTC()
@@ -115,8 +121,8 @@ func fromProto(p *pb.Goal, userID uuid.UUID) (*Goal, error) {
 		UserID:            userID,
 		Name:              normalizeName(p.Name),
 		TargetAmountCents: p.TargetAmountCents,
-		SavedAmountCents:  p.SavedAmountCents,
 		TargetDate:        targetDate,
+		CurrencyCode:      currencyCode,
 		CreatedAt:         createdAt,
 		UpdatedAt:         updatedAt,
 		DeletedAt:         deletedAt,

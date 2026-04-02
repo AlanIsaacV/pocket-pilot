@@ -35,7 +35,7 @@ class GoalRemoteService {
         id: map['id'] as String,
         name: map['name'] as String,
         targetAmountCents: Int64(_asInt(map['target_amount_cents'])),
-        savedAmountCents: Int64(_asInt(map['saved_amount_cents'])),
+        currencyCode: map['currency_code'] as String,
         targetDate: _dateOnly(map['target_date'] as String),
         createdAt: Timestamp.fromDateTime(
           map['created_at'] != null

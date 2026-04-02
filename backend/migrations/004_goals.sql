@@ -4,9 +4,8 @@ CREATE TABLE goals (
     name                text         NOT NULL,
 
     target_amount_cents bigint       NOT NULL,
-    saved_amount_cents  bigint       NOT NULL DEFAULT 0,
-
     target_date         date         NOT NULL,
+    currency_code       text         NOT NULL,
 
     created_at          timestamptz  NOT NULL DEFAULT now(),
     updated_at          timestamptz  NOT NULL DEFAULT now(),

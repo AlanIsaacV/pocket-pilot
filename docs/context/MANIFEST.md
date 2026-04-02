@@ -14,6 +14,7 @@ Before starting any task, identify the relevant domain (Backend, Frontend, or Pr
 - [architecture/frontend_flutter.md](architecture/frontend_flutter.md) - Flutter app structure, State Management (Provider), and SQLite patterns.
 - [architecture/transaction_templates_and_scheduled_generation.md](architecture/transaction_templates_and_scheduled_generation.md) - Transaction templates, scheduled generator (`sync -> generate -> sync`), deterministic UUIDv5 occurrences, transfer-pair reconciliation, and tags/template linkage behavior.
 - [architecture/yield_configs_and_interest_generation.md](architecture/yield_configs_and_interest_generation.md) - Yield config schema/contracts, local interest generation with deterministic UUIDv5, maturity/auto-renew behavior, `transactions.yield_id` linkage, and sync order integration.
+- [architecture/goals_and_liquidity.md](architecture/goals_and_liquidity.md) - Goals schema/contracts, computed properties (progress, monthly quota, overdue), liquidity concept (deferred), and integration points for when liquidity is available.
 
 ### Development Conventions
 - [conventions/coding_standards.md](conventions/coding_standards.md) - Naming conventions, error handling, and style guides for Go and Dart.
@@ -24,6 +25,9 @@ Before starting any task, identify the relevant domain (Backend, Frontend, or Pr
 - [decisions/0001-sync-strategy.md](decisions/0001-sync-strategy.md) - Initial ADR: Why we chose Last Write Wins (LWW) and Delta Pull.
 - [decisions/0002-sync-coalescing-and-user-preferences.md](decisions/0002-sync-coalescing-and-user-preferences.md) - Ensures concurrent sync requests are coalesced and preference saves flush to server immediately.
 - [dependencies/module_map.md](dependencies/module_map.md) - Dependency graph between internal modules and external libraries.
+
+### Deferred Work
+- [todos.md](todos.md) - Index of code-level TODOs grouped by dependency (e.g. `TODO(liquidity)`). Revisit when the blocking feature is implemented.
 
 ### Session Logs
 - [.journal.md](.journal.md) - Temporary log for technical decisions made during the current session.

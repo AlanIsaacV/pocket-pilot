@@ -11,12 +11,8 @@ func ValidateGoal(g Goal) error {
 		return fmt.Errorf("target_amount_cents must be > 0")
 	}
 
-	if g.SavedAmountCents < 0 {
-		return fmt.Errorf("saved_amount_cents must be >= 0")
-	}
-
-	if g.SavedAmountCents > g.TargetAmountCents {
-		return fmt.Errorf("saved_amount_cents must be <= target_amount_cents")
+	if g.CurrencyCode == "" {
+		return fmt.Errorf("currency_code is required")
 	}
 
 	if g.TargetDate.IsZero() {

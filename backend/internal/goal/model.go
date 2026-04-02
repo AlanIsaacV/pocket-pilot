@@ -13,8 +13,8 @@ type Goal struct {
 	UserID            uuid.UUID
 	Name              string
 	TargetAmountCents int64
-	SavedAmountCents  int64
 	TargetDate        time.Time
+	CurrencyCode      string
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 	DeletedAt         *time.Time

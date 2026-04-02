@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package pocket_pilot.v1;
 
-import "pocket_pilot/v1/common.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
 
 option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
 
@@ -13,16 +13,12 @@ message Goal {
   string name = 2;
 
   int64 target_amount_cents = 3;
-  int64 saved_amount_cents = 4;
-
+  string currency_code = 4;
   string target_date = 5; // YYYY-MM-DD
 
-  reserved 6;
-  reserved "category_id";
-
-  google.protobuf.Timestamp created_at = 7;
-  google.protobuf.Timestamp updated_at = 8;
-  google.protobuf.Timestamp deleted_at = 9;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp deleted_at = 8;
 }
 
 service GoalService {

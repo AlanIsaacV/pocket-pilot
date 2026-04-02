@@ -134,18 +134,14 @@ class _GoalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final progress = goal.progressPercentage.clamp(0, 100).toDouble();
     final progressFraction = progress / 100;
-    final saved = goal.savedAmountCents / 100;
     final target = goal.targetAmountCents / 100;
     final monthly = goal.monthlyRequiredCents / 100;
     final months = goal.monthsRemaining;
     final isOverdue = goal.isOverdue;
-    final isComplete = goal.savedAmountCents >= goal.targetAmountCents;
 
-    final (statusLabel, statusColor) = isComplete
-        ? ('Completada', Theme.of(context).colorScheme.primary)
-        : isOverdue
-            ? ('Atrasada', Theme.of(context).colorScheme.error)
-            : ('En curso', Theme.of(context).colorScheme.tertiary);
+    final (statusLabel, statusColor) = isOverdue
+        ? ('Atrasada', Theme.of(context).colorScheme.error)
+        : ('En curso', Theme.of(context).colorScheme.tertiary);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -260,8 +256,8 @@ class _GoalCard extends StatelessWidget {
               Row(
                 children: [
                   _InfoChip(
-                    label: 'Ahorrado',
-                    value: '\$${_formatMoney(saved)} / \$${_formatMoney(target)}',
+                    label: 'Objetivo',
+                    value: '${goal.currencyCode} \$${_formatMoney(target)}',
                     context: context,
                   ),
                   const SizedBox(width: 12),
@@ -272,27 +268,25 @@ class _GoalCard extends StatelessWidget {
                   ),
                 ],
               ),
-              if (!isComplete) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.calendar_month_outlined,
-                      size: 14,
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.calendar_month_outlined,
+                    size: 14,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Cuota mensual: ${goal.currencyCode} \$${_formatMoney(monthly)}',
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Cuota mensual: \$${_formatMoney(monthly)}',
-                      style: GoogleFonts.ibmPlexSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ],
           ),
         ),

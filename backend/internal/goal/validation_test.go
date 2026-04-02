@@ -18,7 +18,7 @@ func TestValidateGoal(t *testing.T) {
 			g: Goal{
 				Name:              "Laptop",
 				TargetAmountCents: 4800000,
-				SavedAmountCents:  1500000,
+				CurrencyCode:      "MXN",
 				TargetDate:        targetDate,
 			},
 			wantErr: false,
@@ -28,7 +28,7 @@ func TestValidateGoal(t *testing.T) {
 			g: Goal{
 				Name:              "   ",
 				TargetAmountCents: 100,
-				SavedAmountCents:  0,
+				CurrencyCode:      "MXN",
 				TargetDate:        targetDate,
 			},
 			wantErr: true,
@@ -38,27 +38,17 @@ func TestValidateGoal(t *testing.T) {
 			g: Goal{
 				Name:              "Zero target",
 				TargetAmountCents: 0,
-				SavedAmountCents:  0,
+				CurrencyCode:      "MXN",
 				TargetDate:        targetDate,
 			},
 			wantErr: true,
 		},
 		{
-			name: "saved cannot be negative",
+			name: "currency code required",
 			g: Goal{
-				Name:              "Negative saved",
+				Name:              "No currency",
 				TargetAmountCents: 1000,
-				SavedAmountCents:  -1,
-				TargetDate:        targetDate,
-			},
-			wantErr: true,
-		},
-		{
-			name: "saved cannot exceed target",
-			g: Goal{
-				Name:              "Overflow saved",
-				TargetAmountCents: 1000,
-				SavedAmountCents:  1001,
+				CurrencyCode:      "",
 				TargetDate:        targetDate,
 			},
 			wantErr: true,
@@ -68,7 +58,7 @@ func TestValidateGoal(t *testing.T) {
 			g: Goal{
 				Name:              "No date",
 				TargetAmountCents: 1000,
-				SavedAmountCents:  0,
+				CurrencyCode:      "MXN",
 			},
 			wantErr: true,
 		},

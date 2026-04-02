@@ -9,16 +9,14 @@ import "pocket_pilot/v1/common.proto";
 option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
 
 message Goal {
-  string id = 1;
-  string name = 2;
-
-  int64 target_amount_cents = 3;
-  string currency_code = 4;
-  string target_date = 5; // YYYY-MM-DD
-
-  google.protobuf.Timestamp created_at = 6;
-  google.protobuf.Timestamp updated_at = 7;
-  google.protobuf.Timestamp deleted_at = 8;
+  google.protobuf.Timestamp created_at = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  google.protobuf.Timestamp deleted_at = 3;
+  string id = 4;
+  string name = 5;
+  int64 target_amount_cents = 6;
+  string currency_code = 7;
+  string target_date = 8; // YYYY-MM-DD
 }
 
 service GoalService {

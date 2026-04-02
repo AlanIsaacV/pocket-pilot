@@ -1,5 +1,4 @@
-CREATE TABLE accounts
-(
+CREATE TABLE accounts (
     id                 TEXT PRIMARY KEY,
     name               TEXT     NOT NULL,
     type               TEXT     NOT NULL,
@@ -24,8 +23,7 @@ BEGIN
     WHERE id = new.id;
 END;
 
-CREATE TABLE categories
-(
+CREATE TABLE categories (
     id         TEXT PRIMARY KEY,
     name       TEXT     NOT NULL,
     icon       TEXT,
@@ -48,8 +46,7 @@ BEGIN
 END;
 
 
-CREATE TABLE tags
-(
+CREATE TABLE tags (
     id         TEXT PRIMARY KEY,
     name       TEXT     NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -68,12 +65,88 @@ BEGIN
 END;
 
 
-CREATE TABLE transactions
-(
+CREATE TABLE transaction_templates (
+    id            TEXT PRIMARY KEY,
+    name          TEXT     NOT NULL,
+    account_id    TEXT     NOT NULL REFERENCES accounts (id),
+    to_account_id TEXT REFERENCES accounts (id),
+    category_id   TEXT REFERENCES categories (id),
+    type          TEXT     NOT NULL,
+    amount_cents  BIGINT,
+    currency_code TEXT     NOT NULL,
+    tags          TEXT,
+    description   TEXT     NOT NULL DEFAULT '',
+    frequency     TEXT,
+    next_date     DATE,
+    end_date      DATE,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at    DATETIME
+);
+
+CREATE INDEX idx_transaction_templates_next_date
+    ON transaction_templates (next_date)
+    WHERE deleted_at IS NULL
+        AND frequency IS NOT NULL
+        AND next_date IS NOT NULL;
+
+CREATE INDEX idx_transaction_templates_updated_at
+    ON transaction_templates (updated_at);
+
+CREATE TRIGGER set_updated_at_transaction_templates
+    AFTER UPDATE
+    ON transaction_templates
+    FOR EACH ROW
+    WHEN new.updated_at = old.updated_at
+BEGIN
+    UPDATE transaction_templates
+    SET updated_at = CURRENT_TIMESTAMP
+    WHERE id = new.id;
+END;
+
+
+CREATE TABLE yield_configs (
+    id               TEXT PRIMARY KEY,
+    account_id       TEXT          NOT NULL REFERENCES accounts (id),
+    name             TEXT          NOT NULL,
+    amount_cents     BIGINT        NOT NULL,
+    apy_rate         NUMERIC(7, 4) NOT NULL,
+    payout_frequency TEXT          NOT NULL,
+    next_date        DATE          NOT NULL,
+    maturity_date    DATE,
+    term_days        INTEGER,
+    auto_renew       INTEGER       NOT NULL DEFAULT 0,
+    status           TEXT          NOT NULL,
+    created_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at       DATETIME
+);
+
+
+CREATE INDEX idx_yield_configs_next_date_active
+    ON yield_configs (next_date)
+    WHERE deleted_at IS NULL
+        AND status = 'active';
+
+CREATE TRIGGER set_updated_at_yield_configs
+    AFTER UPDATE
+    ON yield_configs
+    FOR EACH ROW
+    WHEN new.updated_at = old.updated_at
+BEGIN
+    UPDATE yield_configs
+    SET updated_at = CURRENT_TIMESTAMP
+    WHERE id = new.id;
+END;
+
+
+CREATE TABLE transactions (
     id                    TEXT PRIMARY KEY,
     account_id            TEXT     NOT NULL REFERENCES accounts (id),
     category_id           TEXT REFERENCES categories (id),
     linked_transaction_id TEXT,
+    template_id           TEXT REFERENCES transaction_templates (id),
+    yield_id              TEXT REFERENCES yield_configs (id),
     type                  TEXT     NOT NULL,
     amount_cents          BIGINT   NOT NULL,
     currency_code         TEXT     NOT NULL,
@@ -86,7 +159,17 @@ CREATE TABLE transactions
     deleted_at            DATETIME
 );
 CREATE INDEX idx_transactions_date
-  ON transactions(date) WHERE deleted_at IS NULL;
+    ON transactions (date) WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_transactions_template_id
+    ON transactions (template_id)
+    WHERE template_id IS NOT NULL;
+
+
+CREATE INDEX idx_transactions_yield_id
+    ON transactions (yield_id)
+    WHERE yield_id IS NOT NULL;
+
 
 CREATE TRIGGER set_updated_at_transactions
     AFTER UPDATE
@@ -100,8 +183,7 @@ BEGIN
 END;
 
 
-CREATE TABLE user_preferences
-(
+CREATE TABLE user_preferences (
     pref_key   TEXT PRIMARY KEY,
     pref_value TEXT     NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -141,8 +223,37 @@ CREATE INDEX idx_transactions_linked
     WHERE linked_transaction_id IS NOT NULL;
 
 
-CREATE TABLE sync_outbox
-(
+CREATE TABLE goals (
+    id                  TEXT PRIMARY KEY,
+    name                TEXT     NOT NULL,
+    target_amount_cents INTEGER  NOT NULL,
+    target_date         DATE     NOT NULL,
+    currency_code       TEXT     NOT NULL,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at          DATETIME
+);
+
+CREATE INDEX idx_goals_target_date_active
+    ON goals (target_date)
+    WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_goals_updated_at
+    ON goals (updated_at);
+
+CREATE TRIGGER set_updated_at_goals
+    AFTER UPDATE
+    ON goals
+    FOR EACH ROW
+    WHEN new.updated_at = old.updated_at
+BEGIN
+    UPDATE goals
+    SET updated_at = CURRENT_TIMESTAMP
+    WHERE id = new.id;
+END;
+
+
+CREATE TABLE sync_outbox (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     entity_type TEXT    NOT NULL,
     entity_id   TEXT    NOT NULL,
@@ -155,15 +266,11 @@ CREATE TABLE sync_outbox
 CREATE UNIQUE INDEX idx_sync_outbox_entity ON sync_outbox (entity_type, entity_id);
 
 
-CREATE TABLE sync_metadata
-(
-    entity_type    TEXT PRIMARY KEY,
-    last_synced_at TEXT
+CREATE TABLE sync_metadata (
+    entity_type TEXT PRIMARY KEY, last_synced_at TEXT
 );
 
 
-CREATE TABLE app_metadata
-(
-    key   TEXT PRIMARY KEY,
-    value TEXT NOT NULL
+CREATE TABLE app_metadata (
+    key TEXT PRIMARY KEY, value TEXT NOT NULL
 );

@@ -2,30 +2,30 @@ syntax = "proto3";
 
 package pocket_pilot.v1;
 
-import "pocket_pilot/v1/common.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
 
 option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
 
 message YieldConfig {
-  string id = 1;
-  string account_id = 2;
-  string name = 3;
+  google.protobuf.Timestamp created_at = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  google.protobuf.Timestamp deleted_at = 3;
+  string id = 4;
+  string account_id = 5;
+  string name = 6;
 
-  int64 amount_cents = 4;
-  double apy_rate = 5;
+  int64 amount_cents = 7;
+  double apy_rate = 8;
 
-  string payout_frequency = 6;
-  string next_date = 7;
-  optional string maturity_date = 8;
+  string payout_frequency = 9;
+  string next_date = 10;
+  optional string maturity_date = 11;
 
-  bool auto_renew = 9;
-  string status = 10;
+  bool auto_renew = 12;
+  string status = 13;
 
-  google.protobuf.Timestamp created_at = 11;
-  google.protobuf.Timestamp updated_at = 12;
-  google.protobuf.Timestamp deleted_at = 13;
   optional int32 term_days = 14;
 }
 

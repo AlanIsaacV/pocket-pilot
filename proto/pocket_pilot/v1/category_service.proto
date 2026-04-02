@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package pocket_pilot.v1;
 
-import "pocket_pilot/v1/common.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
 
 option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
 
@@ -15,15 +15,15 @@ enum CategoryType {
 }
 
 message Category {
-  string id = 1;
-  string name = 2;
-  string icon = 3;
-  string color = 4;
-  string parent_id = 5;
-  CategoryType type = 6;
-  google.protobuf.Timestamp created_at = 7;
-  google.protobuf.Timestamp updated_at = 8;
-  google.protobuf.Timestamp deleted_at = 9;
+  google.protobuf.Timestamp created_at = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  google.protobuf.Timestamp deleted_at = 3;
+  string id = 4;
+  string name = 5;
+  string icon = 6;
+  string color = 7;
+  string parent_id = 8;
+  CategoryType type = 9;
 }
 
 service CategoryService {

@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package pocket_pilot.v1;
 
-import "pocket_pilot/v1/common.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
 
 option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
 
@@ -17,19 +17,19 @@ enum TransactionType {
 }
 
 message Transaction {
-  string id = 1;
-  string account_id = 2;
-  optional string category_id = 3;
-  TransactionType type = 4;
-  int64 amount_cents = 5;
-  string currency_code = 6;
-  string status = 7;
-  repeated string tags = 8;
-  string description = 9;
-  google.protobuf.Timestamp date = 10;
-  google.protobuf.Timestamp created_at = 11;
-  google.protobuf.Timestamp updated_at = 12;
-  google.protobuf.Timestamp deleted_at = 13;
+  google.protobuf.Timestamp created_at = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  google.protobuf.Timestamp deleted_at = 3;
+  string id = 4;
+  string account_id = 5;
+  optional string category_id = 6;
+  TransactionType type = 7;
+  int64 amount_cents = 8;
+  string currency_code = 9;
+  string status = 10;
+  repeated string tags = 11;
+  string description = 12;
+  google.protobuf.Timestamp date = 13;
   optional string linked_transaction_id = 14;
   optional string template_id = 15;
   optional string yield_id = 16;

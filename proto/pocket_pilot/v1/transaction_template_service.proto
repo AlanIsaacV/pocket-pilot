@@ -2,28 +2,28 @@ syntax = "proto3";
 
 package pocket_pilot.v1;
 
-import "pocket_pilot/v1/common.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
 
 option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
 
 message TransactionTemplate {
-  string id = 1;
-  string name = 2;
-  string account_id = 3;
-  optional string category_id = 4;
-  string type = 5;
-  optional int64 amount_cents = 6;
-  string currency_code = 7;
-  repeated string tags = 8;
-  string description = 9;
-  optional string frequency = 10;
-  optional string next_date = 11;
-  optional string end_date = 12;
-  google.protobuf.Timestamp created_at = 13;
-  google.protobuf.Timestamp updated_at = 14;
-  google.protobuf.Timestamp deleted_at = 15;
+  google.protobuf.Timestamp created_at = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  google.protobuf.Timestamp deleted_at = 3;
+  string id = 4;
+  string name = 5;
+  string account_id = 6;
+  optional string category_id = 7;
+  string type = 8;
+  optional int64 amount_cents = 9;
+  string currency_code = 10;
+  repeated string tags = 11;
+  string description = 12;
+  optional string frequency = 13;
+  optional string next_date = 14;
+  optional string end_date = 15;
   optional string to_account_id = 16;
 }
 

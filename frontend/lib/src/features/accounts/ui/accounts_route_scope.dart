@@ -27,6 +27,9 @@ import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_repository.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
+import 'package:pocket_pilot/src/features/budgets/data/budget_local_store.dart';
+import 'package:pocket_pilot/src/features/budgets/data/budget_repository.dart';
+import 'package:pocket_pilot/src/features/budgets/ui/budget_view_model.dart';
 import 'package:pocket_pilot/src/features/goals/data/goal_local_store.dart';
 import 'package:pocket_pilot/src/features/goals/data/goal_repository.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
@@ -78,6 +81,24 @@ class AccountsRouteScope extends StatelessWidget {
             );
 
             return GoalViewModel(
+              repository: repository,
+              syncService: syncService,
+            )..loadOnAppear();
+          },
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) {
+            final db = ctx.read<DatabaseHelper>();
+            final outbox = ctx.read<SyncOutbox>();
+            final syncService = ctx.read<SyncService>();
+
+            final localStore = BudgetLocalStore(db: db);
+            final repository = BudgetRepository(
+              local: localStore,
+              outbox: outbox,
+            );
+
+            return BudgetViewModel(
               repository: repository,
               syncService: syncService,
             )..loadOnAppear();

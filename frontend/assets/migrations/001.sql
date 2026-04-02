@@ -253,6 +253,37 @@ BEGIN
 END;
 
 
+CREATE TABLE budgets (
+    id                 TEXT PRIMARY KEY,
+    category_id        TEXT     NOT NULL REFERENCES categories (id),
+    limit_amount_cents INTEGER  NOT NULL,
+    currency_code      TEXT     NOT NULL,
+    period             TEXT     NOT NULL,
+    created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at         DATETIME,
+    UNIQUE(category_id)
+);
+
+CREATE INDEX idx_budgets_category_id
+    ON budgets (category_id)
+    WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_budgets_updated_at
+    ON budgets (updated_at);
+
+CREATE TRIGGER set_updated_at_budgets
+    AFTER UPDATE
+    ON budgets
+    FOR EACH ROW
+    WHEN new.updated_at = old.updated_at
+BEGIN
+    UPDATE budgets
+    SET updated_at = CURRENT_TIMESTAMP
+    WHERE id = new.id;
+END;
+
+
 CREATE TABLE sync_outbox (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     entity_type TEXT    NOT NULL,

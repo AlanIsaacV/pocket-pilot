@@ -10,6 +10,8 @@ import 'package:provider/provider.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
+import 'package:pocket_pilot/src/features/budgets/ui/budget_view_model.dart';
+import 'package:pocket_pilot/src/features/budgets/ui/budgets_list_tab.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goals_list_tab.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
@@ -29,7 +31,7 @@ class _AccountsScreenState extends State<AccountsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -48,6 +50,7 @@ class _AccountsScreenState extends State<AccountsScreen>
           tabs: const [
             Tab(text: 'Cuentas'),
             Tab(text: 'Metas'),
+            Tab(text: 'Presupuestos'),
           ],
           labelStyle: GoogleFonts.ibmPlexSans(
             fontSize: 14,
@@ -66,6 +69,7 @@ class _AccountsScreenState extends State<AccountsScreen>
         children: [
           _AccountsListTab(),
           const GoalsListTab(),
+          const BudgetsListTab(),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -132,6 +136,18 @@ class _AccountsScreenState extends State<AccountsScreen>
                   context.push('/accounts/goals/new').then((result) {
                     if (result == true && context.mounted) {
                       context.read<GoalViewModel>().loadOnAppear();
+                    }
+                  });
+                },
+              ),
+              SheetItem(
+                icon: Icons.pie_chart_outline_rounded,
+                label: 'Nuevo presupuesto',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.push('/accounts/budgets/new').then((result) {
+                    if (result == true && context.mounted) {
+                      context.read<BudgetViewModel>().loadOnAppear();
                     }
                   });
                 },

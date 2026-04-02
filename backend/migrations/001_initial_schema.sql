@@ -182,6 +182,27 @@ CREATE INDEX idx_goals_user_target_date_active
     WHERE deleted_at IS NULL;
 
 
+CREATE TABLE budgets (
+    id                 uuid PRIMARY KEY      DEFAULT gen_random_uuid(),
+    user_id            uuid         NOT NULL,
+    category_id        uuid         NOT NULL REFERENCES categories (id),
+    limit_amount_cents BIGINT       NOT NULL,
+    currency_code      TEXT         NOT NULL,
+    period             TEXT         NOT NULL,
+    created_at         timestamptz  NOT NULL DEFAULT NOW(),
+    updated_at         timestamptz  NOT NULL DEFAULT NOW(),
+    deleted_at         timestamptz,
+    UNIQUE(user_id, category_id)
+);
+
+CREATE INDEX idx_budgets_user_id
+    ON budgets (user_id)
+    WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_budgets_user_updated_at
+    ON budgets (user_id, updated_at);
+
+
 CREATE OR REPLACE FUNCTION trigger_set_updated_at()
     RETURNS TRIGGER AS
 $$
@@ -236,5 +257,11 @@ EXECUTE FUNCTION trigger_set_updated_at();
 CREATE TRIGGER set_updated_at_goals
     BEFORE UPDATE
     ON goals
+    FOR EACH ROW
+EXECUTE FUNCTION trigger_set_updated_at();
+
+CREATE TRIGGER set_updated_at_budgets
+    BEFORE UPDATE
+    ON budgets
     FOR EACH ROW
 EXECUTE FUNCTION trigger_set_updated_at();

@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+message Budget {
+  google.protobuf.Timestamp created_at = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  google.protobuf.Timestamp deleted_at = 3;
+  string id = 4;
+  string category_id = 5;
+  int64 limit_amount_cents = 6;
+  string currency_code = 7;
+  string period = 8; // 'MONTHLY' o 'YEARLY'
+}
+
+service BudgetService {
+  rpc ListBudgets(ListBudgetsRequest) returns (ListBudgetsResponse);
+  rpc UpsertBudget(UpsertBudgetRequest) returns (UpsertBudgetResponse);
+  rpc DeleteBudget(DeleteBudgetRequest) returns (google.protobuf.Empty);
+}
+
+message ListBudgetsRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListBudgetsResponse {
+  repeated Budget budgets = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertBudgetRequest {
+  Budget budget = 1;
+}
+
+message UpsertBudgetResponse {
+  Budget budget = 1;
+  bool conflict_resolved = 2;
+}
+
+message DeleteBudgetRequest {
+  string id = 1;
+  google.protobuf.Timestamp deleted_at = 2;
+}

@@ -21,12 +21,17 @@
 //   3. Agregar destino en HomeScreen._routes
 
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
+import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/account_form_screen.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_route_scope.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_screen.dart';
+import 'package:pocket_pilot/src/features/budgets/domain/budget.dart';
+import 'package:pocket_pilot/src/features/budgets/ui/budget_form_screen.dart';
 import 'package:pocket_pilot/src/features/goals/domain/goal.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_form_screen.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
@@ -160,6 +165,50 @@ GoRouter buildRouter() {
                     goal: state.extra as GoalModel?,
                   ),
                 ),
+              ),
+              GoRoute(
+                path: 'budgets/new',
+                builder: (context, state) =>
+                    const AccountsRouteScope(child: BudgetFormScreen()),
+                routes: [
+                  GoRoute(
+                    path: 'category',
+                    builder: (context, state) {
+                      final extra = state.extra as Map<String, dynamic>?;
+                      final db = DatabaseHelper();
+                      return Provider<CategoryLocalStore>(
+                        create: (_) => CategoryLocalStore(db: db),
+                        child: CategoryPickerScreen(
+                          type: extra?['type'] as String? ?? 'expense',
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: 'budgets/:budgetId/edit',
+                builder: (context, state) => AccountsRouteScope(
+                  child: BudgetFormScreen(
+                    budget: state.extra as BudgetModel?,
+                    categoryRoute: '/accounts/budgets/${state.pathParameters['budgetId']}/edit/category',
+                  ),
+                ),
+                routes: [
+                  GoRoute(
+                    path: 'category',
+                    builder: (context, state) {
+                      final extra = state.extra as Map<String, dynamic>?;
+                      final db = DatabaseHelper();
+                      return Provider<CategoryLocalStore>(
+                        create: (_) => CategoryLocalStore(db: db),
+                        child: CategoryPickerScreen(
+                          type: extra?['type'] as String? ?? 'expense',
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),

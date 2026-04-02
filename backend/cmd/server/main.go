@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/AlanIsaacV/pocket-pilot/internal/account"
+	"github.com/AlanIsaacV/pocket-pilot/internal/budget"
 	"github.com/AlanIsaacV/pocket-pilot/internal/category"
 	"github.com/AlanIsaacV/pocket-pilot/internal/config"
 	"github.com/AlanIsaacV/pocket-pilot/internal/database"
@@ -48,6 +49,7 @@ func main() {
 	transactionTemplateHandler := transactiontemplate.NewHandler(transactiontemplate.NewRepository(pool))
 	yieldConfigHandler := yieldconfig.NewHandler(yieldconfig.NewRepository(pool))
 	goalHandler := goal.NewHandler(goal.NewRepository(pool))
+	budgetHandler := budget.NewHandler(budget.NewRepository(pool))
 	tagHandler := tag.NewHandler(tag.NewRepository(pool))
 	userPreferenceHandler := userpreference.NewHandler(userpreference.NewRepository(pool))
 
@@ -62,6 +64,7 @@ func main() {
 	pb.RegisterTransactionTemplateServiceServer(srv, transactionTemplateHandler)
 	pb.RegisterYieldConfigServiceServer(srv, yieldConfigHandler)
 	pb.RegisterGoalServiceServer(srv, goalHandler)
+	pb.RegisterBudgetServiceServer(srv, budgetHandler)
 	pb.RegisterTagServiceServer(srv, tagHandler)
 	pb.RegisterUserPreferenceServiceServer(srv, userPreferenceHandler)
 

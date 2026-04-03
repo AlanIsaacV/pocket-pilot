@@ -104,7 +104,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     final currencySnapshot = results[3] as CurrencyPreferencesSnapshot;
     final lastUsedAccountId = results[4] as String?;
 
-    final accounts = results[0] as List<AccountModel>;
+    final accounts = (results[0] as List<AccountModel>)
+        .where((a) => a.type != 'contact')
+        .toList();
     final categories = results[1] as List<CategoryModel>;
     final tags = results[2] as List<TagModel>;
 
@@ -208,7 +210,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       return;
     }
 
-    final accounts = await context.read<AccountLocalStore>().getAccounts();
+    final accounts = (await context.read<AccountLocalStore>().getAccounts())
+        .where((a) => a.type != 'contact')
+        .toList();
     if (!mounted) return;
 
     if (accounts.isEmpty && closeIfNoAccounts) {

@@ -78,6 +78,8 @@ func accountTypeToString(t pb.AccountType) string {
 		return "crypto"
 	case pb.AccountType_ACCOUNT_TYPE_OTHER:
 		return "other"
+	case pb.AccountType_ACCOUNT_TYPE_CONTACT:
+		return "contact"
 	default:
 		return "other"
 	}
@@ -97,6 +99,8 @@ func stringToAccountType(s string) pb.AccountType {
 		return pb.AccountType_ACCOUNT_TYPE_INVESTMENT
 	case "crypto":
 		return pb.AccountType_ACCOUNT_TYPE_CRYPYO
+	case "contact":
+		return pb.AccountType_ACCOUNT_TYPE_CONTACT
 	default:
 		return pb.AccountType_ACCOUNT_TYPE_OTHER
 	}

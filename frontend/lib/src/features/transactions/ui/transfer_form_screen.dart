@@ -146,7 +146,9 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
 
     if (!mounted) return;
 
-    final accounts = results[0] as List<AccountModel>;
+    final accounts = (results[0] as List<AccountModel>)
+        .where((a) => a.type != 'contact')
+        .toList();
     final tags = results[1] as List<TagModel>;
     final currencySnapshot = results[2] as CurrencyPreferencesSnapshot;
 
@@ -469,7 +471,9 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
     }
 
     // Si no creó cuenta, verificar si sigue sin cuentas
-    final accounts = await context.read<AccountLocalStore>().getAccounts();
+    final accounts = (await context.read<AccountLocalStore>().getAccounts())
+        .where((a) => a.type != 'contact')
+        .toList();
     if (!mounted) return;
 
     if (accounts.isEmpty) {

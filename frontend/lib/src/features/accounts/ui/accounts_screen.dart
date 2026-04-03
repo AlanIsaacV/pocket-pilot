@@ -12,6 +12,8 @@ import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
 import 'package:pocket_pilot/src/features/budgets/ui/budget_view_model.dart';
 import 'package:pocket_pilot/src/features/budgets/ui/budgets_list_tab.dart';
+import 'package:pocket_pilot/src/features/debts/ui/debt_view_model.dart';
+import 'package:pocket_pilot/src/features/debts/ui/debts_list_tab.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goals_list_tab.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
@@ -31,7 +33,7 @@ class _AccountsScreenState extends State<AccountsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -51,6 +53,7 @@ class _AccountsScreenState extends State<AccountsScreen>
             Tab(text: 'Cuentas'),
             Tab(text: 'Metas'),
             Tab(text: 'Presupuestos'),
+            Tab(text: 'Deudas'),
           ],
           labelStyle: GoogleFonts.ibmPlexSans(
             fontSize: 14,
@@ -70,6 +73,7 @@ class _AccountsScreenState extends State<AccountsScreen>
           _AccountsListTab(),
           const GoalsListTab(),
           const BudgetsListTab(),
+          const DebtsListTab(),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -148,6 +152,18 @@ class _AccountsScreenState extends State<AccountsScreen>
                   context.push('/accounts/budgets/new').then((result) {
                     if (result == true && context.mounted) {
                       context.read<BudgetViewModel>().loadOnAppear();
+                    }
+                  });
+                },
+              ),
+              SheetItem(
+                icon: Icons.handshake_outlined,
+                label: 'Agregar deuda',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.push('/accounts/debts/new').then((result) {
+                    if (result == true && context.mounted) {
+                      context.read<DebtViewModel>().loadOnAppear();
                     }
                   });
                 },
@@ -238,9 +254,7 @@ class _AccountsListTab extends StatelessWidget {
   }
 
   void _onAccountTap(BuildContext context, AccountModel account) {
-    context
-        .push('/accounts/${account.id}/edit', extra: account)
-        .then((result) {
+    context.push('/accounts/${account.id}/edit', extra: account).then((result) {
       if (result == true && context.mounted) {
         context.read<AccountsViewModel>().loadOnAppear();
       }
@@ -357,6 +371,8 @@ class _AccountCard extends StatelessWidget {
         return Icons.request_quote_outlined;
       case 'crypto':
         return Icons.currency_bitcoin;
+      case 'contact':
+        return Icons.person_outline;
       default:
         return Icons.account_balance_wallet_outlined;
     }
@@ -376,6 +392,8 @@ class _AccountCard extends StatelessWidget {
         return 'Prestamo';
       case 'crypto':
         return 'Criptomonedas';
+      case 'contact':
+        return 'Contacto';
       default:
         return 'Otra cuenta';
     }

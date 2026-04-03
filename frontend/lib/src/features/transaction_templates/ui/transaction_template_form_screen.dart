@@ -130,7 +130,9 @@ class _TransactionTemplateFormScreenState
 
     if (!mounted) return;
 
-    final accounts = results[0] as List<AccountModel>;
+    final accounts = (results[0] as List<AccountModel>)
+        .where((a) => a.type != 'contact')
+        .toList();
     final categories = results[1] as List<CategoryModel>;
     final tags = results[2] as List<TagModel>;
     final currencySnapshot = results[3] as CurrencyPreferencesSnapshot;

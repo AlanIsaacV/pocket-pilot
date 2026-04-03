@@ -96,7 +96,7 @@ class AccountsViewModel extends ChangeNotifier {
       );
     }
 
-    accounts = await _repository.getAccounts();
+    accounts = await _loadAccounts();
     _safeNotify();
   }
 
@@ -160,7 +160,7 @@ class AccountsViewModel extends ChangeNotifier {
       );
     }
 
-    accounts = await _repository.getAccounts();
+    accounts = await _loadAccounts();
     _safeNotify();
   }
 
@@ -175,7 +175,7 @@ class AccountsViewModel extends ChangeNotifier {
 
   Future<void> deleteAccount(String id) async {
     await _repository.deleteAccount(id);
-    accounts = await _repository.getAccounts();
+    accounts = await _loadAccounts();
     _safeNotify();
   }
 
@@ -193,8 +193,14 @@ class AccountsViewModel extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
+  Future<List<AccountModel>> _loadAccounts() async {
+    return (await _repository.getAccounts())
+        .where((a) => a.type != 'contact')
+        .toList();
+  }
+
   Future<void> _loadLocalThenMaybeSync() async {
-    accounts = await _repository.getAccounts();
+    accounts = await _loadAccounts();
     _safeNotify();
     await _maybeSyncRemote();
   }
@@ -215,7 +221,7 @@ class AccountsViewModel extends ChangeNotifier {
 
     try {
       await _syncService.sync();
-      accounts = await _repository.getAccounts();
+      accounts = await _loadAccounts();
       _lastSyncAt = DateTime.now();
       errorMessage = null;
     } catch (e) {

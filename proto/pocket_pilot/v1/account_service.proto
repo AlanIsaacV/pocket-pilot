@@ -17,6 +17,7 @@ enum AccountType {
   ACCOUNT_TYPE_INVESTMENT = 5;
   ACCOUNT_TYPE_CRYPYO = 6;
   ACCOUNT_TYPE_OTHER = 7;
+  ACCOUNT_TYPE_CONTACT = 8;
 }
 
 message Account {

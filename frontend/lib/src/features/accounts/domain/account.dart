@@ -5,7 +5,7 @@ class AccountModel {
   final String id;
   final String name;
 
-  /// Tipo de cuenta: 'bank', 'cash', 'credit_card', 'loan', 'investment', 'crypto', 'other'.
+  /// Tipo de cuenta: 'bank', 'cash', 'credit_card', 'loan', 'investment', 'crypto', 'other', 'contact'.
   final String type;
   final String currencyCode;
 
@@ -113,6 +113,8 @@ class AccountModel {
         return 'crypto';
       case AccountType.ACCOUNT_TYPE_OTHER:
         return 'other';
+      case AccountType.ACCOUNT_TYPE_CONTACT:
+        return 'contact';
       default:
         return 'other';
     }
@@ -132,6 +134,8 @@ class AccountModel {
         return AccountType.ACCOUNT_TYPE_INVESTMENT;
       case 'crypto':
         return AccountType.ACCOUNT_TYPE_CRYPYO;
+      case 'contact':
+        return AccountType.ACCOUNT_TYPE_CONTACT;
       default:
         return AccountType.ACCOUNT_TYPE_OTHER;
     }

@@ -95,7 +95,9 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
 
   Future<void> _loadData() async {
     final accountStore = context.read<AccountLocalStore>();
-    final accounts = await accountStore.getAccounts();
+    final accounts = (await accountStore.getAccounts())
+        .where((a) => a.type != 'contact')
+        .toList();
 
     if (!mounted) return;
 

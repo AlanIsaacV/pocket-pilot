@@ -38,7 +38,9 @@ class _FilterSheetState extends State<FilterSheet> {
     final categoryStore = CategoryLocalStore(db: db);
     final txnStore = TransactionLocalStore(db: db);
 
-    final accounts = await accountStore.getAccounts();
+    final accounts = (await accountStore.getAccounts())
+        .where((a) => a.type != 'contact')
+        .toList();
     final topIds = await txnStore.queryTopCategoryIds();
     final allCategories = await categoryStore.getCategories();
 

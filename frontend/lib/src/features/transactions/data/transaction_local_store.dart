@@ -31,10 +31,11 @@ class TransactionLocalStore {
   /// consultando la tabla de categorías.
   Future<List<Map<String, dynamic>>> queryRows() async {
     final db = await _db.database;
-    return db.query(
-      'transactions',
-      where: 'deleted_at IS NULL',
-      orderBy: 'date DESC',
+    return db.rawQuery(
+      'SELECT t.* FROM transactions t '
+      'INNER JOIN accounts a ON a.id = t.account_id '
+      "WHERE t.deleted_at IS NULL AND a.type != 'contact' "
+      'ORDER BY t.date DESC',
     );
   }
 
@@ -118,16 +119,16 @@ class TransactionLocalStore {
     TransactionFilter filter,
   ) async {
     final db = await _db.database;
-    final where = StringBuffer('deleted_at IS NULL');
+    final where = StringBuffer("t.deleted_at IS NULL AND a.type != 'contact'");
     final args = <dynamic>[];
 
     // Date range (always present)
-    where.write(' AND date BETWEEN ? AND ?');
+    where.write(' AND t.date BETWEEN ? AND ?');
     args.addAll([filter.dateFrom, filter.dateTo]);
 
     // Account
     if (filter.accountId != null) {
-      where.write(' AND account_id = ?');
+      where.write(' AND t.account_id = ?');
       args.add(filter.accountId);
     }
 
@@ -137,7 +138,7 @@ class TransactionLocalStore {
         filter.categoryIds.length,
         '?',
       ).join(',');
-      where.write(' AND category_id IN ($placeholders)');
+      where.write(' AND t.category_id IN ($placeholders)');
       args.addAll(filter.categoryIds);
     }
 
@@ -145,27 +146,28 @@ class TransactionLocalStore {
     final typeValues = filter.typeValues;
     if (typeValues != null) {
       final placeholders = List.filled(typeValues.length, '?').join(',');
-      where.write(' AND type IN ($placeholders)');
+      where.write(' AND t.type IN ($placeholders)');
       args.addAll(typeValues);
     }
 
     // Status
     if (filter.status != null) {
-      where.write(' AND status = ?');
+      where.write(' AND t.status = ?');
       args.add(filter.status);
     }
 
     // Currency
     if (filter.currencyCode != null) {
-      where.write(' AND currency_code = ?');
+      where.write(' AND t.currency_code = ?');
       args.add(filter.currencyCode);
     }
 
-    return db.query(
-      'transactions',
-      where: where.toString(),
-      whereArgs: args,
-      orderBy: 'date DESC',
+    return db.rawQuery(
+      'SELECT t.* FROM transactions t '
+      'INNER JOIN accounts a ON a.id = t.account_id '
+      'WHERE ${where.toString()} '
+      'ORDER BY t.date DESC',
+      args,
     );
   }
 

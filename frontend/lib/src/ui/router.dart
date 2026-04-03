@@ -32,6 +32,9 @@ import 'package:pocket_pilot/src/features/accounts/ui/accounts_route_scope.dart'
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_screen.dart';
 import 'package:pocket_pilot/src/features/budgets/domain/budget.dart';
 import 'package:pocket_pilot/src/features/budgets/ui/budget_form_screen.dart';
+import 'package:pocket_pilot/src/features/debts/domain/contact_balance.dart';
+import 'package:pocket_pilot/src/features/debts/ui/debt_detail_screen.dart';
+import 'package:pocket_pilot/src/features/debts/ui/debt_form_screen.dart';
 import 'package:pocket_pilot/src/features/goals/domain/goal.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_form_screen.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
@@ -161,9 +164,7 @@ GoRouter buildRouter() {
               GoRoute(
                 path: 'goals/:goalId/edit',
                 builder: (context, state) => AccountsRouteScope(
-                  child: GoalFormScreen(
-                    goal: state.extra as GoalModel?,
-                  ),
+                  child: GoalFormScreen(goal: state.extra as GoalModel?),
                 ),
               ),
               GoRoute(
@@ -191,7 +192,8 @@ GoRouter buildRouter() {
                 builder: (context, state) => AccountsRouteScope(
                   child: BudgetFormScreen(
                     budget: state.extra as BudgetModel?,
-                    categoryRoute: '/accounts/budgets/${state.pathParameters['budgetId']}/edit/category',
+                    categoryRoute:
+                        '/accounts/budgets/${state.pathParameters['budgetId']}/edit/category',
                   ),
                 ),
                 routes: [
@@ -209,6 +211,23 @@ GoRouter buildRouter() {
                     },
                   ),
                 ],
+              ),
+              GoRoute(
+                path: 'debts/new',
+                builder: (context, state) => AccountsRouteScope(
+                  child: DebtFormScreen(
+                    contact: state.extra as ContactBalance?,
+                  ),
+                ),
+              ),
+              GoRoute(
+                path: 'debts/:accountId',
+                builder: (context, state) => AccountsRouteScope(
+                  child: DebtDetailScreen(
+                    accountId: state.pathParameters['accountId']!,
+                    initialContact: state.extra as ContactBalance?,
+                  ),
+                ),
               ),
             ],
           ),
@@ -295,15 +314,13 @@ GoRouter buildRouter() {
       ),
       GoRoute(
         path: '/yields',
-        builder: (context, state) => const YieldConfigRouteScope(
-          child: YieldConfigsScreen(),
-        ),
+        builder: (context, state) =>
+            const YieldConfigRouteScope(child: YieldConfigsScreen()),
       ),
       GoRoute(
         path: '/yields/new',
-        builder: (context, state) => const YieldConfigFormRouteScope(
-          child: YieldConfigFormScreen(),
-        ),
+        builder: (context, state) =>
+            const YieldConfigFormRouteScope(child: YieldConfigFormScreen()),
       ),
       GoRoute(
         path: '/yields/:yieldId/edit',

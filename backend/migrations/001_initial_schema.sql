@@ -1,4 +1,4 @@
-CREATE TYPE account_type AS ENUM ('bank', 'cash', 'credit_card', 'loan', 'investment', 'crypto', 'other');
+CREATE TYPE account_type AS ENUM ('bank', 'cash', 'credit_card', 'loan', 'investment', 'crypto', 'other', 'contact');
 CREATE TABLE accounts (
     id                 uuid PRIMARY KEY      DEFAULT gen_random_uuid(),
     user_id            uuid         NOT NULL,

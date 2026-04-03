@@ -157,6 +157,64 @@ class DebtRepository {
     tags: tags,
   );
 
+  Future<void> createDebtTransfer({
+    required String outId,
+    required String inId,
+    required String fromAccountId,
+    required String toAccountId,
+    required int amountOutCents,
+    required String currencyOut,
+    required int amountInCents,
+    required String currencyIn,
+    required String date,
+    required String descriptionOut,
+    required String descriptionIn,
+    required List<String> tags,
+  }) => _txnRepo.createTransfer(
+    outId: outId,
+    inId: inId,
+    fromAccountId: fromAccountId,
+    toAccountId: toAccountId,
+    amountOutCents: amountOutCents,
+    currencyOut: currencyOut,
+    amountInCents: amountInCents,
+    currencyIn: currencyIn,
+    date: date,
+    descriptionOut: descriptionOut,
+    descriptionIn: descriptionIn,
+    tags: tags,
+  );
+
+  Future<void> updateDebtTransfer({
+    required String outId,
+    required String inId,
+    required String fromAccountId,
+    required String toAccountId,
+    required int amountOutCents,
+    required String currencyOut,
+    required int amountInCents,
+    required String currencyIn,
+    required String date,
+    required String descriptionOut,
+    required String descriptionIn,
+    required List<String> tags,
+    required DateTime createdAt,
+  }) => _txnRepo.updateTransfer(
+    outId: outId,
+    inId: inId,
+    fromAccountId: fromAccountId,
+    toAccountId: toAccountId,
+    amountOutCents: amountOutCents,
+    currencyOut: currencyOut,
+    amountInCents: amountInCents,
+    currencyIn: currencyIn,
+    date: date,
+    descriptionOut: descriptionOut,
+    descriptionIn: descriptionIn,
+    tags: tags,
+    createdAt: createdAt,
+  );
+
   // ----------------------------------------------------------
   // Gestión de contactos
   // ----------------------------------------------------------
@@ -174,6 +232,45 @@ class DebtRepository {
 
   Future<List<TransactionModel>> getContactTransactions(String accountId) =>
       _debtLocal.getContactTransactions(accountId);
+
+  Future<TransactionModel?> getTransactionById(String id) =>
+      _txnRepo.getTransactionById(id);
+
+  Future<({TransactionModel out, TransactionModel inTxn})?> getTransferPair(
+    TransactionModel transaction,
+  ) async {
+    if (!transaction.isTransfer || transaction.linkedTransactionId == null) {
+      return null;
+    }
+
+    final linked = await _txnRepo.getTransactionById(
+      transaction.linkedTransactionId!,
+    );
+    if (linked == null || !linked.isTransfer) {
+      return null;
+    }
+
+    TransactionModel? out;
+    TransactionModel? inTx;
+
+    if (transaction.type == 'transfer_out') {
+      out = transaction;
+    } else if (transaction.type == 'transfer_in') {
+      inTx = transaction;
+    }
+
+    if (linked.type == 'transfer_out') {
+      out = linked;
+    } else if (linked.type == 'transfer_in') {
+      inTx = linked;
+    }
+
+    if (out == null || inTx == null) {
+      return null;
+    }
+
+    return (out: out, inTxn: inTx);
+  }
 
   Future<List<Map<String, dynamic>>> searchContacts(String query) =>
       _debtLocal.searchContacts(query);

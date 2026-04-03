@@ -27,6 +27,7 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
   ContactBalance? _contact;
   List<TransactionModel>? _transactions;
   bool _isLoading = true;
+  bool _didMutate = false;
 
   @override
   void initState() {
@@ -57,99 +58,118 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
   Widget build(BuildContext context) {
     final c = _contact;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(c?.contactName ?? 'Detalle de deuda'),
-        actions: [
-          if (c != null && !c.isDeleted)
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'forgive') {
-                  _forgiveDebt();
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'forgive',
-                  child: Row(
-                    children: [
-                      Icon(Icons.volunteer_activism_outlined, size: 20),
-                      SizedBox(width: 12),
-                      Text('Perdonar deuda'),
-                    ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.pop(_didMutate);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(c?.contactName ?? 'Detalle de deuda'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+            onPressed: () => context.pop(_didMutate),
+          ),
+          actions: [
+            if (c != null && !c.isDeleted)
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'forgive') {
+                    _forgiveDebt();
+                  }
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'forgive',
+                    child: Row(
+                      children: [
+                        Icon(Icons.volunteer_activism_outlined, size: 20),
+                        SizedBox(width: 12),
+                        Text('Perdonar deuda'),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-        ],
-      ),
-      body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
-                color: Theme.of(context).colorScheme.primary,
-                strokeWidth: 2,
+                ],
               ),
-            )
-          : c == null
-          ? Center(
-              child: Text(
-                'No se encontró el contacto',
-                style: GoogleFonts.ibmPlexSans(
-                  fontSize: 14,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ],
+        ),
+        body: _isLoading
+            ? Center(
+                child: CircularProgressIndicator(
+                  color: Theme.of(context).colorScheme.primary,
+                  strokeWidth: 2,
                 ),
-              ),
-            )
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-              children: [
-                _BalanceCard(contact: c),
-                const SizedBox(height: 24),
-                Text(
-                  'Historial',
+              )
+            : c == null
+            ? Center(
+                child: Text(
+                  'No se encontró el contacto',
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 14,
-                    fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 8),
-                if (_transactions == null || _transactions!.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: Center(
-                      child: Text(
-                        'Sin transacciones',
-                        style: GoogleFonts.ibmPlexSans(
-                          fontSize: 14,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+              )
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                children: [
+                  _BalanceCard(contact: c),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Historial',
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_transactions == null || _transactions!.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32),
+                      child: Center(
+                        child: Text(
+                          'Sin transacciones',
+                          style: GoogleFonts.ibmPlexSans(
+                            fontSize: 14,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
+                    )
+                  else
+                    ..._transactions!.map(
+                      (txn) => _TransactionTile(
+                        txn: txn,
+                        onTap: () => _onTransactionTap(txn),
+                      ),
                     ),
-                  )
-                else
-                  ..._transactions!.map((txn) => _TransactionTile(txn: txn)),
-              ],
-            ),
-      floatingActionButton: c != null && !c.isDeleted
-          ? FloatingActionButton(
-              onPressed: () {
-                final vm = context.read<DebtViewModel>();
-                context.push('/accounts/debts/new', extra: c).then((
-                  result,
-                ) async {
-                  if (result == true && mounted) {
-                    await _loadData();
-                    if (mounted) {
-                      vm.loadOnAppear();
+                ],
+              ),
+        floatingActionButton: c != null && !c.isDeleted
+            ? FloatingActionButton(
+                onPressed: () {
+                  final vm = context.read<DebtViewModel>();
+                  context.push('/accounts/debts/new', extra: c).then((
+                    result,
+                  ) async {
+                    if (result == true && mounted) {
+                      _didMutate = true;
+                      await _loadData();
+                      if (mounted) {
+                        vm.loadOnAppear();
+                      }
                     }
-                  }
-                });
-              },
-              tooltip: 'Registrar movimiento',
-              child: const Icon(Icons.add),
-            )
-          : null,
+                  });
+                },
+                tooltip: 'Registrar movimiento',
+                child: const Icon(Icons.add),
+              )
+            : null,
+      ),
     );
   }
 
@@ -184,9 +204,40 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
 
     final repo = context.read<DebtRepository>();
     await repo.forgiveDebt(contact.accountId);
+    setState(() {
+      _contact = ContactBalance(
+        accountId: contact.accountId,
+        contactName: contact.contactName,
+        balances: contact.balances,
+        isDeleted: true,
+      );
+    });
+    _didMutate = true;
     if (!mounted) return;
     context.read<DebtViewModel>().loadOnAppear();
     context.pop(true);
+  }
+
+  Future<void> _onTransactionTap(TransactionModel txn) async {
+    final repo = context.read<DebtRepository>();
+    final pair = await repo.getTransferPair(txn);
+    if (pair == null) {
+      return;
+    }
+
+    if (!mounted) return;
+    final result = await context.push<bool>(
+      '/accounts/debts/new',
+      extra: {'contact': _contact, 'out': pair.out, 'in': pair.inTxn},
+    );
+
+    if (result == true && mounted) {
+      _didMutate = true;
+      await _loadData();
+      if (mounted) {
+        context.read<DebtViewModel>().loadOnAppear();
+      }
+    }
   }
 }
 
@@ -313,8 +364,9 @@ class _BalanceCard extends StatelessWidget {
 
 class _TransactionTile extends StatelessWidget {
   final TransactionModel txn;
+  final VoidCallback onTap;
 
-  const _TransactionTile({required this.txn});
+  const _TransactionTile({required this.txn, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -325,72 +377,76 @@ class _TransactionTile extends StatelessWidget {
         ? const Color(0xFF43A047)
         : Theme.of(context).colorScheme.error;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 1),
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
-            width: 1,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: AppTheme.radiusSmall,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 1),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+              width: 1,
+            ),
           ),
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHigh,
-              borderRadius: AppTheme.radiusSmall,
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                borderRadius: AppTheme.radiusSmall,
+              ),
+              child: Icon(icon, size: 18, color: amountColor),
             ),
-            child: Icon(icon, size: 18, color: amountColor),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: GoogleFonts.ibmPlexSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                if (txn.description.isNotEmpty)
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    txn.description,
+                    label,
                     style: GoogleFonts.ibmPlexSans(
-                      fontSize: 12,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  if (txn.description.isNotEmpty)
+                    Text(
+                      txn.description,
+                      style: GoogleFonts.ibmPlexSans(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  Text(
+                    _formatDate(txn.date),
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 11,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                Text(
-                  _formatDate(txn.date),
-                  style: GoogleFonts.ibmPlexSans(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Text(
-            '${isIncoming ? '+' : '-'}\$${_formatMoney(amount)} ${txn.currencyCode}',
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: amountColor,
+            Text(
+              '${isIncoming ? '+' : '-'}\$${_formatMoney(amount)} ${txn.currencyCode}',
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: amountColor,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

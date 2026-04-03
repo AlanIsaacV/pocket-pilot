@@ -52,6 +52,12 @@ class TransactionRepository {
     return TransactionModel.fromMap(row);
   }
 
+  Future<TransactionModel?> getTransactionById(String id) async {
+    final row = await _local.findRowById(id);
+    if (row == null) return null;
+    return TransactionModel.fromMap(row);
+  }
+
   // ----------------------------------------------------------
   // WRITE — income/expense
   // ----------------------------------------------------------

@@ -18,96 +18,90 @@ class DebtLocalStore {
   Future<List<ContactBalance>> getContactsBalances() async {
     final db = await _db.database;
 
-    final rows = await db.rawQuery('''
-      SELECT
-        a.id AS account_id,
-        a.name AS contact_name,
-        a.deleted_at,
-        a.currency_code AS account_currency_code,
-        t.currency_code AS txn_currency_code,
-        COALESCE(SUM(
-          CASE
-            WHEN t.type IN ('income', 'transfer_in') THEN t.amount_cents
-            WHEN t.type IN ('expense', 'transfer_out') THEN -t.amount_cents
-            ELSE 0
-          END
-        ), 0) AS balance_cents
-      FROM accounts a
-      LEFT JOIN transactions t
-        ON t.account_id = a.id
-        AND t.deleted_at IS NULL
-        AND t.type IN ($_includedTxnTypes)
-      WHERE a.type = 'contact'
-      GROUP BY a.id, a.name, a.deleted_at, a.currency_code, t.currency_code
-      ORDER BY a.name ASC, t.currency_code ASC
-    ''');
+    final accountRows = await db.query(
+      'accounts',
+      columns: ['id', 'name', 'currency_code', 'deleted_at'],
+      where: "type = 'contact'",
+      orderBy: 'name COLLATE NOCASE ASC',
+    );
 
-    final grouped = <String, _ContactAccumulator>{};
+    final contacts = <ContactBalance>[];
 
-    for (final row in rows) {
-      final accountId = row['account_id'] as String;
-      final contact = grouped.putIfAbsent(
-        accountId,
-        () => _ContactAccumulator(
-          accountId: accountId,
-          contactName: row['contact_name'] as String,
-          accountCurrencyCode: row['account_currency_code'] as String,
-          isDeleted: row['deleted_at'] != null,
-        ),
+    for (final account in accountRows) {
+      final accountId = account['id'] as String;
+      final accountCurrency = account['currency_code'] as String;
+
+      final balanceRows = await db.rawQuery(
+        '''
+        SELECT
+          currency_code,
+          COALESCE(SUM(
+            CASE
+              WHEN type IN ('income', 'transfer_in') THEN amount_cents
+              WHEN type IN ('expense', 'transfer_out') THEN -amount_cents
+              ELSE 0
+            END
+          ), 0) AS balance_cents
+        FROM transactions
+        WHERE account_id = ?
+          AND deleted_at IS NULL
+          AND type IN ($_includedTxnTypes)
+        GROUP BY currency_code
+        ORDER BY currency_code ASC
+      ''',
+        [accountId],
       );
 
-      final txnCurrency = row['txn_currency_code'] as String?;
-      if (txnCurrency == null) {
-        continue;
+      final balances = <ContactCurrencyBalance>[];
+      for (final row in balanceRows) {
+        final currency = row['currency_code'] as String;
+        final rawBalance = row['balance_cents'];
+        final balanceCents = switch (rawBalance) {
+          int v => v,
+          num v => v.toInt(),
+          _ => 0,
+        };
+
+        final originDate = balanceCents == 0
+            ? null
+            : await _findDebtOriginDateByCurrency(db, accountId, currency);
+
+        balances.add(
+          ContactCurrencyBalance(
+            currencyCode: currency,
+            balanceCents: balanceCents,
+            debtOriginDate: originDate,
+          ),
+        );
       }
 
-      final balanceCents = (row['balance_cents'] as int?) ?? 0;
-      final debtOriginDate = balanceCents == 0
-          ? null
-          : await _findDebtOriginDateByCurrency(db, accountId, txnCurrency);
+      if (balances.isEmpty) {
+        balances.add(
+          ContactCurrencyBalance(
+            currencyCode: accountCurrency,
+            balanceCents: 0,
+          ),
+        );
+      }
 
-      contact.balances.add(
-        ContactCurrencyBalance(
-          currencyCode: txnCurrency,
-          balanceCents: balanceCents,
-          debtOriginDate: debtOriginDate,
+      balances.sort((a, b) {
+        final aZero = a.balanceCents == 0;
+        final bZero = b.balanceCents == 0;
+        if (aZero != bZero) {
+          return aZero ? 1 : -1;
+        }
+        return a.currencyCode.compareTo(b.currencyCode);
+      });
+
+      contacts.add(
+        ContactBalance(
+          accountId: accountId,
+          contactName: account['name'] as String,
+          balances: balances,
+          isDeleted: account['deleted_at'] != null,
         ),
       );
     }
-
-    final contacts =
-        grouped.values.map((acc) {
-          final balances = List<ContactCurrencyBalance>.from(acc.balances);
-          if (balances.isEmpty) {
-            balances.add(
-              ContactCurrencyBalance(
-                currencyCode: acc.accountCurrencyCode,
-                balanceCents: 0,
-                debtOriginDate: null,
-              ),
-            );
-          }
-
-          balances.sort((a, b) {
-            final aZero = a.balanceCents == 0;
-            final bZero = b.balanceCents == 0;
-            if (aZero != bZero) {
-              return aZero ? 1 : -1;
-            }
-            return a.currencyCode.compareTo(b.currencyCode);
-          });
-
-          return ContactBalance(
-            accountId: acc.accountId,
-            contactName: acc.contactName,
-            balances: balances,
-            isDeleted: acc.isDeleted,
-          );
-        }).toList()..sort(
-          (a, b) => a.contactName.toLowerCase().compareTo(
-            b.contactName.toLowerCase(),
-          ),
-        );
 
     return contacts;
   }
@@ -215,19 +209,4 @@ class DebtLocalStore {
       orderBy: 'name ASC',
     );
   }
-}
-
-class _ContactAccumulator {
-  final String accountId;
-  final String contactName;
-  final String accountCurrencyCode;
-  final bool isDeleted;
-  final List<ContactCurrencyBalance> balances = [];
-
-  _ContactAccumulator({
-    required this.accountId,
-    required this.contactName,
-    required this.accountCurrencyCode,
-    required this.isDeleted,
-  });
 }

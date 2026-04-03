@@ -139,11 +139,13 @@ class _DebtCard extends StatelessWidget {
       child: InkWell(
         borderRadius: AppTheme.radiusMedium,
         onTap: () {
-          context.push('/accounts/debts/${contact.accountId}').then((result) {
-            if (result == true && context.mounted) {
-              context.read<DebtViewModel>().loadOnAppear();
-            }
-          });
+          context
+              .push('/accounts/debts/${contact.accountId}', extra: contact)
+              .then((result) {
+                if (result == true && context.mounted) {
+                  context.read<DebtViewModel>().refresh();
+                }
+              });
         },
         child: Container(
           padding: const EdgeInsets.all(16),

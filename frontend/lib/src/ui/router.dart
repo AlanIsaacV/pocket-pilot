@@ -214,11 +214,28 @@ GoRouter buildRouter() {
               ),
               GoRoute(
                 path: 'debts/new',
-                builder: (context, state) => AccountsRouteScope(
-                  child: DebtFormScreen(
-                    contact: state.extra as ContactBalance?,
-                  ),
-                ),
+                builder: (context, state) {
+                  ContactBalance? contact;
+                  TransactionModel? transferOut;
+                  TransactionModel? transferIn;
+
+                  final extra = state.extra;
+                  if (extra is ContactBalance) {
+                    contact = extra;
+                  } else if (extra is Map<String, dynamic>) {
+                    contact = extra['contact'] as ContactBalance?;
+                    transferOut = extra['out'] as TransactionModel?;
+                    transferIn = extra['in'] as TransactionModel?;
+                  }
+
+                  return AccountsRouteScope(
+                    child: DebtFormScreen(
+                      contact: contact,
+                      transferOut: transferOut,
+                      transferIn: transferIn,
+                    ),
+                  );
+                },
               ),
               GoRoute(
                 path: 'debts/:accountId',

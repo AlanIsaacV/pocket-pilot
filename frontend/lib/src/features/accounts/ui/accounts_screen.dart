@@ -163,7 +163,7 @@ class _AccountsScreenState extends State<AccountsScreen>
                   Navigator.of(context).pop();
                   context.push('/accounts/debts/new').then((result) {
                     if (result == true && context.mounted) {
-                      context.read<DebtViewModel>().loadOnAppear();
+                      context.read<DebtViewModel>().refresh();
                     }
                   });
                 },

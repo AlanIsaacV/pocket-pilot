@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -13,22 +12,29 @@ import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/debts/data/debt_repository.dart';
 import 'package:pocket_pilot/src/features/debts/domain/contact_balance.dart';
+import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/form_date_utils.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/widgets/transfer_form_widgets.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
+import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
-enum DebtOperation { create, pay }
-
-enum DebtDirection {
-  theyOweMe, // Me debe
-  iOweThem, // Le debo
-}
+enum _ActiveField { source, destination }
 
 class DebtFormScreen extends StatefulWidget {
   final ContactBalance? contact;
+  final TransactionModel? transferOut;
+  final TransactionModel? transferIn;
 
-  const DebtFormScreen({this.contact, super.key});
+  const DebtFormScreen({
+    this.contact,
+    this.transferOut,
+    this.transferIn,
+    super.key,
+  });
 
   @override
   State<DebtFormScreen> createState() => _DebtFormScreenState();
@@ -37,50 +43,43 @@ class DebtFormScreen extends StatefulWidget {
 class _DebtFormScreenState extends State<DebtFormScreen> {
   static const _uuid = Uuid();
 
-  DebtOperation _operation = DebtOperation.create;
-  DebtDirection _direction = DebtDirection.theyOweMe;
+  bool get _isEditMode =>
+      widget.transferOut != null && widget.transferIn != null;
 
   final _contactController = TextEditingController();
-  String? _selectedContactId;
-  AccountModel? _selectedMyAccount;
-  String _currencyCode = 'USD';
-  List<String> _allowedCurrencies = [];
+  final _noteController = TextEditingController();
+
+  String? _contactAccountId;
+  AccountModel? _myAccount;
   List<AccountModel> _myAccounts = [];
   List<Map<String, dynamic>> _contactSuggestions = [];
 
-  final _amountController = TextEditingController();
-  final _noteController = TextEditingController();
-  DateTime _selectedDate = DateTime.now();
+  String _amountSourceInput = '0';
+  String _amountDestinationInput = '0';
+
+  String _sourceCurrency = kInitialDefaultCurrency;
+  String _destinationCurrency = kInitialDefaultCurrency;
+  List<String> _allowedCurrencies = List<String>.from(
+    kInitialAllowedCurrencies,
+  );
+
+  bool _isContactSource = false;
+  _ActiveField _activeField = _ActiveField.source;
+  DateTime _date = DateTime.now();
 
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _didMutate = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.contact != null) {
-      _contactController.text = widget.contact!.contactName;
-      _selectedContactId = widget.contact!.accountId;
-      final primary = widget.contact!.primaryBalance;
-      if (primary != null) {
-        _currencyCode = primary.currencyCode;
-      }
-
-      _operation = DebtOperation.pay;
-      final primaryActive = widget.contact!.primaryActiveBalance;
-      if (primaryActive != null) {
-        _direction = primaryActive.balanceCents >= 0
-            ? DebtDirection.theyOweMe
-            : DebtDirection.iOweThem;
-      }
-    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
   @override
   void dispose() {
     _contactController.dispose();
-    _amountController.dispose();
     _noteController.dispose();
     super.dispose();
   }
@@ -103,221 +102,416 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
     final currencySnapshot = results[1] as CurrencyPreferencesSnapshot;
 
     final myAccounts = allAccounts.where((a) => a.type != 'contact').toList();
-    final allowedCurrencies = List<String>.from(currencySnapshot.allowedCodes);
+    var allowedCurrencies = List<String>.from(currencySnapshot.allowedCodes);
 
-    if (!allowedCurrencies.contains(_currencyCode)) {
-      allowedCurrencies.add(_currencyCode);
+    String sourceCurrency = currencySnapshot.defaultCode;
+    String destinationCurrency = currencySnapshot.defaultCode;
+    String amountSource = '0';
+    String amountDestination = '0';
+    String? contactAccountId;
+    AccountModel? myAccount;
+    DateTime date = DateTime.now();
+    String note = '';
+    String contactName = '';
+    bool isContactSource = false;
+
+    if (_isEditMode) {
+      final out = widget.transferOut!;
+      final inTxn = widget.transferIn!;
+
+      date = out.parsedDate;
+      note = out.description;
+      amountSource = _toAmountInput(out.amount);
+      amountDestination = _toAmountInput(inTxn.amount);
+
+      sourceCurrency = out.currencyCode;
+      destinationCurrency = inTxn.currencyCode;
+
+      final outAccount = allAccounts
+          .where((a) => a.id == out.accountId)
+          .cast<AccountModel?>()
+          .firstWhere((a) => a != null, orElse: () => null);
+      final inAccount = allAccounts
+          .where((a) => a.id == inTxn.accountId)
+          .cast<AccountModel?>()
+          .firstWhere((a) => a != null, orElse: () => null);
+
+      if (outAccount != null && outAccount.type == 'contact') {
+        isContactSource = true;
+        contactAccountId = outAccount.id;
+        contactName = outAccount.name;
+        myAccount = inAccount;
+      } else if (inAccount != null && inAccount.type == 'contact') {
+        isContactSource = false;
+        contactAccountId = inAccount.id;
+        contactName = inAccount.name;
+        myAccount = outAccount;
+      } else {
+        isContactSource = false;
+        contactAccountId = out.accountId;
+        myAccount = inAccount;
+      }
+    } else if (widget.contact != null) {
+      final contact = widget.contact!;
+      contactAccountId = contact.accountId;
+      contactName = contact.contactName;
+
+      final primary = contact.primaryBalance;
+      if (primary != null) {
+        sourceCurrency = primary.currencyCode;
+      }
+      destinationCurrency = sourceCurrency;
+      if (myAccounts.isNotEmpty) {
+        myAccount = myAccounts.first;
+      }
+
+      final active = contact.primaryActiveBalance;
+      if (active != null) {
+        isContactSource = active.balanceCents > 0;
+      }
+    } else {
+      if (myAccounts.isNotEmpty) {
+        myAccount = myAccounts.first;
+      }
+      sourceCurrency = currencySnapshot.defaultCode;
+      destinationCurrency = myAccount?.currencyCode ?? sourceCurrency;
+      isContactSource = false;
     }
-    allowedCurrencies.sort();
+
+    for (final code in [sourceCurrency, destinationCurrency]) {
+      if (!allowedCurrencies.contains(code)) {
+        allowedCurrencies.add(code);
+      }
+    }
+    allowedCurrencies.sort(compareCurrencyCodes);
 
     setState(() {
       _myAccounts = myAccounts;
       _allowedCurrencies = allowedCurrencies;
-      if (widget.contact == null) {
-        _currencyCode = currencySnapshot.defaultCode;
-      }
-      if (_myAccounts.isNotEmpty && _selectedMyAccount == null) {
-        _selectedMyAccount = _myAccounts.first;
-      }
+      _sourceCurrency = sourceCurrency;
+      _destinationCurrency = destinationCurrency;
+      _amountSourceInput = amountSource;
+      _amountDestinationInput = amountDestination;
+      _contactAccountId = contactAccountId;
+      _myAccount = myAccount;
+      _isContactSource = isContactSource;
+      _activeField = _ActiveField.source;
+      _date = date;
+      _noteController.text = note;
+      _contactController.text = contactName;
       _isLoading = false;
     });
   }
 
+  String _toAmountInput(int cents) {
+    final value = cents / 100;
+    if (value == value.truncateToDouble()) {
+      return value.toInt().toString();
+    }
+    return value.toStringAsFixed(2);
+  }
+
+  void _onNumKey(String key) {
+    setState(() {
+      if (_activeField == _ActiveField.source) {
+        _amountSourceInput = _applyNumKey(
+          _amountSourceInput,
+          key,
+          maxDecimals: 2,
+        );
+      } else {
+        _amountDestinationInput = _applyNumKey(
+          _amountDestinationInput,
+          key,
+          maxDecimals: 2,
+        );
+      }
+    });
+  }
+
+  String _applyNumKey(String current, String key, {required int maxDecimals}) {
+    if (key == 'backspace') {
+      if (current.length > 1) {
+        return current.substring(0, current.length - 1);
+      }
+      return '0';
+    }
+    if (key == '.') {
+      if (!current.contains('.')) {
+        return '$current.';
+      }
+      return current;
+    }
+    if (current == '0') {
+      return key;
+    }
+    if (current.contains('.')) {
+      final parts = current.split('.');
+      if (parts[1].length < maxDecimals) {
+        return '$current$key';
+      }
+      return current;
+    }
+    return '$current$key';
+  }
+
   bool get _canSave {
-    final amount = double.tryParse(_amountController.text);
-    final hasContact = _contactController.text.trim().isNotEmpty;
-    final hasAccount = _selectedMyAccount != null;
-    final validAmount = amount != null && amount > 0;
-    final hasExistingContactForPayment =
-        _operation == DebtOperation.create || _selectedContactId != null;
-    return hasContact &&
-        hasAccount &&
-        validAmount &&
-        hasExistingContactForPayment;
+    final source = double.tryParse(_amountSourceInput) ?? 0;
+    final destination = double.tryParse(_amountDestinationInput) ?? 0;
+    return !_isSaving &&
+        _contactController.text.trim().isNotEmpty &&
+        _myAccount != null &&
+        source > 0 &&
+        destination > 0;
+  }
+
+  bool get _isContactAsSource => _isContactSource;
+
+  String get _screenTitle {
+    if (_isEditMode) return 'Editar movimiento deuda';
+    return 'Registrar deuda';
   }
 
   @override
   Widget build(BuildContext context) {
-    final title = _operation == DebtOperation.create
-        ? 'Agregar deuda'
-        : 'Pagar deuda';
+    final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+    final keyboardOpen = keyboardInset > 0;
 
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        title: Text(title),
-        actions: [
-          TextButton(
-            onPressed: _canSave && !_isSaving ? _onSave : null,
-            child: Text(
-              _isSaving ? 'Guardando...' : 'Guardar',
-              style: GoogleFonts.ibmPlexSans(
-                fontWeight: FontWeight.w600,
-                color: _canSave && !_isSaving
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.pop(_didMutate);
+      },
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        appBar: AppBar(
+          title: Text(_screenTitle),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+            onPressed: () => context.pop(_didMutate),
           ),
-        ],
-      ),
-      body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
-                color: Theme.of(context).colorScheme.primary,
-                strokeWidth: 2,
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildOperationSelector(),
-                  const SizedBox(height: 20),
-                  _buildDirectionSelector(),
-                  const SizedBox(height: 20),
-                  _buildContactField(),
-                  const SizedBox(height: 16),
-                  _buildAmountField(),
-                  const SizedBox(height: 16),
-                  _buildMyAccountSelector(),
-                  const SizedBox(height: 16),
-                  _buildDateSelector(),
-                  const SizedBox(height: 16),
-                  NoteField(controller: _noteController),
-                  if (_operation == DebtOperation.pay &&
-                      _selectedContactId == null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Text(
-                        'Para pagar deuda debes seleccionar un contacto existente.',
-                        style: GoogleFonts.ibmPlexSans(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+          actions: [
+            FormAppBarActions(
+              canSave: _canSave,
+              isSaving: _isSaving,
+              onSave: _onSave,
+              saveTooltip: _isEditMode ? 'Guardar cambios' : 'Guardar deuda',
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(
+                        20,
+                        0,
+                        20,
+                        keyboardOpen ? keyboardInset + 24 : 0,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 12),
+                          _ContactAutocompleteField(
+                            controller: _contactController,
+                            suggestions: _contactSuggestions,
+                            onChanged: _onContactQueryChanged,
+                            onSelected: _onContactSuggestionSelected,
+                          ),
+                          const SizedBox(height: 12),
+                          TransferCard(
+                            label: 'DESDE',
+                            account: _isContactAsSource
+                                ? _contactAsAccount
+                                : _myAccount,
+                            amountInput: _amountSourceInput,
+                            currencyCode: _sourceCurrency,
+                            isActive: _activeField == _ActiveField.source,
+                            trailing: null,
+                            onAccountTap: _isContactAsSource
+                                ? () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'La cuenta de contacto se define desde el campo Contacto.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                : () => _showAccountSheet(isSource: true),
+                            onCurrencyTap: () =>
+                                _showCurrencySheet(isSource: true),
+                            onAmountTap: () => setState(
+                              () => _activeField = _ActiveField.source,
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Center(
+                              child: GestureDetector(
+                                onTap: _swapDirection,
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHigh,
+                                    borderRadius: AppTheme.radiusFull,
+                                  ),
+                                  child: Icon(
+                                    Icons.swap_vert_rounded,
+                                    size: 16,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          TransferCard(
+                            label: 'HACIA',
+                            account: _isContactAsSource
+                                ? _myAccount
+                                : _contactAsAccount,
+                            amountInput: _amountDestinationInput,
+                            currencyCode: _destinationCurrency,
+                            isActive: _activeField == _ActiveField.destination,
+                            trailing: null,
+                            onAccountTap: _isContactAsSource
+                                ? () => _showAccountSheet(isSource: false)
+                                : () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'La cuenta de contacto se define desde el campo Contacto.',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                            onCurrencyTap: () =>
+                                _showCurrencySheet(isSource: false),
+                            onAmountTap: () => setState(
+                              () => _activeField = _ActiveField.destination,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          DetailRow(
+                            icon: Icons.calendar_today_outlined,
+                            label: 'Fecha',
+                            value: formatDateDisplay(_date),
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _date,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime.now().add(
+                                  const Duration(days: 365),
+                                ),
+                              );
+                              if (picked != null) {
+                                setState(() => _date = picked);
+                              }
+                            },
+                          ),
+                          NoteField(controller: _noteController),
+                          if (_contactAccountId == null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                'Si el contacto no existe se creará automáticamente al guardar.',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            ),
+                          const SizedBox(height: 12),
+                        ],
                       ),
                     ),
-                ],
-              ),
             ),
-    );
-  }
-
-  Widget _buildOperationSelector() {
-    return _LabeledChips<DebtOperation>(
-      label: 'Operación',
-      values: const [DebtOperation.create, DebtOperation.pay],
-      selected: _operation,
-      toText: (v) => v == DebtOperation.create ? 'Crear deuda' : 'Pagar deuda',
-      onSelected: (value) => setState(() {
-        _operation = value;
-      }),
-    );
-  }
-
-  Widget _buildDirectionSelector() {
-    return _LabeledChips<DebtDirection>(
-      label: 'Sentido',
-      values: const [DebtDirection.theyOweMe, DebtDirection.iOweThem],
-      selected: _direction,
-      toText: (v) => v == DebtDirection.theyOweMe ? 'Me debe' : 'Le debo',
-      onSelected: (value) => setState(() {
-        _direction = value;
-      }),
-    );
-  }
-
-  Widget _buildContactField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Contacto',
-          style: GoogleFonts.ibmPlexSans(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+            if (!keyboardOpen && !_isLoading) ...[NumPad(onKey: _onNumKey)],
+          ],
         ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _contactController,
-          decoration: InputDecoration(
-            hintText: 'Nombre del contacto',
-            prefixIcon: const Icon(Icons.person_outline, size: 20),
-            border: OutlineInputBorder(borderRadius: AppTheme.radiusMedium),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
-          ),
-          onChanged: _onContactQueryChanged,
-        ),
-        if (_contactSuggestions.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.only(top: 4),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainer,
-              borderRadius: AppTheme.radiusMedium,
-              border: Border.all(
-                color: Theme.of(context).colorScheme.surfaceContainerHigh,
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: _contactSuggestions.map((row) {
-                final name = row['name'] as String;
-                final id = row['id'] as String;
-                final currencyCode = row['currency_code'] as String?;
-                return InkWell(
-                  onTap: () => setState(() {
-                    _contactController.text = name;
-                    _selectedContactId = id;
-                    if (currencyCode != null && currencyCode.isNotEmpty) {
-                      _currencyCode = currencyCode;
-                      if (!_allowedCurrencies.contains(currencyCode)) {
-                        _allowedCurrencies =
-                            List<String>.from(_allowedCurrencies)
-                              ..add(currencyCode)
-                              ..sort();
-                      }
-                    }
-                    _contactSuggestions = [];
-                  }),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.person_outline,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          name,
-                          style: GoogleFonts.ibmPlexSans(
-                            fontSize: 14,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-      ],
+      ),
     );
+  }
+
+  AccountModel? get _contactAsAccount {
+    final id = _contactAccountId;
+    final name = _contactController.text.trim();
+    if (id == null || name.isEmpty) return null;
+    final now = DateTime.now().toUtc();
+    final currency = _isContactAsSource
+        ? _sourceCurrency
+        : _destinationCurrency;
+    return AccountModel(
+      id: id,
+      name: name,
+      type: 'contact',
+      currencyCode: currency,
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
+  void _swapDirection() {
+    setState(() {
+      _isContactSource = !_isContactSource;
+      _activeField = _activeField == _ActiveField.source
+          ? _ActiveField.destination
+          : _ActiveField.source;
+
+      final sourceAmount = _amountSourceInput;
+      _amountSourceInput = _amountDestinationInput;
+      _amountDestinationInput = sourceAmount;
+
+      final sourceCurrency = _sourceCurrency;
+      _sourceCurrency = _destinationCurrency;
+      _destinationCurrency = sourceCurrency;
+    });
+  }
+
+  void _onContactSuggestionSelected(Map<String, dynamic> row) {
+    final id = row['id'] as String;
+    final name = row['name'] as String;
+    final currency = row['currency_code'] as String?;
+    setState(() {
+      _contactAccountId = id;
+      _contactController.text = name;
+      _contactSuggestions = [];
+      if (currency != null && currency.isNotEmpty) {
+        if (_isContactAsSource) {
+          _sourceCurrency = currency;
+        } else {
+          _destinationCurrency = currency;
+        }
+        if (!_allowedCurrencies.contains(currency)) {
+          _allowedCurrencies = List<String>.from(_allowedCurrencies)
+            ..add(currency)
+            ..sort(compareCurrencyCodes);
+        }
+      }
+
+      if (!_isContactAsSource && _myAccount != null) {
+        _sourceCurrency = _myAccount!.currencyCode;
+      }
+      if (_isContactAsSource && _myAccount != null) {
+        _destinationCurrency = _myAccount!.currencyCode;
+      }
+    });
   }
 
   Future<void> _onContactQueryChanged(String query) async {
-    _selectedContactId = null;
+    _contactAccountId = null;
     if (query.trim().length < 2) {
       setState(() => _contactSuggestions = []);
       return;
@@ -329,362 +523,190 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
     setState(() => _contactSuggestions = results);
   }
 
-  Widget _buildAmountField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Monto',
-          style: GoogleFonts.ibmPlexSans(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            GestureDetector(
-              onTap: _showCurrencyPicker,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainer,
-                  borderRadius: AppTheme.radiusMedium,
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _currencyCode,
-                      style: GoogleFonts.ibmPlexSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.expand_more,
-                      size: 18,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  hintText: '0.00',
-                  prefixIcon: const Icon(Icons.attach_money, size: 20),
-                  border: OutlineInputBorder(
-                    borderRadius: AppTheme.radiusMedium,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  void _showCurrencyPicker() {
-    showModalBottomSheet(
+  void _showAccountSheet({required bool isSource}) {
+    showFormBottomSheet<Object>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) => ScrollableBottomSheet(
-        title: 'Moneda',
-        children: _allowedCurrencies
-            .map(
-              (code) => SheetItem(
-                label: code,
-                onTap: () {
-                  setState(() => _currencyCode = code);
-                  Navigator.of(context).pop();
-                },
-              ),
-            )
-            .toList(),
-      ),
-    );
-  }
-
-  Widget _buildMyAccountSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Mi cuenta',
-          style: GoogleFonts.ibmPlexSans(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+      builder: (ctx) => ScrollableBottomSheet(
+        title: isSource ? 'Cuenta origen' : 'Cuenta destino',
+        children: [
+          SheetItem(
+            icon: Icons.add_circle_outline_rounded,
+            label: 'Agregar cuenta',
+            onTap: () => Navigator.of(ctx).pop('__add_new__'),
           ),
-        ),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: _showAccountPicker,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainer,
-              borderRadius: AppTheme.radiusMedium,
-              border: Border.all(
-                color: Theme.of(context).colorScheme.surfaceContainerHigh,
-              ),
+          for (final account in _myAccounts)
+            SheetItem(
+              icon: Icons.account_balance_outlined,
+              label: account.name,
+              onTap: () => Navigator.of(ctx).pop(account),
             ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.account_balance_outlined,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _selectedMyAccount?.name ?? 'Seleccionar cuenta',
-                    style: GoogleFonts.ibmPlexSans(
-                      fontSize: 14,
-                      color: _selectedMyAccount != null
-                          ? Theme.of(context).colorScheme.onSurface
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showAccountPicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ],
       ),
-      builder: (_) => ScrollableBottomSheet(
-        title: 'Seleccionar cuenta',
-        children: _myAccounts
-            .map(
-              (a) => SheetItem(
-                icon: Icons.account_balance_outlined,
-                label: '${a.name} (${a.currencyCode})',
-                onTap: () {
-                  setState(() => _selectedMyAccount = a);
-                  Navigator.of(context).pop();
-                },
-              ),
-            )
-            .toList(),
-      ),
-    );
-  }
+    ).then((selection) async {
+      if (selection == null || !mounted) return;
 
-  Widget _buildDateSelector() {
-    final months = [
-      '',
-      'Ene',
-      'Feb',
-      'Mar',
-      'Abr',
-      'May',
-      'Jun',
-      'Jul',
-      'Ago',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dic',
-    ];
-    final label =
-        '${_selectedDate.day} ${months[_selectedDate.month]} ${_selectedDate.year}';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Fecha',
-          style: GoogleFonts.ibmPlexSans(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: _selectedDate,
-              firstDate: DateTime(2020),
-              lastDate: DateTime.now().add(const Duration(days: 365)),
-            );
-            if (picked != null) {
-              setState(() => _selectedDate = picked);
-            }
-          },
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainer,
-              borderRadius: AppTheme.radiusMedium,
-              border: Border.all(
-                color: Theme.of(context).colorScheme.surfaceContainerHigh,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.calendar_today_outlined,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  label,
-                  style: GoogleFonts.ibmPlexSans(
-                    fontSize: 14,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _onSave() async {
-    if (!_canSave || _isSaving) return;
-
-    setState(() => _isSaving = true);
-
-    try {
-      final repo = context.read<DebtRepository>();
-      final syncService = context.read<SyncService>();
-      final contactName = _contactController.text.trim();
-      final amountCents = (double.parse(_amountController.text) * 100).round();
-      final date = _toDateString(_selectedDate);
-      final description = _noteController.text.trim();
-
-      var contactAccountId = _selectedContactId;
-      if (contactAccountId == null && _operation == DebtOperation.create) {
-        contactAccountId = _uuid.v4();
-        await repo.createContact(
-          id: contactAccountId,
-          name: contactName,
-          currencyCode: _currencyCode,
-        );
-      }
-
-      if (contactAccountId == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Selecciona un contacto existente para pagar deuda.',
-              ),
-            ),
-          );
+      if (selection is String && selection == '__add_new__') {
+        final created = await context.push<bool>('/accounts/new');
+        if (created == true && mounted) {
+          await _loadData();
         }
         return;
       }
 
-      if (_operation == DebtOperation.create) {
-        if (_direction == DebtDirection.theyOweMe) {
-          await repo.recordLoan(
-            outId: _uuid.v4(),
-            inId: _uuid.v4(),
-            myAccountId: _selectedMyAccount!.id,
-            contactAccountId: contactAccountId,
-            amountCents: amountCents,
-            currencyCode: _currencyCode,
-            date: date,
-            description: description,
-            tags: const [],
-          );
-        } else {
-          await repo.recordPaymentReceived(
-            outId: _uuid.v4(),
-            inId: _uuid.v4(),
-            contactAccountId: contactAccountId,
-            myAccountId: _selectedMyAccount!.id,
-            amountCents: amountCents,
-            currencyCode: _currencyCode,
-            date: date,
-            description: description,
-            tags: const [],
-          );
+      if (selection is AccountModel) {
+        setState(() {
+          _myAccount = selection;
+          if (_isContactAsSource) {
+            if (!isSource) {
+              _destinationCurrency = selection.currencyCode;
+            }
+          } else {
+            if (isSource) {
+              _sourceCurrency = selection.currencyCode;
+            }
+          }
+        });
+      }
+    });
+  }
+
+  void _showCurrencySheet({required bool isSource}) {
+    showFormBottomSheet<Object>(
+      context: context,
+      builder: (ctx) => ScrollableBottomSheet(
+        title: isSource ? 'Moneda origen' : 'Moneda destino',
+        children: [
+          SheetItem(
+            icon: Icons.tune_rounded,
+            label: 'Configurar monedas',
+            onTap: () => Navigator.of(ctx).pop('__preferences__'),
+          ),
+          for (final code in _allowedCurrencies)
+            SheetItem(
+              label: '$code — ${currencyNameForCode(code)}',
+              onTap: () => Navigator.of(ctx).pop(code),
+            ),
+        ],
+      ),
+    ).then((selection) async {
+      if (selection == null || !mounted) return;
+
+      if (selection is String && selection == '__preferences__') {
+        await context.push<bool>('/settings/currency');
+        if (!mounted) return;
+        final db = context.read<DatabaseHelper>();
+        final currencyStore = CurrencyPreferencesLocalStore(
+          preferences: UserPreferenceLocalStore(db: db),
+        );
+        final snapshot = await currencyStore.getSnapshot();
+        if (!mounted) return;
+        final allowed = List<String>.from(snapshot.allowedCodes);
+        for (final code in [_sourceCurrency, _destinationCurrency]) {
+          if (!allowed.contains(code)) {
+            allowed.add(code);
+          }
         }
-      } else {
-        if (_direction == DebtDirection.theyOweMe) {
-          await repo.recordPaymentReceived(
-            outId: _uuid.v4(),
-            inId: _uuid.v4(),
-            contactAccountId: contactAccountId,
-            myAccountId: _selectedMyAccount!.id,
-            amountCents: amountCents,
-            currencyCode: _currencyCode,
-            date: date,
-            description: description,
-            tags: const [],
-          );
-        } else {
-          await repo.recordPaymentMade(
-            outId: _uuid.v4(),
-            inId: _uuid.v4(),
-            myAccountId: _selectedMyAccount!.id,
-            contactAccountId: contactAccountId,
-            amountCents: amountCents,
-            currencyCode: _currencyCode,
-            date: date,
-            description: description,
-            tags: const [],
-          );
-        }
+        allowed.sort(compareCurrencyCodes);
+        setState(() => _allowedCurrencies = allowed);
+        return;
       }
 
-      unawaited(syncService.sync());
-      if (mounted) {
-        context.pop(true);
+      if (selection is String) {
+        setState(() {
+          if (isSource) {
+            _sourceCurrency = selection;
+          } else {
+            _destinationCurrency = selection;
+          }
+        });
       }
+    });
+  }
+
+  Future<void> _onSave() async {
+    if (!_canSave || _isSaving) return;
+    setState(() => _isSaving = true);
+
+    try {
+      final repo = context.read<DebtRepository>();
+      final sync = context.read<SyncService>();
+      final contactName = _contactController.text.trim();
+
+      var contactAccountId = _contactAccountId;
+      if (contactAccountId == null) {
+        contactAccountId = _uuid.v4();
+        final contactCurrency = _isContactAsSource
+            ? _sourceCurrency
+            : _destinationCurrency;
+        await repo.createContact(
+          id: contactAccountId,
+          name: contactName,
+          currencyCode: contactCurrency,
+        );
+      }
+
+      final amountSource = (double.parse(_amountSourceInput) * 100).round();
+      final amountDestination = (double.parse(_amountDestinationInput) * 100)
+          .round();
+      final dateIso = formatDateISO(_date);
+      final note = _noteController.text.trim();
+
+      String fromAccountId;
+      String toAccountId;
+
+      if (_isContactAsSource) {
+        fromAccountId = contactAccountId;
+        toAccountId = _myAccount!.id;
+      } else {
+        fromAccountId = _myAccount!.id;
+        toAccountId = contactAccountId;
+      }
+
+      final outDescription = note;
+      final inDescription = note;
+
+      if (_isEditMode) {
+        await repo.updateDebtTransfer(
+          outId: widget.transferOut!.id,
+          inId: widget.transferIn!.id,
+          fromAccountId: fromAccountId,
+          toAccountId: toAccountId,
+          amountOutCents: amountSource,
+          currencyOut: _sourceCurrency,
+          amountInCents: amountDestination,
+          currencyIn: _destinationCurrency,
+          date: dateIso,
+          descriptionOut: outDescription,
+          descriptionIn: inDescription,
+          tags: const [],
+          createdAt: widget.transferOut!.createdAt,
+        );
+      } else {
+        await repo.createDebtTransfer(
+          outId: _uuid.v4(),
+          inId: _uuid.v4(),
+          fromAccountId: fromAccountId,
+          toAccountId: toAccountId,
+          amountOutCents: amountSource,
+          currencyOut: _sourceCurrency,
+          amountInCents: amountDestination,
+          currencyIn: _destinationCurrency,
+          date: dateIso,
+          descriptionOut: outDescription,
+          descriptionIn: inDescription,
+          tags: const [],
+        );
+      }
+
+      unawaited(sync.sync());
+      _didMutate = true;
+      if (!mounted) return;
+      context.pop(true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('No se pudo guardar: $e')));
+        ).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
       }
     } finally {
       if (mounted) {
@@ -692,26 +714,18 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
       }
     }
   }
-
-  String _toDateString(DateTime date) {
-    final month = date.month.toString().padLeft(2, '0');
-    final day = date.day.toString().padLeft(2, '0');
-    return '${date.year}-$month-$day';
-  }
 }
 
-class _LabeledChips<T> extends StatelessWidget {
-  final String label;
-  final List<T> values;
-  final T selected;
-  final String Function(T value) toText;
-  final ValueChanged<T> onSelected;
+class _ContactAutocompleteField extends StatelessWidget {
+  final TextEditingController controller;
+  final List<Map<String, dynamic>> suggestions;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<Map<String, dynamic>> onSelected;
 
-  const _LabeledChips({
-    required this.label,
-    required this.values,
-    required this.selected,
-    required this.toText,
+  const _ContactAutocompleteField({
+    required this.controller,
+    required this.suggestions,
+    required this.onChanged,
     required this.onSelected,
   });
 
@@ -720,44 +734,49 @@ class _LabeledChips<T> extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.ibmPlexSans(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        TextField(
+          controller: controller,
+          onChanged: onChanged,
+          decoration: const InputDecoration(
+            hintText: 'Contacto',
+            prefixIcon: Icon(Icons.person_outline, size: 20),
           ),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: values.map((value) {
-            final isSelected = value == selected;
-            return ChoiceChip(
-              label: Text(toText(value)),
-              selected: isSelected,
-              onSelected: (_) => onSelected(value),
-              labelStyle: GoogleFonts.ibmPlexSans(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: isSelected
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
+        if (suggestions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainer,
+              borderRadius: AppTheme.radiusMedium,
+              border: Border.all(
+                color: Theme.of(context).colorScheme.surfaceContainerHigh,
               ),
-              selectedColor: Theme.of(context).colorScheme.primary,
-              backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-              side: BorderSide(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.surfaceContainerHigh,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: AppTheme.radiusMedium,
-              ),
-            );
-          }).toList(),
-        ),
+            ),
+            child: Column(
+              children: suggestions.map((row) {
+                return InkWell(
+                  onTap: () => onSelected(row),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.person_outline,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(row['name'] as String)),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
       ],
     );
   }

@@ -87,12 +87,19 @@ class AccountRepository {
 
   Future<void> deleteAccount(String id) async {
     final now = DateTime.now().toUtc();
-    await _local.softDelete(id, now);
+    final current = await _local.getById(id);
+
+    var deletedAt = now;
+    if (current != null && !current.updatedAt.isBefore(now)) {
+      deletedAt = current.updatedAt.add(const Duration(milliseconds: 1));
+    }
+
+    await _local.softDelete(id, deletedAt);
     await _outbox.enqueue(
       entityType: 'account',
       entityId: id,
       operation: 'delete',
-      payload: jsonEncode({'deleted_at': now.toIso8601String()}),
+      payload: jsonEncode({'deleted_at': deletedAt.toIso8601String()}),
     );
   }
 }

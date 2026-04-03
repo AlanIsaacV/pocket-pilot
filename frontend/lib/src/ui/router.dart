@@ -60,6 +60,7 @@ import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_form_rou
 import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_form_screen.dart';
 import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_route_scope.dart';
 import 'package:pocket_pilot/src/features/yield_configs/ui/yield_configs_screen.dart';
+import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_route_scope.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/settings/settings_screen.dart';
@@ -78,7 +79,8 @@ GoRouter buildRouter() {
         routes: [
           GoRoute(
             path: '/dashboard',
-            builder: (context, state) => const DashboardScreen(),
+            builder: (context, state) =>
+                const DashboardRouteScope(child: DashboardScreen()),
           ),
           GoRoute(
             path: '/transactions',

@@ -1,19 +1,20 @@
 // ============================================================
-// DashboardScreen — Pantalla principal (placeholder)
+// DashboardScreen — Pantalla principal con métricas financieras
 // ============================================================
-//
-// Muestra el resumen financiero: patrimonio neto, métricas rápidas,
-// cuentas y transacciones recientes. Todo estático por ahora.
-//
-// TODO: conectar a un DashboardViewModel que agregue datos de
-//       AccountRepository y TransactionRepository.
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/account_balance_dto.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/category_spend_dto.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/dashboard_metrics.dart';
+import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
+import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_view_model.dart';
+import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -26,144 +27,259 @@ class DashboardScreen extends StatelessWidget {
         tooltip: 'Nueva transacción',
         child: const Icon(Icons.add),
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            floating: true,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            title: Text(
-              'Dashboard',
-              style: GoogleFonts.ibmPlexSans(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
+      body: Consumer2<DashboardViewModel, DashboardFilterViewModel>(
+        builder: (context, vm, filterVM, _) {
+          if (vm.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final metrics = vm.activeMetrics;
+
+          return RefreshIndicator(
+            onRefresh: vm.refresh,
+            child: CustomScrollView(
+              slivers: [
+                SliverAppBar(
+                  floating: true,
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
+                  title: Text(
+                    'Dashboard',
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  actions: [
+                    _FilterButton(hasFilters: filterVM.hasFilters),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      // Currency selector (only if multiple)
+                      if (vm.availableCurrencies.length > 1) ...[
+                        _CurrencyTabs(
+                          currencies: vm.availableCurrencies,
+                          selected: vm.selectedCurrency,
+                          onSelected: (cc) => filterVM.setCurrencyCode(cc),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Hero + metrics
+                      if (metrics != null) ...[
+                        _NetWorthCard(metrics: metrics),
+                        const SizedBox(height: 12),
+                        _MetricsGrid(metrics: metrics),
+                      ] else
+                        _EmptyHint(
+                          icon: Icons.analytics_outlined,
+                          label: 'Sin datos disponibles',
+                        ),
+
+                      const SizedBox(height: 28),
+                      _SectionHeader(title: 'Cuentas'),
+                      const SizedBox(height: 12),
+                      if (vm.filteredAccountBalances.isEmpty)
+                        _EmptyHint(
+                          icon: Icons.account_balance_wallet_outlined,
+                          label: 'Sin cuentas registradas',
+                        )
+                      else
+                        ...vm.filteredAccountBalances.map(
+                          (b) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _AccountCard(balance: b),
+                          ),
+                        ),
+
+                      const SizedBox(height: 20),
+                      _SectionHeader(title: 'Gasto del mes'),
+                      const SizedBox(height: 12),
+                      if (vm.filteredMonthlySpend.isEmpty)
+                        _EmptyHint(
+                          icon: Icons.pie_chart_outline,
+                          label: 'Sin gastos este mes',
+                        )
+                      else
+                        _SpendBreakdown(items: vm.filteredMonthlySpend),
+                    ]),
+                  ),
+                ),
+              ],
             ),
-          ),
-
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // --- Net Worth principal ---
-                _NetWorthCard(),
-                const SizedBox(height: 16),
-
-                // --- Métricas rápidas ---
-                _QuickMetricsRow(),
-                const SizedBox(height: 28),
-
-                // --- Sección cuentas ---
-                _SectionHeader(title: 'Cuentas'),
-                const SizedBox(height: 12),
-                _PlaceholderAccountCard(
-                  label: 'Cuenta principal',
-                  type: 'Banco',
-                  icon: Icons.account_balance_outlined,
-                ),
-                const SizedBox(height: 8),
-                _PlaceholderAccountCard(
-                  label: 'Efectivo',
-                  type: 'Efectivo',
-                  icon: Icons.payments_outlined,
-                ),
-                const SizedBox(height: 28),
-
-                // --- Transacciones recientes ---
-                _SectionHeader(title: 'Últimas transacciones'),
-                const SizedBox(height: 12),
-                _PlaceholderTransactionTile(
-                  description: 'Sin descripción',
-                  date: '—',
-                  amount: '--',
-                  isIncome: false,
-                ),
-                _PlaceholderTransactionTile(
-                  description: 'Sin descripción',
-                  date: '—',
-                  amount: '--',
-                  isIncome: true,
-                ),
-                _PlaceholderTransactionTile(
-                  description: 'Sin descripción',
-                  date: '—',
-                  amount: '--',
-                  isIncome: false,
-                ),
-              ]),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
 // ============================================================
-// Tarjeta de patrimonio neto
+// Filter button with active indicator
+// ============================================================
+
+class _FilterButton extends StatelessWidget {
+  final bool hasFilters;
+
+  const _FilterButton({required this.hasFilters});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Stack(
+      children: [
+        IconButton(
+          icon: Icon(
+            Icons.tune_outlined,
+            color: hasFilters ? cs.primary : cs.onSurfaceVariant,
+          ),
+          onPressed: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              builder: (_) {
+                // Re-provide the VMs so the sheet can access them
+                return MultiProvider(
+                  providers: [
+                    ChangeNotifierProvider.value(
+                      value: context.read<DashboardFilterViewModel>(),
+                    ),
+                    ChangeNotifierProvider.value(
+                      value: context.read<DashboardViewModel>(),
+                    ),
+                  ],
+                  child: const DashboardFilterSheet(),
+                );
+              },
+            );
+          },
+        ),
+        if (hasFilters)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: cs.primary,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ============================================================
+// Currency tabs
+// ============================================================
+
+class _CurrencyTabs extends StatelessWidget {
+  final List<String> currencies;
+  final String? selected;
+  final ValueChanged<String> onSelected;
+
+  const _CurrencyTabs({
+    required this.currencies,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: currencies.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final cc = currencies[index];
+          final isSelected = cc == selected;
+          return ChoiceChip(
+            label: Text(cc),
+            selected: isSelected,
+            onSelected: (_) => onSelected(cc),
+            visualDensity: VisualDensity.compact,
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Net Worth hero card
 // ============================================================
 
 class _NetWorthCard extends StatelessWidget {
+  final DashboardMetrics metrics;
+
+  const _NetWorthCard({required this.metrics});
+
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isNegative = metrics.netWorthCents < 0;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainer,
+        color: cs.surfaceContainer,
         borderRadius: AppTheme.radiusMedium,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.surfaceContainerHigh,
-          width: 1,
-        ),
+        border: Border.all(color: cs.surfaceContainerHigh, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Patrimonio neto',
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 13,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '\$ --',
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 40,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -1,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 4),
           Row(
             children: [
+              Text(
+                'Patrimonio neto',
+                style: GoogleFonts.ibmPlexSans(
+                  fontSize: 13,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                  color: cs.surfaceContainerHigh,
                   borderRadius: AppTheme.radiusFull,
                 ),
                 child: Text(
-                  '— %',
+                  metrics.currencyCode,
                   style: GoogleFonts.ibmPlexSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
-              Text(
-                'este mes',
-                style: GoogleFonts.ibmPlexSans(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _formatAmount(metrics.netWorthCents, metrics.currencyCode),
+            style: GoogleFonts.ibmPlexSans(
+              fontSize: 36,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -1,
+              color: isNegative ? cs.error : cs.onSurface,
+            ),
           ),
         ],
       ),
@@ -172,28 +288,49 @@ class _NetWorthCard extends StatelessWidget {
 }
 
 // ============================================================
-// Fila de métricas rápidas
+// Metrics grid — 3 secondary metrics
 // ============================================================
 
-class _QuickMetricsRow extends StatelessWidget {
+class _MetricsGrid extends StatelessWidget {
+  final DashboardMetrics metrics;
+
+  const _MetricsGrid({required this.metrics});
+
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _MetricCard(
-            label: 'Patrimonio líquido',
-            value: '\$ --',
-            icon: Icons.water_drop_outlined,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _MetricCard(
+                label: 'Liquidez real',
+                cents: metrics.liquidAssetsCents,
+                currency: metrics.currencyCode,
+                icon: Icons.water_drop_outlined,
+                iconColor: AppColors.catSapphire,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _MetricCard(
+                label: 'Liquidez libre',
+                cents: metrics.safeToSpendCents,
+                currency: metrics.currencyCode,
+                icon: Icons.shield_outlined,
+                iconColor: AppColors.catGreen,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _MetricCard(
-            label: 'Poder de compra',
-            value: '\$ --',
-            icon: Icons.bolt_outlined,
-          ),
+        const SizedBox(height: 10),
+        _MetricCard(
+          label: 'Poder de compra',
+          cents: metrics.buyingPowerCents,
+          currency: metrics.currencyCode,
+          icon: Icons.bolt_outlined,
+          iconColor: AppColors.catYellow,
+          fullWidth: true,
         ),
       ],
     );
@@ -202,38 +339,44 @@ class _QuickMetricsRow extends StatelessWidget {
 
 class _MetricCard extends StatelessWidget {
   final String label;
-  final String value;
+  final int cents;
+  final String currency;
   final IconData icon;
+  final Color iconColor;
+  final bool fullWidth;
 
   const _MetricCard({
     required this.label,
-    required this.value,
+    required this.cents,
+    required this.currency,
     required this.icon,
+    required this.iconColor,
+    this.fullWidth = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final cs = Theme.of(context).colorScheme;
+    final isNegative = cents < 0;
+
+    final card = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainer,
+        color: cs.surfaceContainer,
         borderRadius: AppTheme.radiusMedium,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.surfaceContainerHigh,
-          width: 1,
-        ),
+        border: Border.all(color: cs.surfaceContainerHigh, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+          Icon(icon, size: 18, color: iconColor),
           const SizedBox(height: 8),
           Text(
-            value,
+            _formatAmount(cents, currency),
             style: GoogleFonts.ibmPlexSans(
-              fontSize: 20,
+              fontSize: fullWidth ? 22 : 18,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface,
+              color: isNegative ? cs.error : cs.onSurface,
             ),
           ),
           const SizedBox(height: 2),
@@ -241,9 +384,84 @@ class _MetricCard extends StatelessWidget {
             label,
             style: GoogleFonts.ibmPlexSans(
               fontSize: 11,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: cs.onSurfaceVariant,
             ),
             maxLines: 2,
+          ),
+        ],
+      ),
+    );
+
+    return fullWidth ? SizedBox(width: double.infinity, child: card) : card;
+  }
+}
+
+// ============================================================
+// Account cards
+// ============================================================
+
+class _AccountCard extends StatelessWidget {
+  final AccountBalanceDTO balance;
+
+  const _AccountCard({required this.balance});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isNegative = balance.balanceCents < 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: AppTheme.radiusMedium,
+        border: Border.all(color: cs.surfaceContainerHigh, width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(alpha: 0.12),
+              borderRadius: AppTheme.radiusSmall,
+            ),
+            child: Icon(
+              _accountIcon(balance.accountType),
+              size: 20,
+              color: cs.primary,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  balance.accountName,
+                  style: GoogleFonts.ibmPlexSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                ),
+                Text(
+                  _accountTypeLabel(balance.accountType),
+                  style: GoogleFonts.ibmPlexSans(
+                    fontSize: 12,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            _formatAmount(balance.balanceCents, balance.currencyCode),
+            style: GoogleFonts.ibmPlexSans(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: isNegative ? cs.error : cs.onSurface,
+            ),
           ),
         ],
       ),
@@ -252,7 +470,126 @@ class _MetricCard extends StatelessWidget {
 }
 
 // ============================================================
-// Header de sección
+// Monthly spend breakdown
+// ============================================================
+
+class _SpendBreakdown extends StatelessWidget {
+  final List<CategorySpendDTO> items;
+
+  const _SpendBreakdown({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    final sorted = items.where((i) => i.spentCents > 0).toList()
+      ..sort((a, b) => b.spentCents.compareTo(a.spentCents));
+
+    if (sorted.isEmpty) {
+      return _EmptyHint(
+        icon: Icons.pie_chart_outline,
+        label: 'Sin gastos este mes',
+      );
+    }
+
+    final totalSpent = sorted.fold(0, (sum, i) => sum + i.spentCents);
+    final currency = sorted.first.currencyCode;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: AppTheme.radiusMedium,
+        border: Border.all(color: cs.surfaceContainerHigh, width: 1),
+      ),
+      child: Column(
+        children: [
+          // Stacked bar
+          ClipRRect(
+            borderRadius: AppTheme.radiusFull,
+            child: SizedBox(
+              height: 8,
+              child: Row(
+                children: sorted.map((item) {
+                  final fraction =
+                      totalSpent > 0 ? item.spentCents / totalSpent : 0.0;
+                  return Expanded(
+                    flex: (fraction * 1000).round().clamp(1, 1000),
+                    child: Container(
+                      color: _parseCategoryColor(item.categoryColor, cs),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...sorted.take(6).map((item) {
+            final pct = totalSpent > 0
+                ? (item.spentCents / totalSpent * 100).round()
+                : 0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: _parseCategoryColor(item.categoryColor, cs),
+                      borderRadius:
+                          const BorderRadius.all(Radius.circular(3)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      item.categoryName ?? 'Sin categoría',
+                      style: GoogleFonts.ibmPlexSans(
+                        fontSize: 13,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '$pct%',
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    _formatAmount(item.spentCents, currency),
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (sorted.length > 6)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '+${sorted.length - 6} más',
+                style: GoogleFonts.ibmPlexSans(
+                  fontSize: 12,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Shared helpers
 // ============================================================
 
 class _SectionHeader extends StatelessWidget {
@@ -273,79 +610,32 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ============================================================
-// Placeholder: tarjeta de cuenta
-// ============================================================
-
-class _PlaceholderAccountCard extends StatelessWidget {
-  final String label;
-  final String type;
+class _EmptyHint extends StatelessWidget {
   final IconData icon;
+  final String label;
 
-  const _PlaceholderAccountCard({
-    required this.label,
-    required this.type,
-    required this.icon,
-  });
+  const _EmptyHint({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainer,
+        color: cs.surfaceContainer,
         borderRadius: AppTheme.radiusMedium,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.surfaceContainerHigh,
-          width: 1,
-        ),
+        border: Border.all(color: cs.surfaceContainerHigh, width: 1),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.12),
-              borderRadius: AppTheme.radiusSmall,
-            ),
-            child: Icon(
-              icon,
-              size: 20,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: GoogleFonts.ibmPlexSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                Text(
-                  type,
-                  style: GoogleFonts.ibmPlexSans(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          Icon(icon, size: 18, color: cs.onSurfaceVariant),
+          const SizedBox(width: 8),
           Text(
-            '\$ --',
+            label,
             style: GoogleFonts.ibmPlexSans(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 13,
+              color: cs.onSurfaceVariant,
             ),
           ),
         ],
@@ -354,92 +644,60 @@ class _PlaceholderAccountCard extends StatelessWidget {
   }
 }
 
-// ============================================================
-// Placeholder: fila de transacción reciente
-// ============================================================
+String _formatAmount(int cents, String currency) {
+  final negative = cents < 0;
+  final absCents = cents.abs();
+  final whole = absCents ~/ 100;
+  final frac = absCents % 100;
 
-class _PlaceholderTransactionTile extends StatelessWidget {
-  final String description;
-  final String date;
-  final String amount;
-  final bool isIncome;
+  final formatted = frac == 0
+      ? _formatWithCommas(whole)
+      : '${_formatWithCommas(whole)}.${frac.toString().padLeft(2, '0')}';
 
-  const _PlaceholderTransactionTile({
-    required this.description,
-    required this.date,
-    required this.amount,
-    required this.isIncome,
-  });
+  return '${negative ? '-' : ''}$currency \$$formatted';
+}
 
-  @override
-  Widget build(BuildContext context) {
-    final amountColor = isIncome
-        ? Theme.of(context).colorScheme.tertiary
-        : Theme.of(context).colorScheme.error;
+String _formatWithCommas(int value) {
+  final str = value.toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < str.length; i++) {
+    if (i > 0 && (str.length - i) % 3 == 0) buffer.write(',');
+    buffer.write(str[i]);
+  }
+  return buffer.toString();
+}
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainer,
-          borderRadius: AppTheme.radiusMedium,
-          border: Border.all(
-            color: Theme.of(context).colorScheme.surfaceContainerHigh,
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: amountColor.withValues(alpha: 0.12),
-                borderRadius: AppTheme.radiusSmall,
-              ),
-              child: Icon(
-                isIncome
-                    ? Icons.arrow_downward_rounded
-                    : Icons.arrow_upward_rounded,
-                size: 16,
-                color: amountColor,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    description,
-                    style: GoogleFonts.ibmPlexSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  Text(
-                    date,
-                    style: GoogleFonts.ibmPlexSans(
-                      fontSize: 11,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Text(
-              amount,
-              style: GoogleFonts.ibmPlexSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: amountColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+IconData _accountIcon(String type) {
+  return switch (type) {
+    'bank' => Icons.account_balance_outlined,
+    'cash' => Icons.payments_outlined,
+    'credit_card' => Icons.credit_card_outlined,
+    'loan' => Icons.request_quote_outlined,
+    'investment' => Icons.trending_up_outlined,
+    'crypto' => Icons.currency_bitcoin_outlined,
+    _ => Icons.account_balance_wallet_outlined,
+  };
+}
+
+String _accountTypeLabel(String type) {
+  return switch (type) {
+    'bank' => 'Banco',
+    'cash' => 'Efectivo',
+    'credit_card' => 'Tarjeta de crédito',
+    'loan' => 'Préstamo',
+    'investment' => 'Inversión',
+    'crypto' => 'Cripto',
+    'other' => 'Otro',
+    _ => type,
+  };
+}
+
+Color _parseCategoryColor(String? hex, ColorScheme cs) {
+  if (hex == null || hex.isEmpty) return cs.primary;
+  try {
+    final cleaned = hex.replaceFirst('#', '');
+    return Color(int.parse('FF$cleaned', radix: 16));
+  } catch (_) {
+    return cs.primary;
   }
 }

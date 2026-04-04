@@ -1,6 +1,8 @@
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/account_balance_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/category_spend_dto.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_account_cycle_dto.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_movement_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/goal_target_dto.dart';
 
 class DashboardLocalStore {
@@ -20,9 +22,7 @@ class DashboardLocalStore {
     Set<String>? accountIds,
   }) async {
     final db = await _db.database;
-    final where = StringBuffer(
-      "a.deleted_at IS NULL AND a.type != 'contact'",
-    );
+    final where = StringBuffer("a.deleted_at IS NULL AND a.type != 'contact'");
     final args = <dynamic>[];
 
     if (accountIds != null && accountIds.isNotEmpty) {
@@ -124,5 +124,74 @@ class DashboardLocalStore {
       GROUP BY currency_code
     ''');
     return rows.map(GoalTargetDTO.fromMap).toList();
+  }
+
+  Future<List<CreditCardAccountCycleDTO>> getCreditCardAccounts({
+    Set<String>? accountIds,
+  }) async {
+    final db = await _db.database;
+    final where = StringBuffer("deleted_at IS NULL AND type = 'credit_card'");
+    final args = <dynamic>[];
+
+    if (accountIds != null && accountIds.isNotEmpty) {
+      final placeholders = List.filled(accountIds.length, '?').join(',');
+      where.write(' AND id IN ($placeholders)');
+      args.addAll(accountIds);
+    }
+
+    final rows = await db.rawQuery('''
+      SELECT
+        id AS account_id,
+        currency_code,
+        statement_day,
+        payment_due_day
+      FROM accounts
+      WHERE ${where.toString()}
+    ''', args);
+
+    return rows.map(CreditCardAccountCycleDTO.fromMap).toList();
+  }
+
+  Future<List<CreditCardMovementDTO>> getCreditCardMovementsForProjection(
+    String maxDate, {
+    Set<String>? accountIds,
+    String? currencyCode,
+  }) async {
+    final db = await _db.database;
+    final where = StringBuffer(
+      "t.deleted_at IS NULL"
+      " AND t.status = 'cleared'"
+      " AND a.deleted_at IS NULL"
+      " AND a.type = 'credit_card'"
+      " AND t.type IN ('expense', 'transfer_out', 'income', 'transfer_in')"
+      ' AND t.date <= ?',
+    );
+    final args = <dynamic>[maxDate];
+
+    if (accountIds != null && accountIds.isNotEmpty) {
+      final placeholders = List.filled(accountIds.length, '?').join(',');
+      where.write(' AND t.account_id IN ($placeholders)');
+      args.addAll(accountIds);
+    }
+
+    if (currencyCode != null) {
+      where.write(' AND a.currency_code = ?');
+      args.add(currencyCode);
+    }
+
+    final rows = await db.rawQuery('''
+      SELECT
+        t.account_id,
+        t.type,
+        t.amount_cents,
+        t.installments_count,
+        t.date
+      FROM transactions t
+      INNER JOIN accounts a ON a.id = t.account_id
+      WHERE ${where.toString()}
+      ORDER BY t.date ASC
+    ''', args);
+
+    return rows.map(CreditCardMovementDTO.fromMap).toList();
   }
 }

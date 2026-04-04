@@ -21,6 +21,7 @@ type Transaction struct {
 	YieldID             *uuid.UUID // optional reference to yield_configs
 	Type                string     // "income" | "expense" | "transfer_out" | "transfer_in"
 	AmountCents         int64
+	InstallmentsCount   int32
 	CurrencyCode        string
 	Status              string
 	Tags                []string
@@ -39,7 +40,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-const scanColumns = `id, user_id, account_id, category_id, linked_transaction_id, template_id, yield_id, type, amount_cents, currency_code, status, tags, description, date, created_at, updated_at, deleted_at`
+const scanColumns = `id, user_id, account_id, category_id, linked_transaction_id, template_id, yield_id, type, amount_cents, installments_count, currency_code, status, tags, description, date, created_at, updated_at, deleted_at`
 
 var (
 	ErrTemplateReferenceNotFound       = errors.New("template reference does not exist for user")
@@ -57,7 +58,7 @@ func (r *Repository) scan(row pgx.Row) (*Transaction, error) {
 		&t.ID, &t.UserID, &t.AccountID, &t.CategoryID, &t.LinkedTransactionID,
 		&t.TemplateID,
 		&t.YieldID,
-		&t.Type, &t.AmountCents, &t.CurrencyCode, &t.Status,
+		&t.Type, &t.AmountCents, &t.InstallmentsCount, &t.CurrencyCode, &t.Status,
 		&t.Tags, &t.Description, &t.Date,
 		&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt,
 	)
@@ -121,7 +122,7 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 			&t.ID, &t.UserID, &t.AccountID, &t.CategoryID, &t.LinkedTransactionID,
 			&t.TemplateID,
 			&t.YieldID,
-			&t.Type, &t.AmountCents, &t.CurrencyCode, &t.Status,
+			&t.Type, &t.AmountCents, &t.InstallmentsCount, &t.CurrencyCode, &t.Status,
 			&t.Tags, &t.Description, &t.Date,
 			&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt,
 		); err != nil {
@@ -139,8 +140,8 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 //   - conflictResolved=true:  server had a newer version; returned transaction is the server's.
 func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, bool, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO transactions (id, user_id, account_id, category_id, linked_transaction_id, template_id, yield_id, type, amount_cents, currency_code, status, tags, description, date, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		INSERT INTO transactions (id, user_id, account_id, category_id, linked_transaction_id, template_id, yield_id, type, amount_cents, installments_count, currency_code, status, tags, description, date, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		ON CONFLICT (id) DO UPDATE SET
 			account_id              = EXCLUDED.account_id,
 			category_id             = EXCLUDED.category_id,
@@ -149,6 +150,7 @@ func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, 
 			yield_id                = EXCLUDED.yield_id,
 			type                    = EXCLUDED.type,
 			amount_cents            = EXCLUDED.amount_cents,
+			installments_count      = EXCLUDED.installments_count,
 			currency_code           = EXCLUDED.currency_code,
 			status                  = EXCLUDED.status,
 			tags                    = EXCLUDED.tags,
@@ -160,7 +162,7 @@ func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, 
 		t.ID, t.UserID, t.AccountID, t.CategoryID, t.LinkedTransactionID,
 		t.TemplateID,
 		t.YieldID,
-		t.Type, t.AmountCents, t.CurrencyCode, t.Status,
+		t.Type, t.AmountCents, t.InstallmentsCount, t.CurrencyCode, t.Status,
 		t.Tags, t.Description, t.Date,
 		t.CreatedAt, t.UpdatedAt,
 	)

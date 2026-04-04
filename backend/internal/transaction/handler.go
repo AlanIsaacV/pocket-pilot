@@ -92,17 +92,18 @@ func stringToTransactionType(s string) pb.TransactionType {
 
 func toProto(t *Transaction) *pb.Transaction {
 	proto := &pb.Transaction{
-		Id:           t.ID.String(),
-		AccountId:    t.AccountID.String(),
-		Type:         stringToTransactionType(t.Type),
-		AmountCents:  t.AmountCents,
-		CurrencyCode: t.CurrencyCode,
-		Status:       t.Status,
-		Tags:         t.Tags,
-		Description:  t.Description,
-		Date:         timestamppb.New(t.Date),
-		CreatedAt:    timestamppb.New(t.CreatedAt),
-		UpdatedAt:    timestamppb.New(t.UpdatedAt),
+		Id:                t.ID.String(),
+		AccountId:         t.AccountID.String(),
+		Type:              stringToTransactionType(t.Type),
+		AmountCents:       t.AmountCents,
+		InstallmentsCount: t.InstallmentsCount,
+		CurrencyCode:      t.CurrencyCode,
+		Status:            t.Status,
+		Tags:              t.Tags,
+		Description:       t.Description,
+		Date:              timestamppb.New(t.Date),
+		CreatedAt:         timestamppb.New(t.CreatedAt),
+		UpdatedAt:         timestamppb.New(t.UpdatedAt),
 	}
 	if t.CategoryID != nil {
 		s := t.CategoryID.String()
@@ -127,6 +128,10 @@ func toProto(t *Transaction) *pb.Transaction {
 }
 
 func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
+	if err := validateInstallmentsCount(p.GetInstallmentsCount()); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	id, err := parseUUID(p.Id, "transaction.id")
 	if err != nil {
 		return nil, err
@@ -187,6 +192,7 @@ func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
 		YieldID:             yieldID,
 		Type:                transactionTypeToString(p.Type),
 		AmountCents:         p.AmountCents,
+		InstallmentsCount:   p.InstallmentsCount,
 		CurrencyCode:        p.CurrencyCode,
 		Status:              p.Status,
 		Tags:                p.Tags,

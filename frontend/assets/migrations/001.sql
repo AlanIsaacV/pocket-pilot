@@ -149,6 +149,7 @@ CREATE TABLE transactions (
     yield_id              TEXT REFERENCES yield_configs (id),
     type                  TEXT     NOT NULL,
     amount_cents          BIGINT   NOT NULL,
+    installments_count    INTEGER  NOT NULL DEFAULT 1,
     currency_code         TEXT     NOT NULL,
     status                TEXT     NOT NULL,
     tags                  TEXT,

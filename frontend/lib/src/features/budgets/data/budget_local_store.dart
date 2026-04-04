@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
@@ -29,7 +30,11 @@ class BudgetLocalStore {
     final db = await _db.database;
     final batch = db.batch();
     for (final row in rows) {
-      batch.insert('budgets', row, conflictAlgorithm: ConflictAlgorithm.replace);
+      batch.insert(
+        'budgets',
+        row,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
     }
     await batch.commit(noResult: true);
   }
@@ -45,39 +50,109 @@ class BudgetLocalStore {
     );
   }
 
+  @visibleForTesting
+  static int proratedAmountForPeriod({
+    required int amountCents,
+    required int installmentsCount,
+    required int purchaseMonthIndex,
+    required int periodStartMonthIndex,
+    required int periodEndMonthIndex,
+  }) {
+    if (installmentsCount < 1) {
+      throw ArgumentError.value(
+        installmentsCount,
+        'installmentsCount',
+        'installmentsCount must be >= 1',
+      );
+    }
+
+    final txStart = purchaseMonthIndex;
+    final txEnd = purchaseMonthIndex + installmentsCount - 1;
+    final overlapStart = txStart > periodStartMonthIndex
+        ? txStart
+        : periodStartMonthIndex;
+    final overlapEnd = txEnd < periodEndMonthIndex
+        ? txEnd
+        : periodEndMonthIndex;
+    final overlapMonths = overlapEnd >= overlapStart
+        ? (overlapEnd - overlapStart + 1)
+        : 0;
+    if (overlapMonths == 0) return 0;
+
+    final base = amountCents ~/ installmentsCount;
+    final residual = amountCents % installmentsCount;
+    final firstInstallmentInPeriod =
+        purchaseMonthIndex >= periodStartMonthIndex &&
+        purchaseMonthIndex <= periodEndMonthIndex;
+
+    return (base * overlapMonths) + (firstInstallmentInPeriod ? residual : 0);
+  }
+
   Future<int> computeSpentCents(String categoryId, String period) async {
     final db = await _db.database;
     final now = DateTime.now();
 
-    String startDate;
-    String endDate;
+    final periodStartIdx = period == 'MONTHLY'
+        ? (now.year * 12 + (now.month - 1))
+        : (now.year * 12);
+    final periodEndIdx = period == 'MONTHLY'
+        ? periodStartIdx
+        : (now.year * 12 + 11);
 
-    if (period == 'MONTHLY') {
-      startDate =
-          '${now.year}-${now.month.toString().padLeft(2, '0')}-01';
-      final lastDay = DateTime(now.year, now.month + 1, 0).day;
-      endDate =
-          '${now.year}-${now.month.toString().padLeft(2, '0')}-${lastDay.toString().padLeft(2, '0')}';
-    } else {
-      // YEARLY
-      startDate = '${now.year}-01-01';
-      endDate = '${now.year}-12-31';
-    }
-
-    final result = await db.rawQuery('''
+    final result = await db.rawQuery(
+      '''
+      WITH tx AS (
+        SELECT
+          type,
+          amount_cents,
+          installments_count,
+          (CAST(strftime('%Y', date) AS INTEGER) * 12 + CAST(strftime('%m', date) AS INTEGER) - 1) AS purchase_idx
+        FROM transactions
+        WHERE category_id = ?
+          AND deleted_at IS NULL
+          AND installments_count >= 1
+      )
       SELECT COALESCE(SUM(
         CASE
-          WHEN type = 'expense' THEN amount_cents
-          WHEN type = 'income' THEN -amount_cents
+          WHEN type = 'expense' THEN
+            (
+              CAST(amount_cents / installments_count AS INTEGER) *
+              MAX(0, MIN(purchase_idx + installments_count - 1, ?) - MAX(purchase_idx, ?) + 1)
+            ) + CASE
+                  WHEN purchase_idx BETWEEN ? AND ? THEN (amount_cents % installments_count)
+                  ELSE 0
+                END
+          WHEN type = 'income' THEN
+            -(
+              (
+                CAST(amount_cents / installments_count AS INTEGER) *
+                MAX(0, MIN(purchase_idx + installments_count - 1, ?) - MAX(purchase_idx, ?) + 1)
+              ) + CASE
+                    WHEN purchase_idx BETWEEN ? AND ? THEN (amount_cents % installments_count)
+                    ELSE 0
+                  END
+            )
           ELSE 0
         END
       ), 0) as spent
-      FROM transactions
-      WHERE category_id = ?
-        AND date >= ?
-        AND date <= ?
-        AND deleted_at IS NULL
-    ''', [categoryId, startDate, endDate]);
+      FROM tx
+      WHERE purchase_idx <= ?
+        AND (purchase_idx + installments_count - 1) >= ?
+    ''',
+      [
+        categoryId,
+        periodEndIdx,
+        periodStartIdx,
+        periodStartIdx,
+        periodEndIdx,
+        periodEndIdx,
+        periodStartIdx,
+        periodStartIdx,
+        periodEndIdx,
+        periodEndIdx,
+        periodStartIdx,
+      ],
+    );
 
     return (result.first['spent'] as num?)?.toInt() ?? 0;
   }

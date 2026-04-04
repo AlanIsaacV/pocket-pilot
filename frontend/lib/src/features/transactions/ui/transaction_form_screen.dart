@@ -46,12 +46,14 @@ enum _CurrencySheetSelection { openPreferences }
 
 class _TransactionFormScreenState extends State<TransactionFormScreen> {
   static const _uuid = Uuid();
+  static const List<int> _installmentsOptions = [1, 3, 6, 9, 12, 18, 24];
 
   bool get _isEditMode => widget.transaction != null;
 
   String _type = 'expense';
   final TransactionAmountCalculator _amountCalculator =
       TransactionAmountCalculator();
+  int _installmentsCount = 1;
   String _currencyCode = 'MXN';
   DateTime _date = DateTime.now();
   bool _isSaving = false;
@@ -119,11 +121,13 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     var selectedCurrencyCode = currencySnapshot.defaultCode;
     AccountModel? selectedAccount;
     CategoryModel? selectedCategory;
+    var selectedInstallmentsCount = 1;
     var initialAmount = '0';
 
     if (_isEditMode) {
       final t = widget.transaction!;
       _type = t.type;
+      selectedInstallmentsCount = t.installmentsCount;
       final rawAmount = t.amount / 100;
       initialAmount = rawAmount == rawAmount.truncateToDouble()
           ? rawAmount.toInt().toString()
@@ -194,6 +198,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       _currencyCode = selectedCurrencyCode;
       _selectedAccount = selectedAccount;
       _selectedCategory = selectedCategory;
+      _installmentsCount = selectedInstallmentsCount;
     });
   }
 
@@ -365,12 +370,39 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
               ..add(_currencyCode)
               ..sort(compareCurrencyCodes);
           }
+          if (!_canUseInstallments) {
+            _installmentsCount = 1;
+          }
         });
         return;
       }
 
       if (selection == _AccountSheetSelection.addNew) {
         await _openCreateAccountFlow(closeIfNoAccounts: false);
+      }
+    });
+  }
+
+  void _showInstallmentsSheet() {
+    _commitPendingAmountIfAny();
+
+    showFormBottomSheet<int>(
+      context: context,
+      builder: (ctx) => ScrollableBottomSheet(
+        title: 'Meses sin intereses',
+        children: _installmentsOptions
+            .map(
+              (count) => SheetItem(
+                icon: count == _installmentsCount ? Icons.check_rounded : null,
+                label: _installmentsDisplayLabel(count),
+                onTap: () => Navigator.pop(ctx, count),
+              ),
+            )
+            .toList(),
+      ),
+    ).then((selection) {
+      if (selection is int) {
+        setState(() => _installmentsCount = selection);
       }
     });
   }
@@ -504,6 +536,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       final sync = context.read<SyncService>();
 
       final amountCents = _amountCalculator.getAmountMinorForSaveRounded2();
+      final installmentsCount = _effectiveInstallmentsCount;
       final dateStr = formatDateISO(_date);
 
       if (_isEditMode) {
@@ -514,6 +547,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           templateId: widget.transaction!.templateId,
           type: _type,
           amountMinor: amountCents,
+          installmentsCount: installmentsCount,
           currencyCode: _currencyCode,
           description: _noteController.text,
           date: dateStr,
@@ -528,6 +562,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           categoryId: _selectedCategory!.id,
           type: _type,
           amountMinor: amountCents,
+          installmentsCount: installmentsCount,
           currencyCode: _currencyCode,
           description: _noteController.text,
           date: dateStr,
@@ -561,15 +596,18 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       return;
     }
     final amountCents = _amountCalculator.getAmountMinorForSaveRounded2();
-    await context.push<bool>('/templates/new', extra: {
-      'type': _type,
-      'accountId': _selectedAccount!.id,
-      'categoryId': _selectedCategory?.id,
-      'amountCents': amountCents > 0 ? amountCents : null,
-      'currencyCode': _currencyCode,
-      'description': _noteController.text,
-      'tags': _selectedTags.map((t) => t.name).toList(),
-    });
+    await context.push<bool>(
+      '/templates/new',
+      extra: {
+        'type': _type,
+        'accountId': _selectedAccount!.id,
+        'categoryId': _selectedCategory?.id,
+        'amountCents': amountCents > 0 ? amountCents : null,
+        'currencyCode': _currencyCode,
+        'description': _noteController.text,
+        'tags': _selectedTags.map((t) => t.name).toList(),
+      },
+    );
   }
 
   Future<void> _onDelete() async {
@@ -630,6 +668,17 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   Color get _typeColor => _type == 'income'
       ? Theme.of(context).colorScheme.onTertiary
       : Theme.of(context).colorScheme.error;
+
+  bool get _canUseInstallments =>
+      _selectedAccount?.type == 'credit_card' && _type == 'expense';
+
+  int get _effectiveInstallmentsCount =>
+      _canUseInstallments ? _installmentsCount : 1;
+
+  String _installmentsDisplayLabel(int count) {
+    if (count <= 1) return 'Una exhibicion';
+    return '$count meses';
+  }
 
   bool get _canSave =>
       _amountCalculator.getAmountMinorForSaveRounded2() != 0 &&
@@ -692,6 +741,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   if (_selectedCategory != null &&
                       _selectedCategory!.type != t) {
                     _selectedCategory = null;
+                  }
+                  if (!_canUseInstallments) {
+                    _installmentsCount = 1;
                   }
                 });
               },
@@ -808,6 +860,14 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                     },
                     onOpenPicker: _openCategoryPicker,
                   ),
+
+                  if (_canUseInstallments)
+                    DetailRow(
+                      icon: Icons.credit_card_rounded,
+                      label: 'Meses sin intereses',
+                      value: _installmentsDisplayLabel(_installmentsCount),
+                      onTap: _showInstallmentsSheet,
+                    ),
 
                   // Nota
                   NoteField(

@@ -38,11 +38,20 @@ class TransactionRemoteService {
   ) async {
     try {
       final now = DateTime.now().toUtc();
+      final installmentsCount = (map['installments_count'] as int?) ?? 1;
+      if (installmentsCount < 1) {
+        throw ArgumentError.value(
+          installmentsCount,
+          'installments_count',
+          'installments_count must be >= 1',
+        );
+      }
       final transaction = Transaction(
         id: map['id'] as String,
         accountId: map['account_id'] as String,
         type: TransactionModel.stringToTransactionType(map['type'] as String),
         amountCents: Int64(map['amount_cents'] as int),
+        installmentsCount: installmentsCount,
         currencyCode: map['currency_code'] as String,
         status: map['status'] as String? ?? 'cleared',
         tags: _toTags(map['tags']),

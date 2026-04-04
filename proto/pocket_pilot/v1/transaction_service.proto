@@ -33,6 +33,7 @@ message Transaction {
   optional string linked_transaction_id = 14;
   optional string template_id = 15;
   optional string yield_id = 16;
+  int32 installments_count = 17;
 }
 
 service TransactionService {

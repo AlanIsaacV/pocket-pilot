@@ -17,6 +17,7 @@ class TransactionModel {
 
   /// Monto en unidades menores (centavos).
   final int amount;
+  final int installmentsCount;
 
   final String currencyCode;
   final String description;
@@ -30,7 +31,7 @@ class TransactionModel {
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  const TransactionModel({
+  TransactionModel({
     required this.id,
     required this.accountId,
     this.categoryId,
@@ -38,6 +39,7 @@ class TransactionModel {
     this.templateId,
     this.yieldId,
     required this.amount,
+    required int installmentsCount,
     required this.currencyCode,
     required this.description,
     required this.date,
@@ -46,7 +48,7 @@ class TransactionModel {
     required this.tags,
     required this.createdAt,
     required this.updatedAt,
-  });
+  }) : installmentsCount = _ensureInstallmentsCount(installmentsCount);
 
   // ----------------------------------------------------------
   // Factory: desde proto gRPC
@@ -62,6 +64,7 @@ class TransactionModel {
       templateId: proto.hasTemplateId() ? proto.templateId : null,
       yieldId: proto.hasYieldId() ? proto.yieldId : null,
       amount: proto.amountCents.toInt(),
+      installmentsCount: proto.installmentsCount,
       currencyCode: proto.currencyCode,
       description: proto.description,
       date: proto.date.toDateTime().toIso8601String().substring(0, 10),
@@ -85,6 +88,7 @@ class TransactionModel {
       templateId: map['template_id'] as String?,
       yieldId: map['yield_id'] as String?,
       amount: map['amount_cents'] as int,
+      installmentsCount: map['installments_count'] as int,
       currencyCode: map['currency_code'] as String,
       description: map['description'] as String,
       date: map['date'] as String,
@@ -108,6 +112,7 @@ class TransactionModel {
       'template_id': templateId,
       'yield_id': yieldId,
       'amount_cents': amount,
+      'installments_count': installmentsCount,
       'currency_code': currencyCode,
       'tags': jsonEncode(tags),
       'description': description,
@@ -130,6 +135,7 @@ class TransactionModel {
       'template_id': templateId,
       'yield_id': yieldId,
       'amount_cents': amount,
+      'installments_count': installmentsCount,
       'currency_code': currencyCode,
       'tags': tags,
       'description': description,
@@ -139,6 +145,17 @@ class TransactionModel {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
+  }
+
+  static int _ensureInstallmentsCount(int value) {
+    if (value < 1) {
+      throw ArgumentError.value(
+        value,
+        'installmentsCount',
+        'installmentsCount must be >= 1',
+      );
+    }
+    return value;
   }
 
   // ----------------------------------------------------------

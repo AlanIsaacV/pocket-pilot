@@ -64,6 +64,9 @@ import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_route_scope.dar
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/settings/settings_screen.dart';
+import 'package:pocket_pilot/src/features/csv_import/ui/csv_import_route_scope.dart';
+import 'package:pocket_pilot/src/features/csv_import/ui/csv_import_screen.dart';
+import 'package:pocket_pilot/src/features/csv_import/ui/csv_mapping_screen.dart';
 import 'screens/settings/sync_status_screen.dart';
 
 GoRouter buildRouter() {
@@ -253,6 +256,24 @@ GoRouter buildRouter() {
           GoRoute(
             path: '/settings',
             builder: (context, state) => const SettingsScreen(),
+          ),
+          // CSV Import (Settings) — nested shell para compartir ViewModel
+          // sin crear un segundo shell de nivel raíz.
+          ShellRoute(
+            builder: (context, state, child) =>
+                CsvImportRouteScope(child: child),
+            routes: [
+              GoRoute(
+                path: '/settings/csv-import',
+                builder: (context, state) => const CsvImportScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'mapping',
+                    builder: (context, state) => const CsvMappingScreen(),
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),

@@ -51,6 +51,14 @@ dependencies:
   # Genera UUIDs v4 para los IDs de entidades creadas localmente.
   uuid: ^4.5.1
 
+  # --- CSV ---
+  # Parser de archivos CSV para la funcionalidad de importación.
+  csv: ^6.0.0
+
+  # --- File Picker ---
+  # Selector de archivos nativo para importación de CSV.
+  file_picker: ^8.0.0
+
   # --- Tipografía ---
   # google_fonts: descarga y cachea fuentes de Google Fonts en runtime.
   # Usamos Space Grotesk (números), Outfit (títulos) e Inter (cuerpo).

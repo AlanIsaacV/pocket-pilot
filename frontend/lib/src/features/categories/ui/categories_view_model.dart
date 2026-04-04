@@ -30,6 +30,7 @@ class CategoriesViewModel extends ChangeNotifier {
   String? errorMessage;
 
   DateTime? _lastSyncAt;
+  bool _disposed = false;
 
   /// Navegación jerárquica: null = raíz.
   String? currentParentId;
@@ -43,8 +44,8 @@ class CategoriesViewModel extends ChangeNotifier {
   CategoriesViewModel({
     required CategoryRepository repository,
     required SyncService syncService,
-  })  : _repository = repository,
-        _syncService = syncService;
+  }) : _repository = repository,
+       _syncService = syncService;
 
   // ----------------------------------------------------------
   // Getters computados
@@ -62,13 +63,11 @@ class CategoriesViewModel extends ChangeNotifier {
       .where((c) => c.parentId == currentParentId && c.isExpense)
       .toList();
 
-  List<CategoryModel> get currentDeletedCategories => deletedCategories
-      .where((c) => c.parentId == currentParentId)
-      .toList();
+  List<CategoryModel> get currentDeletedCategories =>
+      deletedCategories.where((c) => c.parentId == currentParentId).toList();
 
   /// Número de hijos activos de una categoría.
-  int childCount(String id) =>
-      categories.where((c) => c.parentId == id).length;
+  int childCount(String id) => categories.where((c) => c.parentId == id).length;
 
   /// Modelo de la categoría padre actual (para pasar al formulario).
   CategoryModel? get currentParentModel {
@@ -88,7 +87,7 @@ class CategoriesViewModel extends ChangeNotifier {
     breadcrumb.add((id: cat.id, name: cat.name));
     currentParentId = cat.id;
     selectedIds.clear();
-    notifyListeners();
+    _safeNotify();
   }
 
   void navigateBack() {
@@ -96,14 +95,14 @@ class CategoriesViewModel extends ChangeNotifier {
     breadcrumb.removeLast();
     currentParentId = breadcrumb.isEmpty ? null : breadcrumb.last.id;
     selectedIds.clear();
-    notifyListeners();
+    _safeNotify();
   }
 
   void navigateToRoot() {
     breadcrumb.clear();
     currentParentId = null;
     selectedIds.clear();
-    notifyListeners();
+    _safeNotify();
   }
 
   // ----------------------------------------------------------
@@ -116,12 +115,12 @@ class CategoriesViewModel extends ChangeNotifier {
     } else {
       selectedIds.add(id);
     }
-    notifyListeners();
+    _safeNotify();
   }
 
   void clearSelection() {
     selectedIds.clear();
-    notifyListeners();
+    _safeNotify();
   }
 
   // ----------------------------------------------------------
@@ -198,7 +197,7 @@ class CategoriesViewModel extends ChangeNotifier {
   Future<void> _reloadLocal() async {
     categories = await _repository.getCategories();
     deletedCategories = await _repository.getDeletedCategories();
-    notifyListeners();
+    _safeNotify();
   }
 
   Future<void> _loadLocalThenMaybeSync() async {
@@ -218,7 +217,7 @@ class CategoriesViewModel extends ChangeNotifier {
   Future<void> _runSync() async {
     isLoading = categories.isEmpty && deletedCategories.isEmpty;
     isSyncing = true;
-    notifyListeners();
+    _safeNotify();
 
     try {
       await _syncService.sync();
@@ -231,7 +230,17 @@ class CategoriesViewModel extends ChangeNotifier {
     } finally {
       isLoading = false;
       isSyncing = false;
-      notifyListeners();
+      _safeNotify();
     }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void _safeNotify() {
+    if (!_disposed) notifyListeners();
   }
 }

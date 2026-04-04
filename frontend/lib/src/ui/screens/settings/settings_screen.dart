@@ -141,6 +141,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () {},
               ),
               _SettingsItem(
+                icon: Icons.download_rounded,
+                label: 'Importar CSV',
+                onTap: () => context.push('/settings/csv-import'),
+              ),
+              _SettingsItem(
                 icon: Icons.sync_rounded,
                 label: 'Sincronización',
                 onTap: () => context.push('/settings/sync'),

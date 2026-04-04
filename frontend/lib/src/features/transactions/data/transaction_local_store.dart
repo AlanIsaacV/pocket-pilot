@@ -161,14 +161,14 @@ class TransactionLocalStore {
       where.write(' AND t.currency_code = ?');
       args.add(filter.currencyCode);
     }
-
-    return db.rawQuery(
+    final results = db.rawQuery(
       'SELECT t.* FROM transactions t '
       'INNER JOIN accounts a ON a.id = t.account_id '
       'WHERE ${where.toString()} '
       'ORDER BY t.date DESC',
       args,
     );
+    return results;
   }
 
   /// Returns the IDs of the N most frequently used categories.

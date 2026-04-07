@@ -21,7 +21,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
-import 'package:pocket_pilot/src/core/grpc/auth_interceptor.dart';
 import 'package:pocket_pilot/src/core/sync/composite_scheduled_generator_runner.dart';
 import 'package:pocket_pilot/src/core/sync/connectivity_monitor.dart';
 import 'package:pocket_pilot/src/core/sync/sync_metadata_store.dart';
@@ -75,15 +74,40 @@ import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_remote_service.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_repository.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_sync_handler.dart';
+import 'package:pocket_pilot/src/core/constants/constants.dart';
+import 'package:pocket_pilot/src/core/auth/auth_provider.dart';
+import 'package:pocket_pilot/src/core/auth/auth_service.dart';
+import 'package:pocket_pilot/src/core/auth/token_store.dart';
+import 'package:pocket_pilot/src/core/grpc/auth_interceptor.dart';
+import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
 import 'package:pocket_pilot/src/ui/app.dart';
 import 'package:pocket_pilot/src/ui/router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Construir grafo de dependencias de sync.
   // DatabaseHelper es un singleton interno; las instancias adicionales comparten la misma DB.
   final dbHelper = DatabaseHelper();
+
+  // Auth setup — must happen before any gRPC client is created.
+  final tokenStore = TokenStore();
+  final authService = AuthService(
+    tokenStore: tokenStore,
+    googleServerClientId: kGoogleServerClientId.isNotEmpty
+        ? kGoogleServerClientId
+        : null,
+  );
+  final authProvider = AuthProvider(
+    authService: authService,
+    tokenStore: tokenStore,
+    dbHelper: dbHelper,
+  );
+  await authProvider.init();
+
+  final authInterceptor = AuthInterceptor(tokenStore: tokenStore);
+  GrpcClient.init(interceptors: [authInterceptor]);
+
+  // Construir grafo de dependencias de sync.
   final syncOutbox = SyncOutbox(db: dbHelper);
   final syncMetadataStore = SyncMetadataStore(db: dbHelper);
   final userPreferenceLocalStore = UserPreferenceLocalStore(db: dbHelper);
@@ -249,28 +273,32 @@ Future<void> main() async {
   });
 
   // Insertar categorías por defecto si es la primera ejecución.
-  final categorySeeder = CategorySeeder(
-    local: CategoryLocalStore(db: dbHelper),
-    db: dbHelper,
-    outbox: syncOutbox,
-    userId: kMvpUserId,
-  );
+  final userId = await tokenStore.getUserId();
 
-  // Pre-seed pull: intentar traer categorías del servidor antes de sembrar defaults.
-  // Si tiene éxito, seedIfNeeded() detectará rows existentes y no sembrará.
-  // Fallo silencioso: sin red, error de auth o timeout → seedIfNeeded() siembra localmente.
-  try {
-    final pullResult = await categorySyncHandler
-        .pull(null)
-        .timeout(const Duration(seconds: 5));
-    for (final item in pullResult.items) {
-      try {
-        await categorySyncHandler.saveLocally(item.data);
-      } catch (_) {}
-    }
-  } catch (_) {}
+  if (userId != null) {
+    final categorySeeder = CategorySeeder(
+      local: CategoryLocalStore(db: dbHelper),
+      db: dbHelper,
+      outbox: syncOutbox,
+      userId: userId,
+    );
 
-  await categorySeeder.seedIfNeeded();
+    // Pre-seed pull: intentar traer categorías del servidor antes de sembrar defaults.
+    // Si tiene éxito, seedIfNeeded() detectará rows existentes y no sembrará.
+    // Fallo silencioso: sin red, error de auth o timeout → seedIfNeeded() siembra localmente.
+    try {
+      final pullResult = await categorySyncHandler
+          .pull(null)
+          .timeout(const Duration(seconds: 5));
+      for (final item in pullResult.items) {
+        try {
+          await categorySyncHandler.saveLocally(item.data);
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    await categorySeeder.seedIfNeeded();
+  }
 
   // ConnectivityMonitor: lanza sync automático al recuperar conexión.
   final connectivityMonitor = ConnectivityMonitor(syncService: syncService);
@@ -290,8 +318,10 @@ Future<void> main() async {
         ChangeNotifierProvider<AISessionController>.value(
           value: aiSessionController,
         ),
+        Provider<TokenStore>.value(value: tokenStore),
+        ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
       ],
-      child: PocketPilotApp(router: buildRouter()),
+      child: PocketPilotApp(router: buildRouter(authProvider)),
     ),
   );
 

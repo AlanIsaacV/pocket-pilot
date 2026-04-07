@@ -1,4 +1,3 @@
-import 'package:pocket_pilot/src/core/grpc/auth_interceptor.dart';
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/ai_assistant_service.pbgrpc.dart';
 
@@ -8,7 +7,7 @@ class AIRemoteService {
   AIRemoteService() {
     _client = AIAssistantServiceClient(
       GrpcClient.channel,
-      interceptors: [const AuthInterceptor()],
+      interceptors: GrpcClient.interceptors,
     );
   }
 

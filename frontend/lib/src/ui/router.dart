@@ -23,6 +23,9 @@
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/core/auth/auth_provider.dart';
+import 'package:pocket_pilot/src/ui/screens/login/login_screen.dart';
+
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
@@ -69,11 +72,23 @@ import 'package:pocket_pilot/src/features/csv_import/ui/csv_import_screen.dart';
 import 'package:pocket_pilot/src/features/csv_import/ui/csv_mapping_screen.dart';
 import 'screens/settings/sync_status_screen.dart';
 
-GoRouter buildRouter() {
+GoRouter buildRouter(AuthProvider authProvider) {
   return GoRouter(
     initialLocation: '/dashboard',
+    refreshListenable: authProvider,
+    redirect: (context, state) {
+      final isLoggedIn = authProvider.isAuthenticated;
+      final isOnLogin = state.matchedLocation == '/login';
 
+      if (!isLoggedIn && !isOnLogin) return '/login';
+      if (isLoggedIn && isOnLogin) return '/dashboard';
+      return null;
+    },
     routes: [
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
+      ),
       // ----------------------------------------------------------
       // ShellRoute: tabs con NavigationBar persistente
       // ----------------------------------------------------------

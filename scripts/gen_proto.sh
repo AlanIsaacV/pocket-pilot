@@ -41,7 +41,8 @@ protoc \
     pocket_pilot/v1/goal_service.proto \
     pocket_pilot/v1/user_preferences_service.proto \
     pocket_pilot/v1/budget_service.proto \
-    pocket_pilot/v1/ai_assistant_service.proto
+    pocket_pilot/v1/ai_assistant_service.proto \
+    pocket_pilot/v1/auth_service.proto
 
 echo "→ Generating Dart code..."
 # --dart_out=grpc:<dir>  : "grpc" is a plugin option that tells protoc_plugin
@@ -62,7 +63,8 @@ protoc \
     pocket_pilot/v1/goal_service.proto \
     pocket_pilot/v1/user_preferences_service.proto \
     pocket_pilot/v1/budget_service.proto \
-    pocket_pilot/v1/ai_assistant_service.proto
+    pocket_pilot/v1/ai_assistant_service.proto \
+    pocket_pilot/v1/auth_service.proto
 
 echo "✓ Done. Generated files:"
 echo "  Go   → ${GO_OUT}"

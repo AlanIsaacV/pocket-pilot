@@ -19,3 +19,12 @@ const kGrpcHost = String.fromEnvironment(
 
 /// Puerto donde escucha el backend Go.
 const kGrpcPort = 50051;
+
+/// MVP user ID used for deterministic category seeding.
+/// Replace with the real authenticated user ID when auth is wired end-to-end.
+const kMvpUserId = '00000000-0000-0000-0000-000000000001';
+
+/// Google OAuth Web Client ID.
+/// Se pasa en tiempo de compilación:
+///   flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=xxx.apps.googleusercontent.com
+const kGoogleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');

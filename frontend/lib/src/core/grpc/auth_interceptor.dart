@@ -1,17 +1,13 @@
+import 'dart:async';
+
 import 'package:grpc/grpc.dart';
 
-/// Interceptor gRPC que agrega el header de autorización MVP a todas las requests.
-///
-/// En producción, el token vendría de secure_storage o un sistema de auth real.
-/// Para el MVP, usamos un token hardcodeado que el servidor valida.
-const _kMvpToken = 'Bearer MVP-TOKEN-123';
-
-/// MVP user ID that the backend maps to 'Bearer MVP-TOKEN-123'.
-/// Replace with the real authenticated user ID when auth is implemented.
-const kMvpUserId = '00000000-0000-0000-0000-000000000001';
+import 'package:pocket_pilot/src/core/auth/token_store.dart';
 
 class AuthInterceptor implements ClientInterceptor {
-  const AuthInterceptor();
+  final TokenStore _tokenStore;
+
+  AuthInterceptor({required TokenStore tokenStore}) : _tokenStore = tokenStore;
 
   @override
   ResponseFuture<R> interceptUnary<Q, R>(
@@ -23,8 +19,18 @@ class AuthInterceptor implements ClientInterceptor {
     return invoker(
       method,
       request,
-      options.mergedWith(CallOptions(metadata: {'authorization': _kMvpToken})),
+      options.mergedWith(CallOptions(providers: [_addAuthMetadata])),
     );
+  }
+
+  Future<void> _addAuthMetadata(
+    Map<String, String> metadata,
+    String uri,
+  ) async {
+    final token = await _tokenStore.getAccessToken();
+    if (token != null) {
+      metadata['authorization'] = 'Bearer $token';
+    }
   }
 
   @override
@@ -37,7 +43,7 @@ class AuthInterceptor implements ClientInterceptor {
     return invoker(
       method,
       requests,
-      options.mergedWith(CallOptions(metadata: {'authorization': _kMvpToken})),
+      options.mergedWith(CallOptions(providers: [_addAuthMetadata])),
     );
   }
 }

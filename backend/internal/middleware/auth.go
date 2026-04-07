@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -11,41 +12,64 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// MVP constants — in production these would come from a real auth system (JWT, etc.).
-const (
-	HardcodedMVPToken  = "MVP-TOKEN-123"
-	HardcodedMVPUserID = "00000000-0000-0000-0000-000000000001"
-)
-
 type contextKey string
 
-// ContextUserIDKey is the key used to store/retrieve the authenticated user ID in the context.
 const ContextUserIDKey contextKey = "user_id"
 
-// UnaryAuthInterceptor validates the Bearer token from the gRPC metadata and injects
-// the user ID into the request context. All handlers read user ID via UserIDFromCtx.
-func UnaryAuthInterceptor(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "metadata missing")
-	}
-
-	authHeader := md["authorization"]
-	if len(authHeader) == 0 {
-		return nil, status.Error(codes.Unauthenticated, "authorization token missing")
-	}
-
-	token := strings.TrimPrefix(authHeader[0], "Bearer ")
-	if token != HardcodedMVPToken {
-		return nil, status.Error(codes.Unauthenticated, "invalid token")
-	}
-
-	newCtx := context.WithValue(ctx, ContextUserIDKey, HardcodedMVPUserID)
-	return handler(newCtx, req)
+var publicMethods = map[string]bool{
+	"/pocket_pilot.v1.AuthService/OAuthLogin":   true,
+	"/pocket_pilot.v1.AuthService/RefreshToken": true,
+	"/pocket_pilot.v1.AuthService/Logout":       true,
 }
 
-// UserIDFromCtx extracts the authenticated user ID from the context.
-// Returns an error if the context was not set up by UnaryAuthInterceptor.
+func NewUnaryAuthInterceptor(jwtSecret string) grpc.UnaryServerInterceptor {
+	secret := []byte(jwtSecret)
+
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if publicMethods[info.FullMethod] {
+			return handler(ctx, req)
+		}
+
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, status.Error(codes.Unauthenticated, "metadata missing")
+		}
+
+		authHeader := md["authorization"]
+		if len(authHeader) == 0 {
+			return nil, status.Error(codes.Unauthenticated, "authorization token missing")
+		}
+
+		tokenString := strings.TrimPrefix(authHeader[0], "Bearer ")
+		if tokenString == authHeader[0] {
+			return nil, status.Error(codes.Unauthenticated, "invalid authorization format")
+		}
+
+		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (any, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, status.Errorf(codes.Unauthenticated, "unexpected signing method: %v", t.Header["alg"])
+			}
+			return secret, nil
+		}, jwt.WithExpirationRequired())
+		if err != nil {
+			return nil, status.Errorf(codes.Unauthenticated, "invalid token: %v", err)
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok || !token.Valid {
+			return nil, status.Error(codes.Unauthenticated, "invalid token claims")
+		}
+
+		sub, _ := claims["sub"].(string)
+		if sub == "" {
+			return nil, status.Error(codes.Unauthenticated, "missing sub claim")
+		}
+
+		newCtx := context.WithValue(ctx, ContextUserIDKey, sub)
+		return handler(newCtx, req)
+	}
+}
+
 func UserIDFromCtx(ctx context.Context) (uuid.UUID, error) {
 	val, ok := ctx.Value(ContextUserIDKey).(string)
 	if !ok || val == "" {

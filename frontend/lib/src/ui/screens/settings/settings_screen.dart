@@ -13,6 +13,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/core/auth/auth_provider.dart';
+import 'package:pocket_pilot/src/core/auth/token_store.dart';
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/core/theme/theme_preference_controller.dart';
@@ -64,14 +66,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _SettingsItem(
                 icon: Icons.person_outline_rounded,
                 label: 'Perfil',
-                // TODO: navegar a pantalla de perfil
-                onTap: () {},
+                onTap: () => _openProfileSheet(),
               ),
               _SettingsItem(
-                icon: Icons.lock_outline_rounded,
-                label: 'Seguridad',
-                // TODO: navegar a pantalla de seguridad
-                onTap: () {},
+                icon: Icons.logout_rounded,
+                label: 'Cerrar sesión',
+                destructive: true,
+                onTap: () => _confirmLogout(),
               ),
             ],
           ),
@@ -185,6 +186,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _openProfileSheet() async {
+    final tokenStore = context.read<TokenStore>();
+    final email = await tokenStore.getEmail();
+    final userId = await tokenStore.getUserId();
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Perfil',
+                  style: GoogleFonts.ibmPlexSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.inverseSurface,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _ProfileRow(label: 'Correo', value: email ?? '—'),
+                const SizedBox(height: 12),
+                _ProfileRow(label: 'ID', value: userId ?? '—'),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cerrar sesión'),
+        content: const Text('¿Estás seguro de que quieres cerrar sesión?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Cerrar sesión'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await context.read<AuthProvider>().logout();
+    }
   }
 
   Future<void> _openThemePicker(ThemePreferenceController controller) async {
@@ -317,16 +383,22 @@ class _SettingsItem extends StatelessWidget {
   final String label;
   final Widget? trailing;
   final VoidCallback onTap;
+  final bool destructive;
 
   const _SettingsItem({
     required this.icon,
     required this.label,
     this.trailing,
     required this.onTap,
+    this.destructive = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = destructive
+        ? Theme.of(context).colorScheme.error
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+
     return InkWell(
       onTap: onTap,
       borderRadius: AppTheme.radiusMedium,
@@ -334,11 +406,7 @@ class _SettingsItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 20,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+            Icon(icon, size: 20, color: color),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
@@ -346,19 +414,53 @@ class _SettingsItem extends StatelessWidget {
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Theme.of(context).colorScheme.inverseSurface,
+                  color: destructive
+                      ? Theme.of(context).colorScheme.error
+                      : Theme.of(context).colorScheme.inverseSurface,
                 ),
               ),
             ),
             if (trailing != null) ...[trailing!, const SizedBox(width: 6)],
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 18,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+            Icon(Icons.chevron_right_rounded, size: 18, color: color),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ProfileRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ProfileRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 60,
+          child: Text(
+            label,
+            style: GoogleFonts.ibmPlexSans(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: GoogleFonts.ibmPlexSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Theme.of(context).colorScheme.inverseSurface,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

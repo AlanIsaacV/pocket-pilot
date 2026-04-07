@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+message OAuthLoginRequest {
+  string provider = 1;
+  string id_token = 2;
+}
+
+message AuthResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  string user_id = 3;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
+}
+
+message LogoutRequest {
+  string refresh_token = 1;
+}
+
+service AuthService {
+  rpc OAuthLogin(OAuthLoginRequest) returns (AuthResponse);
+  rpc RefreshToken(RefreshRequest) returns (AuthResponse);
+  rpc Logout(LogoutRequest) returns (google.protobuf.Empty);
+  rpc RevokeAllSessions(google.protobuf.Empty) returns (google.protobuf.Empty);
+}

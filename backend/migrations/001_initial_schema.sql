@@ -1,7 +1,37 @@
+-- ── Auth ─────────────────────────────────────────────────────────────────────
+
+CREATE TABLE users (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email       TEXT NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE user_identities (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       UUID NOT NULL REFERENCES users(id),
+    provider      TEXT NOT NULL,
+    provider_id   TEXT NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(provider, provider_id)
+);
+
+CREATE TABLE refresh_tokens (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID NOT NULL REFERENCES users(id),
+    token_hash  TEXT NOT NULL,
+    expires_at  TIMESTAMPTZ NOT NULL,
+    is_revoked  BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE UNIQUE INDEX idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
+
+
 CREATE TYPE account_type AS ENUM ('bank', 'cash', 'credit_card', 'loan', 'investment', 'crypto', 'other', 'contact');
 CREATE TABLE accounts (
     id                 uuid PRIMARY KEY      DEFAULT gen_random_uuid(),
-    user_id            uuid         NOT NULL,
+    user_id            uuid         NOT NULL REFERENCES users(id),
     name               TEXT         NOT NULL,
     type               account_type NOT NULL,
     currency_code      TEXT         NOT NULL,
@@ -20,7 +50,7 @@ CREATE INDEX idx_accounts_user_id ON accounts (user_id) WHERE deleted_at IS NULL
 CREATE TYPE category_type AS ENUM ('income', 'expense');
 CREATE TABLE categories (
     id         uuid PRIMARY KEY       DEFAULT gen_random_uuid(),
-    user_id    uuid          NOT NULL,
+    user_id    uuid          NOT NULL REFERENCES users(id),
     name       TEXT          NOT NULL,
     icon       TEXT,
     color      TEXT,
@@ -35,7 +65,7 @@ CREATE INDEX idx_categories_user_id ON categories (user_id) WHERE deleted_at IS 
 
 CREATE TABLE tags (
     id         uuid PRIMARY KEY     DEFAULT gen_random_uuid(),
-    user_id    uuid        NOT NULL,
+    user_id    uuid        NOT NULL REFERENCES users(id),
     name       TEXT        NOT NULL,
     created_at timestamptz NOT NULL DEFAULT NOW(),
     updated_at timestamptz NOT NULL DEFAULT NOW(),
@@ -45,7 +75,7 @@ CREATE INDEX idx_tags_user_id ON tags (user_id) WHERE deleted_at IS NULL;
 
 CREATE TABLE yield_configs (
     id               uuid PRIMARY KEY       DEFAULT gen_random_uuid(),
-    user_id          uuid          NOT NULL,
+    user_id          uuid          NOT NULL REFERENCES users(id),
     account_id       uuid          NOT NULL REFERENCES accounts (id),
     name             TEXT          NOT NULL,
     amount_cents     BIGINT        NOT NULL,
@@ -74,7 +104,7 @@ CREATE TYPE transaction_type AS ENUM ('income', 'expense', 'transfer_out', 'tran
 
 CREATE TABLE transaction_templates (
     id            uuid PRIMARY KEY          DEFAULT gen_random_uuid(),
-    user_id       uuid             NOT NULL,
+    user_id       uuid             NOT NULL REFERENCES users(id),
     name          TEXT             NOT NULL,
     account_id    uuid             NOT NULL REFERENCES accounts (id),
     to_account_id uuid REFERENCES accounts (id),
@@ -104,7 +134,7 @@ CREATE INDEX idx_transaction_templates_user_updated_at
 
 CREATE TABLE transactions (
     id                    uuid PRIMARY KEY          DEFAULT gen_random_uuid(),
-    user_id               uuid             NOT NULL,
+    user_id               uuid             NOT NULL REFERENCES users(id),
     account_id            uuid             NOT NULL REFERENCES accounts (id),
     category_id           uuid REFERENCES categories (id),
     linked_transaction_id uuid,
@@ -143,7 +173,7 @@ CREATE INDEX idx_transactions_yield_id
 
 
 CREATE TABLE user_preferences (
-    user_id    uuid        NOT NULL,
+    user_id    uuid        NOT NULL REFERENCES users(id),
     pref_key   VARCHAR(50) NOT NULL,
     pref_value TEXT        NOT NULL,
     created_at timestamptz NOT NULL DEFAULT NOW(),
@@ -161,7 +191,7 @@ CREATE INDEX idx_user_preferences_user_updated_at
 
 CREATE TABLE goals (
     id                  uuid PRIMARY KEY     DEFAULT gen_random_uuid(),
-    user_id             uuid        NOT NULL,
+    user_id             uuid        NOT NULL REFERENCES users(id),
     name                text        NOT NULL,
     target_amount_cents bigint      NOT NULL,
     target_date         date        NOT NULL,
@@ -185,7 +215,7 @@ CREATE INDEX idx_goals_user_target_date_active
 
 CREATE TABLE budgets (
     id                 uuid PRIMARY KEY      DEFAULT gen_random_uuid(),
-    user_id            uuid         NOT NULL,
+    user_id            uuid         NOT NULL REFERENCES users(id),
     category_id        uuid         NOT NULL REFERENCES categories (id),
     limit_amount_cents BIGINT       NOT NULL,
     currency_code      TEXT         NOT NULL,
@@ -206,7 +236,7 @@ CREATE INDEX idx_budgets_user_updated_at
 
 CREATE TABLE ai_usage (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id           UUID        NOT NULL,
+    user_id           UUID        NOT NULL REFERENCES users(id),
     prompt_tokens     INT         NOT NULL,
     completion_tokens INT         NOT NULL,
     total_tokens      INT         NOT NULL,
@@ -220,7 +250,7 @@ CREATE INDEX idx_ai_usage_user_daily ON ai_usage (user_id, created_at);
 
 CREATE TABLE ai_unsupported_tool_reports (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID        NOT NULL,
+    user_id     UUID        NOT NULL REFERENCES users(id),
     user_intent TEXT        NOT NULL,
     reason      TEXT        NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -289,5 +319,10 @@ EXECUTE FUNCTION trigger_set_updated_at();
 CREATE TRIGGER set_updated_at_budgets
     BEFORE UPDATE
     ON budgets
+    FOR EACH ROW
+EXECUTE FUNCTION trigger_set_updated_at();
+
+CREATE TRIGGER set_updated_at_users
+    BEFORE UPDATE ON users
     FOR EACH ROW
 EXECUTE FUNCTION trigger_set_updated_at();

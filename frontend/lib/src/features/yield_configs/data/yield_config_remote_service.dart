@@ -2,7 +2,6 @@ import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 
-import 'package:pocket_pilot/src/core/grpc/auth_interceptor.dart';
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/yield_config_service.pbgrpc.dart';
 
@@ -12,7 +11,7 @@ class YieldConfigRemoteService {
   YieldConfigRemoteService() {
     _client = YieldConfigServiceClient(
       GrpcClient.channel,
-      interceptors: [const AuthInterceptor()],
+      interceptors: GrpcClient.interceptors,
     );
   }
 

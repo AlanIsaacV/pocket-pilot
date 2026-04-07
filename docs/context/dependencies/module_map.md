@@ -27,6 +27,7 @@ This document outlines the dependencies between internal modules and external li
 - `google.golang.org/grpc`: Core gRPC library.
 - `github.com/jackc/pgx/v5`: PostgreSQL driver and connection pool.
 - `github.com/google/uuid`: UUID generation and parsing.
+- `github.com/golang-jwt/jwt/v5`: JWT generation (HS256 access tokens) and validation.
 
 ### Frontend (Flutter)
 - `grpc`: Dart gRPC implementation.
@@ -34,3 +35,6 @@ This document outlines the dependencies between internal modules and external li
 - `provider`: State management.
 - `connectivity_plus`: Monitoring network state.
 - `fixnum`: Handling 64-bit integers from gRPC.
+- `google_sign_in`: Google OIDC id_token for social login.
+- `sign_in_with_apple`: Apple identity token for social login (iOS only).
+- `flutter_secure_storage`: Encrypted storage for auth tokens.

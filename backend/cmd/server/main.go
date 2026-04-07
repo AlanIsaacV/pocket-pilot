@@ -14,12 +14,14 @@ import (
 
 	"github.com/AlanIsaacV/pocket-pilot/internal/account"
 	"github.com/AlanIsaacV/pocket-pilot/internal/aiassistant"
+	"github.com/AlanIsaacV/pocket-pilot/internal/auth"
 	"github.com/AlanIsaacV/pocket-pilot/internal/budget"
 	"github.com/AlanIsaacV/pocket-pilot/internal/category"
 	"github.com/AlanIsaacV/pocket-pilot/internal/config"
 	"github.com/AlanIsaacV/pocket-pilot/internal/database"
 	pb "github.com/AlanIsaacV/pocket-pilot/internal/gen/proto/pocket_pilot/v1/pocket_pilot/v1"
 	"github.com/AlanIsaacV/pocket-pilot/internal/goal"
+	"github.com/AlanIsaacV/pocket-pilot/internal/jwks"
 	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
 	"github.com/AlanIsaacV/pocket-pilot/internal/tag"
 	"github.com/AlanIsaacV/pocket-pilot/internal/transaction"
@@ -60,10 +62,16 @@ func main() {
 	aiRateLimiter := aiassistant.NewRateLimiter(aiRepo, cfg.AIDailyRequestLimit, cfg.AIMonthlyTokenLimit)
 	aiHandler := aiassistant.NewHandler(geminiProvider, aiRateLimiter, aiRepo)
 
-	// gRPC server with auth interceptor.
-	// The interceptor validates the Bearer token and injects user_id into every request context.
+	// Auth
+	keyStore := jwks.NewKeyStore()
+	verifier := jwks.NewVerifier(keyStore, cfg.GoogleClientID, cfg.AppleClientID)
+	tokenService := auth.NewTokenService(cfg.JWTSecret)
+	authRepo := auth.NewRepository(pool)
+	authHandler := auth.NewHandler(authRepo, verifier, tokenService)
+
+	// gRPC server with JWT auth interceptor.
 	srv := grpc.NewServer(
-		grpc.UnaryInterceptor(middleware.UnaryAuthInterceptor),
+		grpc.UnaryInterceptor(middleware.NewUnaryAuthInterceptor(cfg.JWTSecret)),
 	)
 	pb.RegisterAccountServiceServer(srv, accountHandler)
 	pb.RegisterCategoryServiceServer(srv, categoryHandler)
@@ -75,10 +83,8 @@ func main() {
 	pb.RegisterTagServiceServer(srv, tagHandler)
 	pb.RegisterUserPreferenceServiceServer(srv, userPreferenceHandler)
 	pb.RegisterAIAssistantServiceServer(srv, aiHandler)
+	pb.RegisterAuthServiceServer(srv, authHandler)
 
-	// Server Reflection lets grpcurl discover services without a .proto file:
-	//   grpcurl -plaintext localhost:50051 list
-	//   grpcurl -plaintext -d '{"user_id":"..."}' localhost:50051 pocket_pilot.v1.AccountService/ListAccounts
 	reflection.Register(srv)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPCPort))

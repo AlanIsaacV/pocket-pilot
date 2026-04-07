@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/sync/scheduled_generation_orchestrator.dart';
-import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/core/theme/theme_preference_controller.dart';
 import 'package:pocket_pilot/src/features/ai_assistant/ui/ai_overlay.dart';
@@ -68,7 +67,6 @@ class _PocketPilotAppState extends State<PocketPilotApp>
           children: [
             child ?? const SizedBox.shrink(),
             const AIOverlay(),
-            const Positioned(left: 16, bottom: 80, child: _AILaunchButton()),
           ],
         );
       },
@@ -76,22 +74,3 @@ class _PocketPilotAppState extends State<PocketPilotApp>
   }
 }
 
-class _AILaunchButton extends StatelessWidget {
-  const _AILaunchButton();
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = context.watch<AISessionController>();
-    if (controller.state != AISessionState.idle) {
-      return const SizedBox.shrink();
-    }
-
-    return FloatingActionButton(
-      heroTag: 'ai_assistant',
-      mini: true,
-      backgroundColor: AppColors.primary,
-      onPressed: controller.openSession,
-      child: const Icon(Icons.mic, color: AppColors.backgroundDark),
-    );
-  }
-}

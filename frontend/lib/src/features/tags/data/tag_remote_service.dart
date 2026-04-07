@@ -2,7 +2,6 @@ import 'package:grpc/grpc.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/tags_service.pbgrpc.dart';
-import 'package:pocket_pilot/src/core/grpc/auth_interceptor.dart';
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
 
 class TagRemoteService {
@@ -11,7 +10,7 @@ class TagRemoteService {
   TagRemoteService() {
     _client = TagServiceClient(
       GrpcClient.channel,
-      interceptors: [const AuthInterceptor()],
+      interceptors: GrpcClient.interceptors,
     );
   }
 

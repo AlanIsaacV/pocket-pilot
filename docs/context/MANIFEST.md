@@ -16,6 +16,7 @@ Before starting any task, identify the relevant domain (Backend, Frontend, or Pr
 - [architecture/yield_configs_and_interest_generation.md](architecture/yield_configs_and_interest_generation.md) - Yield config schema/contracts, local interest generation with deterministic UUIDv5, maturity/auto-renew behavior, `transactions.yield_id` linkage, and sync order integration.
 - [architecture/goals_and_liquidity.md](architecture/goals_and_liquidity.md) - Goals schema/contracts, computed properties (progress, monthly quota, overdue), liquidity concept (deferred), and integration points for when liquidity is available.
 - [architecture/budgets.md](architecture/budgets.md) - Budgets schema/contracts (with visual-only `currency_code`), dynamic spend calculation from transactions, BudgetStatus DTO, UI integration as third tab in AccountsScreen, category picker via `CategoryPickerScreen`.
+- [architecture/auth.md](architecture/auth.md) - Custom auth with Google/Apple social login, JWKS validation, JWT access tokens, refresh token rotation, account linking by email, DB wipe on user change, platform-specific login (Apple iOS only).
 
 ### Development Conventions
 - [conventions/coding_standards.md](conventions/coding_standards.md) - Naming conventions, error handling, and style guides for Go and Dart.

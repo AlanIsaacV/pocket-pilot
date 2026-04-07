@@ -70,6 +70,14 @@ dependencies:
   speech_to_text: ^7.0.0
   flutter_tts: ^4.2.0
 
+  # --- Auth ---
+  # google_sign_in: obtiene el OIDC id_token de Google.
+  # sign_in_with_apple: obtiene el identity token de Apple.
+  # flutter_secure_storage: almacenamiento cifrado para tokens.
+  google_sign_in: ^6.2.2
+  sign_in_with_apple: ^6.1.4
+  flutter_secure_storage: ^9.2.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

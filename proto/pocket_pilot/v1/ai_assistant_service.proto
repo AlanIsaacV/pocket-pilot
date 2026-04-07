@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+enum AIRole {
+  AI_ROLE_UNSPECIFIED = 0;
+  AI_ROLE_SYSTEM = 1;
+  AI_ROLE_USER = 2;
+  AI_ROLE_ASSISTANT = 3;
+  AI_ROLE_TOOL = 4;
+}
+
+message AIToolCall {
+  string id = 1;
+  string name = 2;
+  string arguments = 3;
+  bytes thought_signature = 4;
+}
+
+message AIMessage {
+  AIRole role = 1;
+  string content = 2;
+  optional string tool_call_id = 3;
+  optional AIToolCall tool_call = 4;
+}
+
+message AIToolDefinition {
+  string name = 1;
+  string description = 2;
+  string parameters_schema = 3;
+}
+
+message AIUsageMetadata {
+  int32 prompt_tokens = 1;
+  int32 completion_tokens = 2;
+  int32 total_tokens = 3;
+}
+
+message AIChatRequest {
+  repeated AIMessage messages = 1;
+  repeated AIToolDefinition tools = 2;
+}
+
+message AIChatResponse {
+  oneof response {
+    string text = 1;
+    AIToolCall tool_call = 2;
+  }
+  AIUsageMetadata usage = 3;
+}
+
+message ReportUnsupportedToolRequest {
+  string user_intent = 1;
+  string reason = 2;
+}
+
+service AIAssistantService {
+  rpc Chat(AIChatRequest) returns (AIChatResponse);
+  rpc ReportUnsupportedTool(ReportUnsupportedToolRequest) returns (google.protobuf.Empty);
+}

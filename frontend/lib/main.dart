@@ -17,6 +17,7 @@
 // en su propio RouteScope bajo features/<feature>/ui/<feature>_route_scope.dart.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
@@ -31,6 +32,15 @@ import 'package:pocket_pilot/src/core/theme/theme_preference_controller.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_remote_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_sync_handler.dart';
+import 'package:pocket_pilot/src/features/ai_assistant/data/ai_context_builder.dart';
+import 'package:pocket_pilot/src/features/ai_assistant/data/ai_remote_service.dart';
+import 'package:pocket_pilot/src/features/ai_assistant/data/ai_tool_dispatcher.dart';
+import 'package:pocket_pilot/src/features/ai_assistant/data/tools/financial_summary_tool.dart';
+import 'package:pocket_pilot/src/features/ai_assistant/data/tools/goal_tool.dart';
+import 'package:pocket_pilot/src/features/ai_assistant/data/tools/template_tool.dart';
+import 'package:pocket_pilot/src/features/ai_assistant/data/tools/edit_transaction_tool.dart';
+import 'package:pocket_pilot/src/features/ai_assistant/data/tools/transaction_tool.dart';
+import 'package:pocket_pilot/src/features/ai_assistant/ui/ai_session_controller.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_remote_service.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_seeder.dart';
@@ -38,6 +48,8 @@ import 'package:pocket_pilot/src/features/categories/data/category_sync_handler.
 import 'package:pocket_pilot/src/features/budgets/data/budget_local_store.dart';
 import 'package:pocket_pilot/src/features/budgets/data/budget_remote_service.dart';
 import 'package:pocket_pilot/src/features/budgets/data/budget_sync_handler.dart';
+import 'package:pocket_pilot/src/features/dashboard/data/dashboard_local_store.dart';
+import 'package:pocket_pilot/src/features/dashboard/data/dashboard_repository.dart';
 import 'package:pocket_pilot/src/features/goals/data/goal_local_store.dart';
 import 'package:pocket_pilot/src/features/goals/data/goal_remote_service.dart';
 import 'package:pocket_pilot/src/features/goals/data/goal_sync_handler.dart';
@@ -51,6 +63,7 @@ import 'package:pocket_pilot/src/features/transaction_templates/data/scheduled_t
 import 'package:pocket_pilot/src/features/transaction_templates/data/transaction_template_sync_handler.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_remote_service.dart';
+import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_sync_handler.dart';
 import 'package:pocket_pilot/src/features/yield_configs/data/yield_config_local_store.dart';
 import 'package:pocket_pilot/src/features/yield_configs/data/yield_config_remote_service.dart';
@@ -188,6 +201,53 @@ Future<void> main() async {
     generator: compositeGenerator,
   );
 
+  // AI Assistant
+  final aiRemoteService = AIRemoteService();
+  final aiDashboardLocalStore = DashboardLocalStore(db: dbHelper);
+  final aiDashboardRepository = DashboardRepository(
+    local: aiDashboardLocalStore,
+  );
+  final aiTransactionRepository = TransactionRepository(
+    local: TransactionLocalStore(db: dbHelper),
+    outbox: syncOutbox,
+  );
+
+  final aiToolDispatcher = AIToolDispatcher(
+    transactionTool: TransactionTool(repo: aiTransactionRepository),
+    editTransactionTool: EditTransactionTool(repo: aiTransactionRepository),
+    templateTool: TemplateTool(
+      db: dbHelper,
+      transactionRepo: aiTransactionRepository,
+    ),
+    financialSummaryTool: FinancialSummaryTool(
+      dashboardRepo: aiDashboardRepository,
+      dashboardLocal: aiDashboardLocalStore,
+    ),
+    goalTool: GoalTool(db: dbHelper, dashboardRepo: aiDashboardRepository),
+    remote: aiRemoteService,
+  );
+
+  final aiContextBuilder = AIContextBuilder(
+    accounts: AccountLocalStore(db: dbHelper),
+    categories: CategoryLocalStore(db: dbHelper),
+    templates: TransactionTemplateLocalStore(db: dbHelper),
+    goals: GoalLocalStore(db: dbHelper),
+    prefs: UserPreferenceLocalStore(db: dbHelper),
+  );
+
+  final aiSessionController = AISessionController(
+    remote: aiRemoteService,
+    dispatcher: aiToolDispatcher,
+    contextBuilder: aiContextBuilder,
+  );
+
+  const aiChannel = MethodChannel('com.pocketpilot/ai_assistant');
+  aiChannel.setMethodCallHandler((call) async {
+    if (call.method == 'onLaunchAssistant') {
+      await aiSessionController.openSession();
+    }
+  });
+
   // Insertar categorías por defecto si es la primera ejecución.
   final categorySeeder = CategorySeeder(
     local: CategoryLocalStore(db: dbHelper),
@@ -226,6 +286,9 @@ Future<void> main() async {
         ),
         ChangeNotifierProvider<ThemePreferenceController>.value(
           value: themePreferenceController,
+        ),
+        ChangeNotifierProvider<AISessionController>.value(
+          value: aiSessionController,
         ),
       ],
       child: PocketPilotApp(router: buildRouter()),

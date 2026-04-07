@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="launch_ai_assistant"
+        android:enabled="true"
+        android:shortcutShortLabel="@string/ai_shortcut_label"
+        android:shortcutLongLabel="@string/ai_shortcut_long_label">
+        <intent
+            android:action="com.pocketpilot.LAUNCH_ASSISTANT"
+            android:targetPackage="${applicationId}"
+            android:targetClass="${applicationId}.MainActivity" />
+    </shortcut>
+</shortcuts>

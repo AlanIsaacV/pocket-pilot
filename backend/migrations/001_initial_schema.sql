@@ -204,6 +204,31 @@ CREATE INDEX idx_budgets_user_updated_at
     ON budgets (user_id, updated_at);
 
 
+CREATE TABLE ai_usage (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id           UUID        NOT NULL,
+    prompt_tokens     INT         NOT NULL,
+    completion_tokens INT         NOT NULL,
+    total_tokens      INT         NOT NULL,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    deleted_at        TIMESTAMPTZ
+);
+
+CREATE INDEX idx_ai_usage_user_daily ON ai_usage (user_id, created_at);
+
+
+CREATE TABLE ai_unsupported_tool_reports (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID        NOT NULL,
+    user_intent TEXT        NOT NULL,
+    reason      TEXT        NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_unsupported_reports_user ON ai_unsupported_tool_reports (user_id, created_at);
+
+
 CREATE OR REPLACE FUNCTION trigger_set_updated_at()
     RETURNS TRIGGER AS
 $$

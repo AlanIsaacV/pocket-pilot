@@ -64,6 +64,12 @@ dependencies:
   # Usamos Space Grotesk (números), Outfit (títulos) e Inter (cuerpo).
   google_fonts: ^8.0.2
 
+  # --- Voz ---
+  # speech_to_text: convierte voz a texto para el asistente.
+  # flutter_tts: sintetiza respuestas del asistente en voz.
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

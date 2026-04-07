@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/AlanIsaacV/pocket-pilot/internal/account"
+	"github.com/AlanIsaacV/pocket-pilot/internal/aiassistant"
 	"github.com/AlanIsaacV/pocket-pilot/internal/budget"
 	"github.com/AlanIsaacV/pocket-pilot/internal/category"
 	"github.com/AlanIsaacV/pocket-pilot/internal/config"
@@ -53,6 +54,12 @@ func main() {
 	tagHandler := tag.NewHandler(tag.NewRepository(pool))
 	userPreferenceHandler := userpreference.NewHandler(userpreference.NewRepository(pool))
 
+	// AI Assistant
+	geminiProvider := aiassistant.NewGeminiProvider(cfg.GeminiAPIKey)
+	aiRepo := aiassistant.NewRepository(pool)
+	aiRateLimiter := aiassistant.NewRateLimiter(aiRepo, cfg.AIDailyRequestLimit, cfg.AIMonthlyTokenLimit)
+	aiHandler := aiassistant.NewHandler(geminiProvider, aiRateLimiter, aiRepo)
+
 	// gRPC server with auth interceptor.
 	// The interceptor validates the Bearer token and injects user_id into every request context.
 	srv := grpc.NewServer(
@@ -67,6 +74,7 @@ func main() {
 	pb.RegisterBudgetServiceServer(srv, budgetHandler)
 	pb.RegisterTagServiceServer(srv, tagHandler)
 	pb.RegisterUserPreferenceServiceServer(srv, userPreferenceHandler)
+	pb.RegisterAIAssistantServiceServer(srv, aiHandler)
 
 	// Server Reflection lets grpcurl discover services without a .proto file:
 	//   grpcurl -plaintext localhost:50051 list

@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>com.pocketpilot.launchAssistant</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -47,6 +51,10 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Pocket Pilot usa reconocimiento de voz para el asistente de IA.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Pocket Pilot necesita acceso al micrófono para el asistente de voz.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

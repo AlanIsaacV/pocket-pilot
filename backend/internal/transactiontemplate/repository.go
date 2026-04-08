@@ -17,7 +17,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-const scanColumns = `id, user_id, name, account_id, to_account_id, category_id, type, amount_cents, currency_code, tags, description, frequency, next_date, end_date, created_at, updated_at, deleted_at, is_auto_charge, is_active`
+const scanColumns = `id, user_id, name, account_id, to_account_id, category_id, type, amount_cents, currency_code, tags, description, frequency, next_date, end_date, created_at, updated_at, deleted_at, is_auto_charge, is_active, nature`
 
 func (r *Repository) scan(row pgx.Row) (*Template, error) {
 	t := &Template{}
@@ -27,7 +27,7 @@ func (r *Repository) scan(row pgx.Row) (*Template, error) {
 		&t.CurrencyCode, &t.Tags, &t.Description,
 		&t.Frequency, &t.NextDate, &t.EndDate,
 		&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt,
-		&t.IsAutoCharge, &t.IsActive,
+		&t.IsAutoCharge, &t.IsActive, &t.Nature,
 	)
 	if err != nil {
 		return nil, err
@@ -88,8 +88,8 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 
 func (r *Repository) Upsert(ctx context.Context, t *Template) (*Template, bool, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO transaction_templates (id, user_id, name, account_id, to_account_id, category_id, type, amount_cents, currency_code, tags, description, frequency, next_date, end_date, created_at, updated_at, is_auto_charge, is_active)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+		INSERT INTO transaction_templates (id, user_id, name, account_id, to_account_id, category_id, type, amount_cents, currency_code, tags, description, frequency, next_date, end_date, created_at, updated_at, is_auto_charge, is_active, nature)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 		ON CONFLICT (id) DO UPDATE SET
 			name           = EXCLUDED.name,
 			account_id     = EXCLUDED.account_id,
@@ -105,6 +105,7 @@ func (r *Repository) Upsert(ctx context.Context, t *Template) (*Template, bool, 
 			end_date       = EXCLUDED.end_date,
 			is_auto_charge = EXCLUDED.is_auto_charge,
 			is_active      = EXCLUDED.is_active,
+			nature         = EXCLUDED.nature,
 			updated_at     = EXCLUDED.updated_at
 		WHERE transaction_templates.updated_at < EXCLUDED.updated_at
 		RETURNING `+scanColumns,
@@ -113,7 +114,7 @@ func (r *Repository) Upsert(ctx context.Context, t *Template) (*Template, bool, 
 		t.CurrencyCode, t.Tags, t.Description,
 		t.Frequency, t.NextDate, t.EndDate,
 		t.CreatedAt, t.UpdatedAt,
-		t.IsAutoCharge, t.IsActive,
+		t.IsAutoCharge, t.IsActive, t.Nature,
 	)
 
 	result, err := r.scan(row)

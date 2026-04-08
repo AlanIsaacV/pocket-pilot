@@ -17,6 +17,7 @@ import 'package:pocket_pilot/src/features/debts/ui/debts_list_tab.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goals_list_tab.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
+import 'package:pocket_pilot/src/ui/widgets/notification_bell.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 class AccountsScreen extends StatefulWidget {
@@ -47,6 +48,7 @@ class _AccountsScreenState extends State<AccountsScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cuentas'),
+        actions: const [NotificationBell()],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

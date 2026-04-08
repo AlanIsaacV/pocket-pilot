@@ -70,6 +70,7 @@ import 'screens/settings/settings_screen.dart';
 import 'package:pocket_pilot/src/features/csv_import/ui/csv_import_route_scope.dart';
 import 'package:pocket_pilot/src/features/csv_import/ui/csv_import_screen.dart';
 import 'package:pocket_pilot/src/features/csv_import/ui/csv_mapping_screen.dart';
+import 'screens/notifications/notifications_screen.dart';
 import 'screens/settings/sync_status_screen.dart';
 
 GoRouter buildRouter(AuthProvider authProvider) {
@@ -389,6 +390,10 @@ GoRouter buildRouter(AuthProvider authProvider) {
         path: '/settings/currency',
         builder: (context, state) =>
             const UserPreferencesRouteScope(child: CurrencyPreferencesScreen()),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
         path: '/settings/sync',

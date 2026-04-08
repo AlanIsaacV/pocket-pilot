@@ -80,6 +80,11 @@ import 'package:pocket_pilot/src/core/auth/auth_service.dart';
 import 'package:pocket_pilot/src/core/auth/token_store.dart';
 import 'package:pocket_pilot/src/core/grpc/auth_interceptor.dart';
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
+import 'package:pocket_pilot/src/core/notifications/notification_center_repository.dart';
+import 'package:pocket_pilot/src/core/notifications/notification_center_view_model.dart';
+import 'package:pocket_pilot/src/core/notifications/notification_local_store.dart';
+import 'package:pocket_pilot/src/core/notifications/notification_repository.dart';
+import 'package:pocket_pilot/src/core/notifications/notification_scheduler_service.dart';
 import 'package:pocket_pilot/src/ui/app.dart';
 import 'package:pocket_pilot/src/ui/router.dart';
 
@@ -265,6 +270,23 @@ Future<void> main() async {
     contextBuilder: aiContextBuilder,
   );
 
+  // Notification scheduling (offline-first, no backend).
+  final notificationRepo = NotificationRepository(db: dbHelper);
+  final notificationLocalStore = NotificationLocalStore(db: dbHelper);
+  final notificationCenterRepo = NotificationCenterRepository(
+    projection: notificationRepo,
+    local: notificationLocalStore,
+  );
+  final notificationCenterVM = NotificationCenterViewModel(
+    repository: notificationCenterRepo,
+  );
+  final router = buildRouter(authProvider);
+  final notificationScheduler = NotificationSchedulerService(
+    repository: notificationRepo,
+    onNotificationTap: () => router.push('/notifications'),
+  );
+  await notificationScheduler.init();
+
   const aiChannel = MethodChannel('com.pocketpilot/ai_assistant');
   aiChannel.setMethodCallHandler((call) async {
     if (call.method == 'onLaunchAssistant') {
@@ -320,8 +342,12 @@ Future<void> main() async {
         ),
         Provider<TokenStore>.value(value: tokenStore),
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
+        Provider<NotificationRepository>.value(value: notificationRepo),
+        ChangeNotifierProvider<NotificationCenterViewModel>.value(
+          value: notificationCenterVM,
+        ),
       ],
-      child: PocketPilotApp(router: buildRouter(authProvider)),
+      child: PocketPilotApp(router: router),
     ),
   );
 
@@ -329,4 +355,8 @@ Future<void> main() async {
   connectivityMonitor.startMonitoring();
   await scheduledOrchestrator.runCycle();
   await themePreferenceController.loadFromLocal();
+
+  // Schedule OS notifications and populate notification center — fire-and-forget.
+  notificationScheduler.rescheduleAllNotifications();
+  notificationCenterVM.load();
 }

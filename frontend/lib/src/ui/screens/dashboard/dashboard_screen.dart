@@ -15,6 +15,7 @@ import 'package:pocket_pilot/src/features/dashboard/domain/dashboard_metrics.dar
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_view_model.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
+import 'package:pocket_pilot/src/ui/widgets/notification_bell.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -51,6 +52,7 @@ class DashboardScreen extends StatelessWidget {
                     ),
                   ),
                   actions: [
+                    const NotificationBell(),
                     _FilterButton(hasFilters: filterVM.hasFilters),
                     const SizedBox(width: 8),
                   ],

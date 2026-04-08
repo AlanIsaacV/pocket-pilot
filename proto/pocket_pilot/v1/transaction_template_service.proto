@@ -27,6 +27,7 @@ message TransactionTemplate {
   optional string to_account_id = 16;
   bool is_auto_charge = 17;
   bool is_active = 18;
+  FinancialNature nature = 19;
 }
 
 service TransactionTemplateService {

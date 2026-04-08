@@ -26,3 +26,5 @@ frontend/lib/src/generated/
 *.env
 .env.*
 !.env.example
+
+__debug*

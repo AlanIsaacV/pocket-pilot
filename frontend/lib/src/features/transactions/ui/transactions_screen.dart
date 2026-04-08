@@ -16,6 +16,7 @@ import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/widgets/filter_sheet.dart';
+import 'package:pocket_pilot/src/ui/widgets/notification_bell.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 class TransactionsScreen extends StatelessWidget {
@@ -24,7 +25,10 @@ class TransactionsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Transacciones')),
+      appBar: AppBar(
+        title: const Text('Transacciones'),
+        actions: const [NotificationBell()],
+      ),
       body: Consumer<TransactionsViewModel>(
         builder: (context, vm, _) {
           final filterVM = context.watch<TransactionFilterViewModel>();

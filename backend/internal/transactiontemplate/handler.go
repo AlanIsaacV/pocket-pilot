@@ -66,6 +66,44 @@ func parseDateOnly(value string, field string) (time.Time, error) {
 	return dateOnly(t), nil
 }
 
+func stringToFinancialNature(s string) pb.FinancialNature {
+	switch s {
+	case "required":
+		return pb.FinancialNature_NATURE_REQUIRED
+	case "obligation":
+		return pb.FinancialNature_NATURE_OBLIGATION
+	case "lifestyle":
+		return pb.FinancialNature_NATURE_LIFESTYLE
+	case "active":
+		return pb.FinancialNature_NATURE_ACTIVE
+	case "passive":
+		return pb.FinancialNature_NATURE_PASSIVE
+	case "windfall":
+		return pb.FinancialNature_NATURE_WINDFALL
+	default:
+		return pb.FinancialNature_NATURE_UNSPECIFIED
+	}
+}
+
+func financialNatureToString(n pb.FinancialNature) string {
+	switch n {
+	case pb.FinancialNature_NATURE_REQUIRED:
+		return "required"
+	case pb.FinancialNature_NATURE_OBLIGATION:
+		return "obligation"
+	case pb.FinancialNature_NATURE_LIFESTYLE:
+		return "lifestyle"
+	case pb.FinancialNature_NATURE_ACTIVE:
+		return "active"
+	case pb.FinancialNature_NATURE_PASSIVE:
+		return "passive"
+	case pb.FinancialNature_NATURE_WINDFALL:
+		return "windfall"
+	default:
+		return ""
+	}
+}
+
 func toProto(t *Template) *pb.TransactionTemplate {
 	proto := &pb.TransactionTemplate{
 		Id:           t.ID.String(),
@@ -77,6 +115,7 @@ func toProto(t *Template) *pb.TransactionTemplate {
 		Description:  t.Description,
 		IsAutoCharge: t.IsAutoCharge,
 		IsActive:     t.IsActive,
+		Nature:       stringToFinancialNature(t.Nature),
 		CreatedAt:    timestamppb.New(t.CreatedAt),
 		UpdatedAt:    timestamppb.New(t.UpdatedAt),
 	}
@@ -185,6 +224,7 @@ func fromProto(p *pb.TransactionTemplate, userID uuid.UUID) (*Template, error) {
 		EndDate:      endDate,
 		IsAutoCharge: p.IsAutoCharge,
 		IsActive:     p.IsActive,
+		Nature:       financialNatureToString(p.Nature),
 		CreatedAt:    p.CreatedAt.AsTime(),
 		UpdatedAt:    p.UpdatedAt.AsTime(),
 	}, nil

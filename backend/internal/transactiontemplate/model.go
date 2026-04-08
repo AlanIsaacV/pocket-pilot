@@ -27,6 +27,7 @@ type Template struct {
 	DeletedAt    *time.Time
 	IsAutoCharge bool
 	IsActive     bool
+	Nature       string
 }
 
 func dateOnly(t time.Time) time.Time {

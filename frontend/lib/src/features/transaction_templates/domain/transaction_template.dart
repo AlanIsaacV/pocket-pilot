@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:pocket_pilot/src/generated/pocket_pilot/v1/common.pb.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/transaction_template_service.pbgrpc.dart';
 
 class TransactionTemplateModel {
@@ -18,6 +19,7 @@ class TransactionTemplateModel {
   final String? endDate;
   final bool isAutoCharge;
   final bool isActive;
+  final String nature;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -38,6 +40,7 @@ class TransactionTemplateModel {
     this.endDate,
     this.isAutoCharge = false,
     this.isActive = true,
+    this.nature = '',
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -60,6 +63,7 @@ class TransactionTemplateModel {
       endDate: proto.hasEndDate() ? _dateOnly(proto.endDate) : null,
       isAutoCharge: proto.isAutoCharge,
       isActive: proto.isActive,
+      nature: _financialNatureToString(proto.nature),
       createdAt: proto.createdAt.toDateTime().toUtc(),
       updatedAt: proto.updatedAt.toDateTime().toUtc(),
       deletedAt: proto.hasDeletedAt()
@@ -89,6 +93,7 @@ class TransactionTemplateModel {
           : null,
       isAutoCharge: (map['is_auto_charge'] as int? ?? 0) == 1,
       isActive: (map['is_active'] as int? ?? 1) == 1,
+      nature: map['nature'] as String? ?? '',
       createdAt: DateTime.parse(map['created_at'] as String).toUtc(),
       updatedAt: DateTime.parse(map['updated_at'] as String).toUtc(),
       deletedAt: map['deleted_at'] != null
@@ -114,6 +119,7 @@ class TransactionTemplateModel {
       'end_date': endDate == null ? null : _dateOnly(endDate!),
       'is_auto_charge': isAutoCharge ? 1 : 0,
       'is_active': isActive ? 1 : 0,
+      'nature': nature,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'deleted_at': deletedAt?.toIso8601String(),
@@ -137,6 +143,7 @@ class TransactionTemplateModel {
       'end_date': endDate == null ? null : _dateOnly(endDate!),
       'is_auto_charge': isAutoCharge,
       'is_active': isActive,
+      'nature': nature,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'deleted_at': deletedAt?.toIso8601String(),
@@ -162,5 +169,24 @@ class TransactionTemplateModel {
 
   static String _dateOnly(String value) {
     return value.length >= 10 ? value.substring(0, 10) : value;
+  }
+
+  static String _financialNatureToString(FinancialNature nature) {
+    switch (nature) {
+      case FinancialNature.NATURE_REQUIRED:
+        return 'required';
+      case FinancialNature.NATURE_OBLIGATION:
+        return 'obligation';
+      case FinancialNature.NATURE_LIFESTYLE:
+        return 'lifestyle';
+      case FinancialNature.NATURE_ACTIVE:
+        return 'active';
+      case FinancialNature.NATURE_PASSIVE:
+        return 'passive';
+      case FinancialNature.NATURE_WINDFALL:
+        return 'windfall';
+      default:
+        return '';
+    }
   }
 }

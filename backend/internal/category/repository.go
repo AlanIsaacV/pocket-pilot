@@ -17,8 +17,9 @@ type Category struct {
 	Icon      string
 	Color     string
 	ParentID  *uuid.UUID
-	Type      string // "income" | "expense"
-	CreatedAt time.Time
+	Type          string // "income" | "expense"
+	DefaultNature string // "required" | "obligation" | "lifestyle" | "active" | "passive" | "windfall" | ""
+	CreatedAt     time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time
 }
@@ -31,13 +32,13 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-const scanColumns = `id, user_id, name, icon, color, parent_id, type, created_at, updated_at, deleted_at`
+const scanColumns = `id, user_id, name, icon, color, parent_id, type, default_nature, created_at, updated_at, deleted_at`
 
 func (r *Repository) scan(row pgx.Row) (*Category, error) {
 	c := &Category{}
 	err := row.Scan(
 		&c.ID, &c.UserID, &c.Name, &c.Icon, &c.Color,
-		&c.ParentID, &c.Type,
+		&c.ParentID, &c.Type, &c.DefaultNature,
 		&c.CreatedAt, &c.UpdatedAt, &c.DeletedAt,
 	)
 	if err != nil {
@@ -98,7 +99,7 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 		c := &Category{}
 		if err := rows.Scan(
 			&c.ID, &c.UserID, &c.Name, &c.Icon, &c.Color,
-			&c.ParentID, &c.Type,
+			&c.ParentID, &c.Type, &c.DefaultNature,
 			&c.CreatedAt, &c.UpdatedAt, &c.DeletedAt,
 		); err != nil {
 			return nil, syncedAt, err
@@ -115,18 +116,19 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 //   - conflictResolved=true:  server had a newer version; returned category is the server's.
 func (r *Repository) Upsert(ctx context.Context, c *Category) (*Category, bool, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO categories (id, user_id, name, icon, color, parent_id, type, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO categories (id, user_id, name, icon, color, parent_id, type, default_nature, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (id) DO UPDATE SET
-			name       = EXCLUDED.name,
-			icon       = EXCLUDED.icon,
-			color      = EXCLUDED.color,
-			parent_id  = EXCLUDED.parent_id,
-			type       = EXCLUDED.type,
-			updated_at = EXCLUDED.updated_at
+			name           = EXCLUDED.name,
+			icon           = EXCLUDED.icon,
+			color          = EXCLUDED.color,
+			parent_id      = EXCLUDED.parent_id,
+			type           = EXCLUDED.type,
+			default_nature = EXCLUDED.default_nature,
+			updated_at     = EXCLUDED.updated_at
 		WHERE categories.updated_at < EXCLUDED.updated_at
 		RETURNING `+scanColumns,
-		c.ID, c.UserID, c.Name, c.Icon, c.Color, c.ParentID, c.Type,
+		c.ID, c.UserID, c.Name, c.Icon, c.Color, c.ParentID, c.Type, c.DefaultNature,
 		c.CreatedAt, c.UpdatedAt,
 	)
 

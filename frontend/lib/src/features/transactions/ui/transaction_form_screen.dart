@@ -51,6 +51,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   bool get _isEditMode => widget.transaction != null;
 
   String _type = 'expense';
+  String _nature = '';
   final TransactionAmountCalculator _amountCalculator =
       TransactionAmountCalculator();
   int _installmentsCount = 1;
@@ -127,6 +128,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     if (_isEditMode) {
       final t = widget.transaction!;
       _type = t.type;
+      _nature = t.nature;
       selectedInstallmentsCount = t.installmentsCount;
       final rawAmount = t.amount / 100;
       initialAmount = rawAmount == rawAmount.truncateToDouble()
@@ -449,7 +451,10 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       extra: {'type': _type},
     );
     if (result != null) {
-      setState(() => _selectedCategory = result);
+      setState(() {
+        _selectedCategory = result;
+        _nature = result.defaultNature;
+      });
     }
   }
 
@@ -550,6 +555,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           installmentsCount: installmentsCount,
           currencyCode: _currencyCode,
           description: _noteController.text,
+          nature: _nature,
           date: dateStr,
           status: widget.transaction!.status,
           tags: _selectedTags.map((t) => t.name).toList(),
@@ -565,6 +571,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           installmentsCount: installmentsCount,
           currencyCode: _currencyCode,
           description: _noteController.text,
+          nature: _nature,
           date: dateStr,
           status: 'cleared',
           tags: _selectedTags.map((t) => t.name).toList(),
@@ -687,6 +694,63 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       !_isSaving;
 
   bool _isDigit(int codeUnit) => codeUnit >= 48 && codeUnit <= 57;
+
+  static String _natureDisplayLabel(String nature) {
+    switch (nature) {
+      case 'required':
+        return 'Necesario';
+      case 'obligation':
+        return 'Obligacion';
+      case 'lifestyle':
+        return 'Estilo de vida';
+      case 'active':
+        return 'Activo';
+      case 'passive':
+        return 'Pasivo';
+      case 'windfall':
+        return 'Extraordinario';
+      default:
+        return 'Sin definir';
+    }
+  }
+
+  void _showNatureSheet() {
+    _commitPendingAmountIfAny();
+
+    final options = _type == 'income'
+        ? const <(String, String)>[
+            ('', 'Sin definir'),
+            ('active', 'Activo'),
+            ('passive', 'Pasivo'),
+            ('windfall', 'Extraordinario'),
+          ]
+        : const <(String, String)>[
+            ('', 'Sin definir'),
+            ('required', 'Necesario'),
+            ('obligation', 'Obligacion'),
+            ('lifestyle', 'Estilo de vida'),
+          ];
+
+    showFormBottomSheet<String>(
+      context: context,
+      builder: (ctx) => ScrollableBottomSheet(
+        title: 'Naturaleza del movimiento',
+        children: options
+            .map(
+              (opt) => SheetItem(
+                icon: opt.$1 == _nature ? Icons.check_rounded : null,
+                label: opt.$2,
+                onTap: () => Navigator.pop(ctx, opt.$1),
+              ),
+            )
+            .toList(),
+      ),
+    ).then((selection) {
+      if (selection != null) {
+        setState(() => _nature = selection);
+      }
+    });
+  }
 
   // ----------------------------------------------------------
   // Build
@@ -856,9 +920,20 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                     recentCategories: _recentCategories,
                     onSelect: (c) {
                       _commitPendingAmountIfAny();
-                      setState(() => _selectedCategory = c);
+                      setState(() {
+                        _selectedCategory = c;
+                        _nature = c.defaultNature;
+                      });
                     },
                     onOpenPicker: _openCategoryPicker,
+                  ),
+
+                  // Naturaleza
+                  DetailRow(
+                    icon: Icons.style_outlined,
+                    label: 'Naturaleza',
+                    value: _natureDisplayLabel(_nature),
+                    onTap: _showNatureSheet,
                   ),
 
                   if (_canUseInstallments)

@@ -16,6 +16,8 @@ class TransactionTemplateModel {
   final String? frequency;
   final String? nextDate;
   final String? endDate;
+  final bool isAutoCharge;
+  final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -34,6 +36,8 @@ class TransactionTemplateModel {
     this.frequency,
     this.nextDate,
     this.endDate,
+    this.isAutoCharge = false,
+    this.isActive = true,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -54,6 +58,8 @@ class TransactionTemplateModel {
       frequency: proto.hasFrequency() ? proto.frequency : null,
       nextDate: proto.hasNextDate() ? _dateOnly(proto.nextDate) : null,
       endDate: proto.hasEndDate() ? _dateOnly(proto.endDate) : null,
+      isAutoCharge: proto.isAutoCharge,
+      isActive: proto.isActive,
       createdAt: proto.createdAt.toDateTime().toUtc(),
       updatedAt: proto.updatedAt.toDateTime().toUtc(),
       deletedAt: proto.hasDeletedAt()
@@ -81,6 +87,8 @@ class TransactionTemplateModel {
       endDate: map['end_date'] != null
           ? _dateOnly(map['end_date'] as String)
           : null,
+      isAutoCharge: (map['is_auto_charge'] as int? ?? 0) == 1,
+      isActive: (map['is_active'] as int? ?? 1) == 1,
       createdAt: DateTime.parse(map['created_at'] as String).toUtc(),
       updatedAt: DateTime.parse(map['updated_at'] as String).toUtc(),
       deletedAt: map['deleted_at'] != null
@@ -104,6 +112,8 @@ class TransactionTemplateModel {
       'frequency': frequency,
       'next_date': nextDate == null ? null : _dateOnly(nextDate!),
       'end_date': endDate == null ? null : _dateOnly(endDate!),
+      'is_auto_charge': isAutoCharge ? 1 : 0,
+      'is_active': isActive ? 1 : 0,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'deleted_at': deletedAt?.toIso8601String(),
@@ -125,6 +135,8 @@ class TransactionTemplateModel {
       'frequency': frequency,
       'next_date': nextDate == null ? null : _dateOnly(nextDate!),
       'end_date': endDate == null ? null : _dateOnly(endDate!),
+      'is_auto_charge': isAutoCharge,
+      'is_active': isActive,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'deleted_at': deletedAt?.toIso8601String(),

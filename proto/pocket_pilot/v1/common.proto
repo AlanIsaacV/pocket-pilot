@@ -17,3 +17,13 @@ message PageRequest {
 message PageResponse {
   string next_page_token = 1;
 }
+
+enum FinancialNature {
+  NATURE_UNSPECIFIED = 0;
+  NATURE_REQUIRED    = 1; // Gastos: supermercado, renta, salud
+  NATURE_OBLIGATION  = 2; // Gastos: impuestos, deudas, seguros
+  NATURE_LIFESTYLE   = 3; // Gastos: entretenimiento, lujos, hobbies
+  NATURE_ACTIVE      = 4; // Ingresos: salario, freelance
+  NATURE_PASSIVE     = 5; // Ingresos: rendimientos, rentas
+  NATURE_WINDFALL    = 6; // Ingresos: bonos, regalos, ventas ocasionales
+}

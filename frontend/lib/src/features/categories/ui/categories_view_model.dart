@@ -133,6 +133,7 @@ class CategoriesViewModel extends ChangeNotifier {
     String? icon,
     String? color,
     String? parentId,
+    String defaultNature = '',
   }) async {
     final id = _uuid.v4();
     await _repository.createCategory(
@@ -142,6 +143,7 @@ class CategoriesViewModel extends ChangeNotifier {
       icon: icon,
       color: color,
       parentId: parentId,
+      defaultNature: defaultNature,
     );
     await _reloadLocal();
   }
@@ -152,6 +154,7 @@ class CategoriesViewModel extends ChangeNotifier {
     required String type,
     String? icon,
     String? color,
+    String? defaultNature,
   }) async {
     await _repository.updateCategory(
       current: current,
@@ -159,6 +162,7 @@ class CategoriesViewModel extends ChangeNotifier {
       type: type,
       icon: icon,
       color: color,
+      defaultNature: defaultNature,
     );
     await _reloadLocal();
   }

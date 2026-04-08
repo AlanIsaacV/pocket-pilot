@@ -23,7 +23,7 @@ class TransactionTemplateLocalStore {
     return db.query(
       'transaction_templates',
       where:
-          'deleted_at IS NULL AND frequency IS NOT NULL AND next_date IS NOT NULL AND next_date <= ?',
+          'deleted_at IS NULL AND is_active = 1 AND frequency IS NOT NULL AND next_date IS NOT NULL AND next_date <= ?',
       whereArgs: [horizonDate],
       orderBy: 'next_date ASC',
     );
@@ -49,6 +49,15 @@ class TransactionTemplateLocalStore {
       );
     }
     await batch.commit(noResult: true);
+  }
+
+  Future<List<Map<String, dynamic>>> queryAutoChargeRows() async {
+    final db = await _db.database;
+    return db.query(
+      'transaction_templates',
+      where: 'deleted_at IS NULL AND is_auto_charge = 1',
+      orderBy: 'is_active DESC, name ASC',
+    );
   }
 
   Future<void> softDelete(String id, DateTime deletedAt) async {

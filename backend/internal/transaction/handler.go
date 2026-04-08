@@ -60,6 +60,44 @@ func nextPageToken(offset, limit, count int) string {
 	return strconv.Itoa(offset + limit)
 }
 
+func financialNatureToString(n pb.FinancialNature) string {
+	switch n {
+	case pb.FinancialNature_NATURE_REQUIRED:
+		return "required"
+	case pb.FinancialNature_NATURE_OBLIGATION:
+		return "obligation"
+	case pb.FinancialNature_NATURE_LIFESTYLE:
+		return "lifestyle"
+	case pb.FinancialNature_NATURE_ACTIVE:
+		return "active"
+	case pb.FinancialNature_NATURE_PASSIVE:
+		return "passive"
+	case pb.FinancialNature_NATURE_WINDFALL:
+		return "windfall"
+	default:
+		return ""
+	}
+}
+
+func stringToFinancialNature(s string) pb.FinancialNature {
+	switch s {
+	case "required":
+		return pb.FinancialNature_NATURE_REQUIRED
+	case "obligation":
+		return pb.FinancialNature_NATURE_OBLIGATION
+	case "lifestyle":
+		return pb.FinancialNature_NATURE_LIFESTYLE
+	case "active":
+		return pb.FinancialNature_NATURE_ACTIVE
+	case "passive":
+		return pb.FinancialNature_NATURE_PASSIVE
+	case "windfall":
+		return pb.FinancialNature_NATURE_WINDFALL
+	default:
+		return pb.FinancialNature_NATURE_UNSPECIFIED
+	}
+}
+
 func transactionTypeToString(t pb.TransactionType) string {
 	switch t {
 	case pb.TransactionType_TRANSACTION_TYPE_INCOME:
@@ -101,6 +139,7 @@ func toProto(t *Transaction) *pb.Transaction {
 		Status:            t.Status,
 		Tags:              t.Tags,
 		Description:       t.Description,
+		Nature:            stringToFinancialNature(t.Nature),
 		Date:              timestamppb.New(t.Date),
 		CreatedAt:         timestamppb.New(t.CreatedAt),
 		UpdatedAt:         timestamppb.New(t.UpdatedAt),
@@ -197,6 +236,7 @@ func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
 		Status:              p.Status,
 		Tags:                p.Tags,
 		Description:         p.Description,
+		Nature:              financialNatureToString(p.Nature),
 		Date:                date,
 		CreatedAt:           p.CreatedAt.AsTime(),
 		UpdatedAt:           p.UpdatedAt.AsTime(),

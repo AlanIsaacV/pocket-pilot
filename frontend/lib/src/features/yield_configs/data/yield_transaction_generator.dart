@@ -242,6 +242,7 @@ class YieldTransactionGenerator implements ScheduledGeneratorRunner {
           'status': cursor.compareTo(today) <= 0 ? 'cleared' : 'pending',
           'tags': jsonEncode(const <String>[]),
           'description': cfg.name,
+          'nature': 'passive',
           'date': cursor,
           'created_at': nowIso,
           'updated_at': nowIso,

@@ -1,4 +1,5 @@
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/category_service.pbgrpc.dart';
+import 'package:pocket_pilot/src/generated/pocket_pilot/v1/common.pb.dart';
 
 class CategoryModel {
   final String id;
@@ -9,6 +10,9 @@ class CategoryModel {
 
   /// Tipo de categoría: 'income' (ingreso) o 'expense' (gasto).
   final String type;
+
+  /// Naturaleza financiera por defecto para transacciones de esta categoría.
+  final String defaultNature;
 
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -21,6 +25,7 @@ class CategoryModel {
     this.color = '',
     this.parentId,
     required this.type,
+    this.defaultNature = '',
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -34,6 +39,7 @@ class CategoryModel {
       color: proto.color,
       parentId: proto.parentId.isNotEmpty ? proto.parentId : null,
       type: _categoryTypeToString(proto.type),
+      defaultNature: _financialNatureToString(proto.defaultNature),
       createdAt: proto.createdAt.toDateTime().toUtc(),
       updatedAt: proto.updatedAt.toDateTime().toUtc(),
       deletedAt:
@@ -49,6 +55,7 @@ class CategoryModel {
       color: map['color'] as String? ?? '',
       parentId: map['parent_id'] as String?,
       type: map['type'] as String,
+      defaultNature: map['default_nature'] as String? ?? '',
       createdAt: DateTime.parse(map['created_at'] as String).toUtc(),
       updatedAt: DateTime.parse(map['updated_at'] as String).toUtc(),
       deletedAt: map['deleted_at'] != null
@@ -66,6 +73,7 @@ class CategoryModel {
       'color': color,
       'parent_id': parentId,
       'type': type,
+      'default_nature': defaultNature,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'deleted_at': deletedAt?.toIso8601String(),
@@ -83,6 +91,7 @@ class CategoryModel {
     String? icon,
     String? color,
     String? type,
+    String? defaultNature,
     DateTime? updatedAt,
     DateTime? deletedAt,
   }) {
@@ -93,6 +102,7 @@ class CategoryModel {
       color: color ?? this.color,
       parentId: parentId,
       type: type ?? this.type,
+      defaultNature: defaultNature ?? this.defaultNature,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -114,5 +124,43 @@ class CategoryModel {
     return type == 'income'
         ? CategoryType.CATEGORY_TYPE_INCOME
         : CategoryType.CATEGORY_TYPE_EXPENSE;
+  }
+
+  static String _financialNatureToString(FinancialNature nature) {
+    switch (nature) {
+      case FinancialNature.NATURE_REQUIRED:
+        return 'required';
+      case FinancialNature.NATURE_OBLIGATION:
+        return 'obligation';
+      case FinancialNature.NATURE_LIFESTYLE:
+        return 'lifestyle';
+      case FinancialNature.NATURE_ACTIVE:
+        return 'active';
+      case FinancialNature.NATURE_PASSIVE:
+        return 'passive';
+      case FinancialNature.NATURE_WINDFALL:
+        return 'windfall';
+      default:
+        return '';
+    }
+  }
+
+  static FinancialNature stringToFinancialNature(String s) {
+    switch (s) {
+      case 'required':
+        return FinancialNature.NATURE_REQUIRED;
+      case 'obligation':
+        return FinancialNature.NATURE_OBLIGATION;
+      case 'lifestyle':
+        return FinancialNature.NATURE_LIFESTYLE;
+      case 'active':
+        return FinancialNature.NATURE_ACTIVE;
+      case 'passive':
+        return FinancialNature.NATURE_PASSIVE;
+      case 'windfall':
+        return FinancialNature.NATURE_WINDFALL;
+      default:
+        return FinancialNature.NATURE_UNSPECIFIED;
+    }
   }
 }

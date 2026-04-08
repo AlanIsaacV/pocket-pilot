@@ -25,6 +25,8 @@ message TransactionTemplate {
   optional string next_date = 14;
   optional string end_date = 15;
   optional string to_account_id = 16;
+  bool is_auto_charge = 17;
+  bool is_active = 18;
 }
 
 service TransactionTemplateService {

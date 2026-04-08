@@ -75,6 +75,8 @@ func toProto(t *Template) *pb.TransactionTemplate {
 		CurrencyCode: t.CurrencyCode,
 		Tags:         t.Tags,
 		Description:  t.Description,
+		IsAutoCharge: t.IsAutoCharge,
+		IsActive:     t.IsActive,
 		CreatedAt:    timestamppb.New(t.CreatedAt),
 		UpdatedAt:    timestamppb.New(t.UpdatedAt),
 	}
@@ -181,6 +183,8 @@ func fromProto(p *pb.TransactionTemplate, userID uuid.UUID) (*Template, error) {
 		Frequency:    frequency,
 		NextDate:     nextDate,
 		EndDate:      endDate,
+		IsAutoCharge: p.IsAutoCharge,
+		IsActive:     p.IsActive,
 		CreatedAt:    p.CreatedAt.AsTime(),
 		UpdatedAt:    p.UpdatedAt.AsTime(),
 	}, nil

@@ -60,6 +60,44 @@ func nextPageToken(offset, limit, count int) string {
 	return strconv.Itoa(offset + limit)
 }
 
+func financialNatureToString(n pb.FinancialNature) string {
+	switch n {
+	case pb.FinancialNature_NATURE_REQUIRED:
+		return "required"
+	case pb.FinancialNature_NATURE_OBLIGATION:
+		return "obligation"
+	case pb.FinancialNature_NATURE_LIFESTYLE:
+		return "lifestyle"
+	case pb.FinancialNature_NATURE_ACTIVE:
+		return "active"
+	case pb.FinancialNature_NATURE_PASSIVE:
+		return "passive"
+	case pb.FinancialNature_NATURE_WINDFALL:
+		return "windfall"
+	default:
+		return ""
+	}
+}
+
+func stringToFinancialNature(s string) pb.FinancialNature {
+	switch s {
+	case "required":
+		return pb.FinancialNature_NATURE_REQUIRED
+	case "obligation":
+		return pb.FinancialNature_NATURE_OBLIGATION
+	case "lifestyle":
+		return pb.FinancialNature_NATURE_LIFESTYLE
+	case "active":
+		return pb.FinancialNature_NATURE_ACTIVE
+	case "passive":
+		return pb.FinancialNature_NATURE_PASSIVE
+	case "windfall":
+		return pb.FinancialNature_NATURE_WINDFALL
+	default:
+		return pb.FinancialNature_NATURE_UNSPECIFIED
+	}
+}
+
 func categoryTypeToString(t pb.CategoryType) string {
 	switch t {
 	case pb.CategoryType_CATEGORY_TYPE_INCOME:
@@ -84,13 +122,14 @@ func stringToCategoryType(s string) pb.CategoryType {
 
 func toProto(c *Category) *pb.Category {
 	proto := &pb.Category{
-		Id:        c.ID.String(),
-		Name:      c.Name,
-		Icon:      c.Icon,
-		Color:     c.Color,
-		Type:      stringToCategoryType(c.Type),
-		CreatedAt: timestamppb.New(c.CreatedAt),
-		UpdatedAt: timestamppb.New(c.UpdatedAt),
+		Id:            c.ID.String(),
+		Name:          c.Name,
+		Icon:          c.Icon,
+		Color:         c.Color,
+		Type:          stringToCategoryType(c.Type),
+		DefaultNature: stringToFinancialNature(c.DefaultNature),
+		CreatedAt:     timestamppb.New(c.CreatedAt),
+		UpdatedAt:     timestamppb.New(c.UpdatedAt),
 	}
 	if c.ParentID != nil {
 		proto.ParentId = c.ParentID.String()
@@ -108,14 +147,15 @@ func fromProto(p *pb.Category, userID uuid.UUID) (*Category, error) {
 	}
 
 	c := &Category{
-		ID:        id,
-		UserID:    userID,
-		Name:      p.Name,
-		Icon:      p.Icon,
-		Color:     p.Color,
-		Type:      categoryTypeToString(p.Type),
-		CreatedAt: p.CreatedAt.AsTime(),
-		UpdatedAt: p.UpdatedAt.AsTime(),
+		ID:            id,
+		UserID:        userID,
+		Name:          p.Name,
+		Icon:          p.Icon,
+		Color:         p.Color,
+		Type:          categoryTypeToString(p.Type),
+		DefaultNature: financialNatureToString(p.DefaultNature),
+		CreatedAt:     p.CreatedAt.AsTime(),
+		UpdatedAt:     p.UpdatedAt.AsTime(),
 	}
 	if p.ParentId != "" {
 		pid, err := parseUUID(p.ParentId, "category.parent_id")

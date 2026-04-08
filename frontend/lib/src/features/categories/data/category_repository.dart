@@ -40,6 +40,7 @@ class CategoryRepository {
     String? icon,
     String? color,
     String? parentId,
+    String defaultNature = '',
   }) async {
     final now = DateTime.now().toUtc();
     final model = CategoryModel(
@@ -49,6 +50,7 @@ class CategoryRepository {
       icon: icon ?? '',
       color: color ?? '',
       parentId: parentId,
+      defaultNature: defaultNature,
       createdAt: now,
       updatedAt: now,
     );
@@ -68,6 +70,7 @@ class CategoryRepository {
     required String type,
     String? icon,
     String? color,
+    String? defaultNature,
   }) async {
     final now = DateTime.now().toUtc();
     final model = CategoryModel(
@@ -77,6 +80,7 @@ class CategoryRepository {
       icon: icon ?? current.icon,
       color: color ?? current.color,
       parentId: current.parentId,
+      defaultNature: defaultNature ?? current.defaultNature,
       createdAt: current.createdAt,
       updatedAt: now,
     );

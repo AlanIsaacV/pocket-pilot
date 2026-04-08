@@ -24,6 +24,7 @@ message Category {
   string color = 7;
   string parent_id = 8;
   CategoryType type = 9;
+  FinancialNature default_nature = 10;
 }
 
 service CategoryService {

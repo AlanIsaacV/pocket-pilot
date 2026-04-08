@@ -83,6 +83,9 @@ class _TransactionTemplateFormScreenState
   String? _frequency;
   DateTime? _nextDate;
   DateTime? _endDate;
+  bool _isAutoCharge = false;
+  bool _isActive = true;
+  String _displayNature = '';
 
   bool _isSaving = false;
   bool _dataLoaded = false;
@@ -153,6 +156,8 @@ class _TransactionTemplateFormScreenState
       type = t.type;
       selectedCurrencyCode = t.currencyCode;
       frequency = t.frequency;
+      _isAutoCharge = t.isAutoCharge;
+      _isActive = t.isActive;
       _nameController.text = t.name;
       _descriptionController.text = t.description;
 
@@ -181,6 +186,7 @@ class _TransactionTemplateFormScreenState
         for (final category in categories) {
           if (category.id == t.categoryId) {
             selectedCategory = category;
+            _displayNature = category.defaultNature;
             break;
           }
         }
@@ -243,6 +249,7 @@ class _TransactionTemplateFormScreenState
         for (final category in categories) {
           if (category.id == categoryId) {
             selectedCategory = category;
+            _displayNature = category.defaultNature;
             break;
           }
         }
@@ -397,6 +404,8 @@ class _TransactionTemplateFormScreenState
         description: _descriptionController.text,
         frequency: _frequency,
         nextDate: _nextDate != null ? formatDateISO(_nextDate!) : null,
+        isAutoCharge: _isAutoCharge,
+        isActive: _isActive,
         endDate: _endDate != null ? formatDateISO(_endDate!) : null,
         createdAt: _isEditMode ? widget.template!.createdAt : now,
         updatedAt: now,
@@ -653,8 +662,70 @@ class _TransactionTemplateFormScreenState
       extra: {'type': _type},
     );
     if (result != null && mounted) {
-      setState(() => _selectedCategory = result);
+      setState(() {
+        _selectedCategory = result;
+        _displayNature = result.defaultNature;
+      });
     }
+  }
+
+  // ----------------------------------------------------------
+  // Naturaleza (display only — hereda de la categoría)
+  // ----------------------------------------------------------
+
+  static String _natureDisplayLabel(String nature) {
+    switch (nature) {
+      case 'required':
+        return 'Necesario';
+      case 'obligation':
+        return 'Obligacion';
+      case 'lifestyle':
+        return 'Estilo de vida';
+      case 'active':
+        return 'Activo';
+      case 'passive':
+        return 'Pasivo';
+      case 'windfall':
+        return 'Extraordinario';
+      default:
+        return 'Sin definir';
+    }
+  }
+
+  void _showNatureSheet() {
+    final options = _type == 'income'
+        ? const <(String, String)>[
+            ('', 'Sin definir'),
+            ('active', 'Activo'),
+            ('passive', 'Pasivo'),
+            ('windfall', 'Extraordinario'),
+          ]
+        : const <(String, String)>[
+            ('', 'Sin definir'),
+            ('required', 'Necesario'),
+            ('obligation', 'Obligacion'),
+            ('lifestyle', 'Estilo de vida'),
+          ];
+
+    showFormBottomSheet<String>(
+      context: context,
+      builder: (ctx) => ScrollableBottomSheet(
+        title: 'Naturaleza del movimiento',
+        children: options
+            .map(
+              (opt) => SheetItem(
+                icon: opt.$1 == _displayNature ? Icons.check_rounded : null,
+                label: opt.$2,
+                onTap: () => Navigator.pop(ctx, opt.$1),
+              ),
+            )
+            .toList(),
+      ),
+    ).then((selection) {
+      if (selection != null) {
+        setState(() => _displayNature = selection);
+      }
+    });
   }
 
   // ----------------------------------------------------------
@@ -812,11 +883,13 @@ class _TransactionTemplateFormScreenState
                         _type = t;
                         if (t == 'transfer_out') {
                           _selectedCategory = null;
+                          _displayNature = '';
                         } else {
                           _selectedToAccount = null;
                           if (_selectedCategory != null &&
                               _selectedCategory!.type != t) {
                             _selectedCategory = null;
+                            _displayNature = '';
                           }
                         }
                       });
@@ -850,6 +923,13 @@ class _TransactionTemplateFormScreenState
                       label: 'Categoría',
                       value: _selectedCategory?.name ?? 'Sin categoría',
                       onTap: _openCategoryPicker,
+                    ),
+                    // ── 5b. Naturaleza ──────────────────────────────────
+                    DetailRow(
+                      icon: Icons.style_outlined,
+                      label: 'Naturaleza',
+                      value: _natureDisplayLabel(_displayNature),
+                      onTap: _showNatureSheet,
                     ),
                   ],
 
@@ -928,6 +1008,55 @@ class _TransactionTemplateFormScreenState
                     onNextDateTap: _pickNextDate,
                     onEndDateTap: _pickEndDate,
                     onClearEndDate: _endDate != null ? _clearEndDate : null,
+                  ),
+
+                  // ── 11. Cargo automático ─────────────────────────────
+                  const SizedBox(height: 8),
+                  SwitchListTile.adaptive(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                    title: Text(
+                      'Cargo automatico',
+                      style: GoogleFonts.ibmPlexSans(fontSize: 14),
+                    ),
+                    subtitle: Text(
+                      'Suscripcion o domiciliacion',
+                      style: GoogleFonts.ibmPlexSans(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    secondary: const Icon(
+                      Icons.autorenew_rounded,
+                      size: 20,
+                    ),
+                    value: _isAutoCharge,
+                    onChanged: (v) => setState(() => _isAutoCharge = v),
+                  ),
+
+                  // ── 12. Activo / Pausado ─────────────────────────────
+                  SwitchListTile.adaptive(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                    title: Text(
+                      'Activa',
+                      style: GoogleFonts.ibmPlexSans(fontSize: 14),
+                    ),
+                    subtitle: Text(
+                      _isActive
+                          ? 'Generando transacciones'
+                          : 'Pausada — no genera transacciones',
+                      style: GoogleFonts.ibmPlexSans(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    secondary: Icon(
+                      _isActive
+                          ? Icons.play_circle_outline_rounded
+                          : Icons.pause_circle_outline_rounded,
+                      size: 20,
+                    ),
+                    value: _isActive,
+                    onChanged: (v) => setState(() => _isActive = v),
                   ),
                 ],
               ),

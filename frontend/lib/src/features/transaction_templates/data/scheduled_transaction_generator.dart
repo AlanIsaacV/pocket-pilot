@@ -52,6 +52,7 @@ abstract class AccountLookup {
 
 abstract class CategoryLookup {
   Future<bool> isActiveById(String id);
+  Future<String> getDefaultNatureById(String id);
 }
 
 class TemplateScheduleStoreAdapter implements TemplateScheduleStore {
@@ -122,6 +123,12 @@ class CategoryLookupAdapter implements CategoryLookup {
   Future<bool> isActiveById(String id) async {
     final category = await _local.getCategoryById(id);
     return category != null && category.deletedAt == null;
+  }
+
+  @override
+  Future<String> getDefaultNatureById(String id) async {
+    final category = await _local.getCategoryById(id);
+    return category?.defaultNature ?? '';
   }
 }
 
@@ -314,6 +321,10 @@ class ScheduledTransactionGenerator implements ScheduledGeneratorRunner {
     final status = _statusForDate(date: date, today: today);
     final nowIso = DateTime.now().toUtc().toIso8601String();
 
+    final nature = template.categoryId != null
+        ? await _categories.getDefaultNatureById(template.categoryId!)
+        : '';
+
     final row = <String, dynamic>{
       'id': transactionId,
       'account_id': template.accountId,
@@ -326,6 +337,7 @@ class ScheduledTransactionGenerator implements ScheduledGeneratorRunner {
       'status': status,
       'tags': jsonEncode(template.tags),
       'description': template.description,
+      'nature': nature,
       'date': date,
       'created_at': nowIso,
       'updated_at': nowIso,
@@ -377,6 +389,7 @@ class ScheduledTransactionGenerator implements ScheduledGeneratorRunner {
       'status': status,
       'tags': jsonEncode(template.tags),
       'description': template.description,
+      'nature': '',
       'date': date,
       'created_at': nowIso,
       'updated_at': nowIso,
@@ -478,6 +491,8 @@ class ScheduledTransactionGenerator implements ScheduledGeneratorRunner {
       frequency: base.frequency,
       nextDate: nextDate,
       endDate: base.endDate,
+      isAutoCharge: base.isAutoCharge,
+      isActive: base.isActive,
       createdAt: base.createdAt,
       updatedAt: updatedAt,
       deletedAt: base.deletedAt,

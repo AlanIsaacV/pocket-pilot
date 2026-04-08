@@ -26,6 +26,11 @@ class TransactionTemplateRepository {
     return rows.map((row) => TransactionTemplateModel.fromMap(row)).toList();
   }
 
+  Future<List<TransactionTemplateModel>> getAutoCharges() async {
+    final rows = await _local.queryAutoChargeRows();
+    return rows.map((row) => TransactionTemplateModel.fromMap(row)).toList();
+  }
+
   Future<void> upsertTemplate(TransactionTemplateModel model) async {
     await _local.upsertRow(model.toMap());
     await _outbox.enqueue(

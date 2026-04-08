@@ -5,6 +5,7 @@
 // pbgrpc re-exporta transaction_service.pb.dart (Transaction).
 import 'dart:convert';
 
+import 'package:pocket_pilot/src/generated/pocket_pilot/v1/common.pb.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/transaction_service.pbgrpc.dart';
 
 class TransactionModel {
@@ -21,6 +22,9 @@ class TransactionModel {
 
   final String currencyCode;
   final String description;
+
+  /// Naturaleza financiera del movimiento.
+  final String nature;
 
   /// Fecha de la transacción como string ISO 8601 (YYYY-MM-DD).
   final String date;
@@ -42,6 +46,7 @@ class TransactionModel {
     required int installmentsCount,
     required this.currencyCode,
     required this.description,
+    this.nature = '',
     required this.date,
     required this.type,
     required this.status,
@@ -67,6 +72,7 @@ class TransactionModel {
       installmentsCount: proto.installmentsCount,
       currencyCode: proto.currencyCode,
       description: proto.description,
+      nature: _financialNatureToString(proto.nature),
       date: proto.date.toDateTime().toIso8601String().substring(0, 10),
       type: _transactionTypeToString(proto.type),
       status: proto.status,
@@ -91,6 +97,7 @@ class TransactionModel {
       installmentsCount: map['installments_count'] as int,
       currencyCode: map['currency_code'] as String,
       description: map['description'] as String,
+      nature: map['nature'] as String? ?? '',
       date: map['date'] as String,
       type: map['type'] as String,
       status: map['status'] as String,
@@ -116,6 +123,7 @@ class TransactionModel {
       'currency_code': currencyCode,
       'tags': jsonEncode(tags),
       'description': description,
+      'nature': nature,
       'date': date,
       'type': type,
       'status': status,
@@ -139,6 +147,7 @@ class TransactionModel {
       'currency_code': currencyCode,
       'tags': tags,
       'description': description,
+      'nature': nature,
       'date': date,
       'type': type,
       'status': status,
@@ -197,6 +206,44 @@ class TransactionModel {
     }
 
     return const <String>[];
+  }
+
+  static String _financialNatureToString(FinancialNature nature) {
+    switch (nature) {
+      case FinancialNature.NATURE_REQUIRED:
+        return 'required';
+      case FinancialNature.NATURE_OBLIGATION:
+        return 'obligation';
+      case FinancialNature.NATURE_LIFESTYLE:
+        return 'lifestyle';
+      case FinancialNature.NATURE_ACTIVE:
+        return 'active';
+      case FinancialNature.NATURE_PASSIVE:
+        return 'passive';
+      case FinancialNature.NATURE_WINDFALL:
+        return 'windfall';
+      default:
+        return '';
+    }
+  }
+
+  static FinancialNature stringToFinancialNature(String s) {
+    switch (s) {
+      case 'required':
+        return FinancialNature.NATURE_REQUIRED;
+      case 'obligation':
+        return FinancialNature.NATURE_OBLIGATION;
+      case 'lifestyle':
+        return FinancialNature.NATURE_LIFESTYLE;
+      case 'active':
+        return FinancialNature.NATURE_ACTIVE;
+      case 'passive':
+        return FinancialNature.NATURE_PASSIVE;
+      case 'windfall':
+        return FinancialNature.NATURE_WINDFALL;
+      default:
+        return FinancialNature.NATURE_UNSPECIFIED;
+    }
   }
 
   static String _transactionTypeToString(TransactionType type) {

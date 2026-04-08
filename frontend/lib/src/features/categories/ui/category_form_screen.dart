@@ -35,6 +35,7 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
   final _nameController = TextEditingController();
 
   late String _type;
+  late String _defaultNature;
   late Color _selectedColor;
   late IconData _selectedIcon;
   bool _isSaving = false;
@@ -54,10 +55,12 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
     if (cat != null) {
       _nameController.text = cat.name;
       _type = cat.type;
+      _defaultNature = cat.defaultNature;
       _selectedColor = _hexToColor(cat.color);
       _selectedIcon = CategoryIconData.iconFromHex(cat.icon);
     } else {
       _type = parent?.type ?? 'expense';
+      _defaultNature = '';
       _selectedColor = parent != null
           ? _hexToColor(parent.color)
           : AppColors.categoryPresets.first;
@@ -101,6 +104,7 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
           type: _type,
           icon: iconHex,
           color: colorHex,
+          defaultNature: _defaultNature,
         );
       } else {
         await vm.createCategory(
@@ -109,6 +113,7 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
           icon: iconHex,
           color: colorHex,
           parentId: widget.parent?.id,
+          defaultNature: _defaultNature,
         );
       }
       if (!mounted) return;
@@ -217,7 +222,32 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
               const SizedBox(height: 12),
               _TypeToggle(
                 value: _type,
-                onChanged: (t) => setState(() => _type = t),
+                onChanged: (t) {
+                  setState(() {
+                    _type = t;
+                    // Reset nature when switching type if incompatible
+                    if (t == 'expense' &&
+                        const {'active', 'passive', 'windfall'}
+                            .contains(_defaultNature)) {
+                      _defaultNature = '';
+                    } else if (t == 'income' &&
+                        const {'required', 'obligation', 'lifestyle'}
+                            .contains(_defaultNature)) {
+                      _defaultNature = '';
+                    }
+                  });
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+              // --- Naturaleza por defecto ---
+              _SectionLabel('Naturaleza por defecto'),
+              const SizedBox(height: 12),
+              _NaturePicker(
+                value: _defaultNature,
+                type: _type,
+                onChanged: (n) => setState(() => _defaultNature = n),
               ),
 
               const SizedBox(height: 24),
@@ -438,6 +468,122 @@ class _ToggleOption extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Nature picker — muestra opciones según el tipo de categoría
+// ============================================================
+
+class _NaturePicker extends StatelessWidget {
+  final String value;
+  final String type;
+  final ValueChanged<String> onChanged;
+
+  const _NaturePicker({
+    required this.value,
+    required this.type,
+    required this.onChanged,
+  });
+
+  static const _expenseOptions = <(String, String, IconData)>[
+    ('required', 'Necesario', Icons.shopping_cart_outlined),
+    ('obligation', 'Obligacion', Icons.gavel_rounded),
+    ('lifestyle', 'Estilo de vida', Icons.local_cafe_outlined),
+  ];
+
+  static const _incomeOptions = <(String, String, IconData)>[
+    ('active', 'Activo', Icons.work_outline_rounded),
+    ('passive', 'Pasivo', Icons.trending_up_rounded),
+    ('windfall', 'Extraordinario', Icons.card_giftcard_outlined),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final options = type == 'income' ? _incomeOptions : _expenseOptions;
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _NatureChip(
+          label: 'Sin definir',
+          icon: Icons.remove_circle_outline_rounded,
+          isSelected: value.isEmpty,
+          onTap: () => onChanged(''),
+        ),
+        ...options.map(
+          (opt) => _NatureChip(
+            label: opt.$2,
+            icon: opt.$3,
+            isSelected: value == opt.$1,
+            onTap: () => onChanged(opt.$1),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NatureChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _NatureChip({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? primary.withValues(alpha: 0.15)
+              : Theme.of(context).colorScheme.surfaceContainerHigh,
+          borderRadius: AppTheme.radiusFull,
+          border: Border.all(
+            color: isSelected
+                ? primary
+                : Theme.of(context).colorScheme.surfaceContainerHigh,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected
+                  ? primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isSelected
+                    ? primary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -22,7 +22,7 @@ import 'package:pocket_pilot/src/core/db/migrations_runner.dart';
 
 class DatabaseHelper {
   // Incrementa este número cada vez que agregues un nuevo archivo .sql.
-  static const int _version = 1;
+  static const int _version = 2;
 
   // Singleton: una sola instancia en toda la app.
   static final DatabaseHelper _instance = DatabaseHelper._();

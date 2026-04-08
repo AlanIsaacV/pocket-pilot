@@ -25,6 +25,8 @@ type Template struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	DeletedAt    *time.Time
+	IsAutoCharge bool
+	IsActive     bool
 }
 
 func dateOnly(t time.Time) time.Time {

@@ -171,6 +171,26 @@ class TransactionLocalStore {
     return results;
   }
 
+  /// Calcula el saldo actual (en centavos) de una cuenta específica,
+  /// sumando ingresos/transferencias entrantes y restando gastos/salientes.
+  /// Solo considera transacciones activas con status 'cleared'.
+  Future<int> queryBalanceCents(String accountId) async {
+    final db = await _db.database;
+    final rows = await db.rawQuery(
+      'SELECT COALESCE(SUM('
+      '  CASE'
+      "    WHEN type IN ('income', 'transfer_in') THEN amount_cents"
+      "    WHEN type IN ('expense', 'transfer_out') THEN -amount_cents"
+      '    ELSE 0'
+      '  END'
+      '), 0) AS balance_cents '
+      'FROM transactions '
+      "WHERE account_id = ? AND deleted_at IS NULL AND status = 'cleared'",
+      [accountId],
+    );
+    return rows.first['balance_cents'] as int;
+  }
+
   /// Returns the IDs of the N most frequently used categories.
   Future<List<String>> queryTopCategoryIds({int limit = 5}) async {
     final db = await _db.database;

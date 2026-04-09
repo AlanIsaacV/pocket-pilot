@@ -16,6 +16,11 @@ import 'package:pocket_pilot/src/features/user_preferences/data/currency_prefere
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
+import 'package:pocket_pilot/src/features/accounts/data/account_adjustment_service.dart';
+import 'package:pocket_pilot/src/features/accounts/ui/adjust_balance_sheet.dart';
+import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart'
+    show showFormBottomSheet;
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
 class AccountFormScreen extends StatefulWidget {
@@ -323,6 +328,22 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     }
   }
 
+  Future<void> _onAdjustBalance() async {
+    final account = widget.account!;
+    final result = await showFormBottomSheet<bool>(
+      context: context,
+      builder: (_) => AdjustBalanceSheet(
+        accountId: account.id,
+        currencyCode: account.currencyCode,
+        transactionLocal: context.read<TransactionLocalStore>(),
+        adjustmentService: context.read<AccountAdjustmentService>(),
+      ),
+    );
+    if (result == true && mounted) {
+      context.pop(true);
+    }
+  }
+
   int _parseMoneyToCents(String input) {
     final normalized = input.replaceAll(',', '.');
     final value = double.tryParse(normalized) ?? 0;
@@ -571,6 +592,16 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
                   decoration: const InputDecoration(hintText: 'Ej. 12'),
                   validator: (value) =>
                       _validatePositiveInt(value, fieldName: 'El plazo'),
+                ),
+              ],
+              if (_isEditMode) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.sync_alt_rounded, size: 18),
+                    label: const Text('Ajustar saldo'),
+                    onPressed: _isSaving ? null : _onAdjustBalance,
+                  ),
                 ),
               ],
               const SizedBox(height: 24),

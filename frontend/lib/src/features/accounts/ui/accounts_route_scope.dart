@@ -24,6 +24,7 @@ import 'package:provider/provider.dart';
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
+import 'package:pocket_pilot/src/features/accounts/data/account_adjustment_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_repository.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
@@ -48,6 +49,23 @@ class AccountsRouteScope extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider<TransactionLocalStore>(
+          create: (ctx) => TransactionLocalStore(
+            db: ctx.read<DatabaseHelper>(),
+          ),
+        ),
+        Provider<TransactionRepository>(
+          create: (ctx) => TransactionRepository(
+            local: ctx.read<TransactionLocalStore>(),
+            outbox: ctx.read<SyncOutbox>(),
+          ),
+        ),
+        Provider<AccountAdjustmentService>(
+          create: (ctx) => AccountAdjustmentService(
+            local: ctx.read<TransactionLocalStore>(),
+            repository: ctx.read<TransactionRepository>(),
+          ),
+        ),
         ChangeNotifierProvider(
           create: (ctx) {
             final db = ctx.read<DatabaseHelper>();
@@ -59,14 +77,10 @@ class AccountsRouteScope extends StatelessWidget {
               local: localStore,
               outbox: outbox,
             );
-            final transactionRepository = TransactionRepository(
-              local: TransactionLocalStore(db: db),
-              outbox: outbox,
-            );
 
             return AccountsViewModel(
               repository: repository,
-              transactionRepository: transactionRepository,
+              transactionRepository: ctx.read<TransactionRepository>(),
               syncService: syncService,
             )..loadOnAppear();
           },

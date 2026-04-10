@@ -11,8 +11,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
 	pb "github.com/AlanIsaacV/pocket-pilot/internal/gen/proto/pocket_pilot/v1/pocket_pilot/v1"
+	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
 )
 
 type Handler struct {
@@ -75,7 +75,7 @@ func financialNatureToString(n pb.FinancialNature) string {
 	case pb.FinancialNature_NATURE_WINDFALL:
 		return "windfall"
 	default:
-		return ""
+		return "unspecified"
 	}
 }
 

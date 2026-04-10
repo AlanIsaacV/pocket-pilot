@@ -24,15 +24,16 @@ BEGIN
 END;
 
 CREATE TABLE categories (
-    id         TEXT PRIMARY KEY,
-    name       TEXT     NOT NULL,
-    icon       TEXT,
-    color      TEXT,
-    parent_id  TEXT REFERENCES categories (id),
-    type       TEXT     NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at DATETIME
+    id             TEXT PRIMARY KEY,
+    name           TEXT     NOT NULL,
+    icon           TEXT,
+    color          TEXT,
+    parent_id      TEXT REFERENCES categories (id),
+    type           TEXT     NOT NULL,
+    default_nature TEXT     NOT NULL DEFAULT 'unspecified',
+    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at     DATETIME
 );
 CREATE TRIGGER set_updated_at_categories
     AFTER UPDATE
@@ -66,22 +67,25 @@ END;
 
 
 CREATE TABLE transaction_templates (
-    id            TEXT PRIMARY KEY,
-    name          TEXT     NOT NULL,
-    account_id    TEXT     NOT NULL REFERENCES accounts (id),
-    to_account_id TEXT REFERENCES accounts (id),
-    category_id   TEXT REFERENCES categories (id),
-    type          TEXT     NOT NULL,
-    amount_cents  BIGINT,
-    currency_code TEXT     NOT NULL,
-    tags          TEXT,
-    description   TEXT     NOT NULL DEFAULT '',
-    frequency     TEXT,
-    next_date     DATE,
-    end_date      DATE,
-    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at    DATETIME
+    id             TEXT PRIMARY KEY,
+    name           TEXT     NOT NULL,
+    account_id     TEXT     NOT NULL REFERENCES accounts (id),
+    to_account_id  TEXT REFERENCES accounts (id),
+    category_id    TEXT REFERENCES categories (id),
+    type           TEXT     NOT NULL,
+    nature         TEXT     NOT NULL DEFAULT 'unspecified',
+    is_auto_charge INTEGER  NOT NULL DEFAULT 0,
+    is_active      INTEGER  NOT NULL DEFAULT 1,
+    amount_cents   BIGINT,
+    currency_code  TEXT     NOT NULL,
+    tags           TEXT,
+    description    TEXT     NOT NULL DEFAULT '',
+    frequency      TEXT,
+    next_date      DATE,
+    end_date       DATE,
+    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at     DATETIME
 );
 
 CREATE INDEX idx_transaction_templates_next_date
@@ -148,6 +152,7 @@ CREATE TABLE transactions (
     template_id           TEXT REFERENCES transaction_templates (id),
     yield_id              TEXT REFERENCES yield_configs (id),
     type                  TEXT     NOT NULL,
+    nature                TEXT     NOT NULL DEFAULT 'unspecified',
     amount_cents          BIGINT   NOT NULL,
     installments_count    INTEGER  NOT NULL DEFAULT 1,
     currency_code         TEXT     NOT NULL,
@@ -263,7 +268,7 @@ CREATE TABLE budgets (
     created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at         DATETIME,
-    UNIQUE(category_id)
+    UNIQUE (category_id)
 );
 
 CREATE INDEX idx_budgets_category_id
@@ -306,3 +311,19 @@ CREATE TABLE sync_metadata (
 CREATE TABLE app_metadata (
     key TEXT PRIMARY KEY, value TEXT NOT NULL
 );
+
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id           TEXT PRIMARY KEY,
+    title        TEXT    NOT NULL,
+    subtitle     TEXT    NOT NULL DEFAULT '',
+    date         TEXT    NOT NULL,
+    type         TEXT    NOT NULL,
+    amount_cents INTEGER,
+    source_id    TEXT    NOT NULL,
+    is_read      INTEGER NOT NULL DEFAULT 0,
+    deleted_at   TEXT,
+    created_at   TEXT    NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_source_date_type
+    ON notifications (source_id, date, type);

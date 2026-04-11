@@ -62,6 +62,6 @@ class AccountSyncHandler implements SyncHandler {
 
   @override
   Future<void> pushDelete(String entityId, DateTime deletedAt) async {
-    await _remote.deleteAccount(id: entityId, deletedAt: deletedAt);
+    await _remote.archiveAccount(id: entityId, deletedAt: deletedAt);
   }
 }

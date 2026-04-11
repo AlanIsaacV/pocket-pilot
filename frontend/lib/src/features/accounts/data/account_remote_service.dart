@@ -39,19 +39,19 @@ class AccountRemoteService {
     }
   }
 
-  Future<void> deleteAccount({
+  Future<void> archiveAccount({
     required String id,
     required DateTime deletedAt,
   }) async {
     try {
-      await _client.deleteAccount(
-        DeleteAccountRequest(
+      await _client.archiveAccount(
+        ArchiveAccountRequest(
           id: id,
           deletedAt: Timestamp.fromDateTime(deletedAt.toUtc()),
         ),
       );
     } on GrpcError catch (e) {
-      throw Exception('gRPC deleteAccount error: ${e.message}');
+      throw Exception('gRPC archiveAccount error: ${e.message}');
     }
   }
 
@@ -61,8 +61,9 @@ class AccountRemoteService {
     final paymentDueDay = map['payment_due_day'] as int?;
     final interestRateApr = map['interest_rate_apr'] as int?;
     final termMonths = map['term_months'] as int?;
+    final deletedAtStr = map['deleted_at'] as String?;
 
-    return Account(
+    final proto = Account(
       id: map['id'] as String,
       name: map['name'] as String,
       type: AccountModel.stringToAccountType(map['type'] as String),
@@ -81,5 +82,13 @@ class AccountRemoteService {
         DateTime.parse(map['updated_at'] as String).toUtc(),
       ),
     );
+
+    if (deletedAtStr != null) {
+      proto.deletedAt = Timestamp.fromDateTime(
+        DateTime.parse(deletedAtStr).toUtc(),
+      );
+    }
+
+    return proto;
   }
 }

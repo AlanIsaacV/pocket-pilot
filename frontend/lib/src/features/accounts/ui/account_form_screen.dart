@@ -256,7 +256,10 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     if (_requiresSpecialFields) {
       creditLimitCents = _parseMoneyToCents(_creditLimitController.text.trim());
       paymentDueDay = int.parse(_paymentDueDayController.text.trim());
-      interestRateApr = int.parse(_interestRateController.text.trim());
+      final aprText = _interestRateController.text.trim();
+      if (aprText.isNotEmpty) {
+        interestRateApr = int.parse(aprText);
+      }
     }
 
     if (_isCreditCard) {
@@ -413,15 +416,6 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     return null;
   }
 
-  String? _validateNonNegativeInt(String? value, {required String fieldName}) {
-    final requiredError = _requiredText(value, fieldName: fieldName);
-    if (requiredError != null) return requiredError;
-    final parsed = int.tryParse(value!.trim());
-    if (parsed == null || parsed < 0) {
-      return '$fieldName debe ser 0 o mayor';
-    }
-    return null;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -589,17 +583,13 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                _SectionLabel('Interés APR (%)'),
+                _SectionLabel('Interés APR (%) — opcional'),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _interestRateController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   decoration: const InputDecoration(hintText: 'Ej. 36'),
-                  validator: (value) => _validateNonNegativeInt(
-                    value,
-                    fieldName: 'El interés APR',
-                  ),
                 ),
               ],
               if (_isLoan) ...[

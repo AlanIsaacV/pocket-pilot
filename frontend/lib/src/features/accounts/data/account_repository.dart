@@ -53,6 +53,7 @@ class AccountRepository {
 
   Future<void> updateAccount({
     required AccountModel current,
+    required String type,
     required String name,
     required String currencyCode,
     int? creditLimitCents,
@@ -65,7 +66,7 @@ class AccountRepository {
     final model = AccountModel(
       id: current.id,
       name: name,
-      type: current.type,
+      type: type,
       currencyCode: currencyCode,
       creditLimitCents: creditLimitCents,
       statementDay: statementDay,

@@ -102,6 +102,7 @@ class AccountsViewModel extends ChangeNotifier {
 
   Future<void> updateAccount({
     required AccountModel current,
+    required String type,
     required String name,
     required String currencyCode,
     int? creditLimitCents,
@@ -113,6 +114,7 @@ class AccountsViewModel extends ChangeNotifier {
   }) async {
     await _repository.updateAccount(
       current: current,
+      type: type,
       name: name,
       currencyCode: currencyCode,
       creditLimitCents: creditLimitCents,
@@ -122,42 +124,65 @@ class AccountsViewModel extends ChangeNotifier {
       termMonths: termMonths,
     );
 
-    final initialBalanceType = _initialBalanceTransactionType(current.type);
+    final oldInitialType = _initialBalanceTransactionType(current.type);
+    final newInitialType = _initialBalanceTransactionType(type);
+    final typeFlipped = oldInitialType != newInitialType;
+
     final existingInitial = await _transactionRepository
         .getInitialBalanceTransaction(
           accountId: current.id,
-          type: initialBalanceType,
+          type: oldInitialType,
         );
 
-    if (existingInitial != null && initialAmountCents == null) {
-      await _transactionRepository.deleteTransaction(existingInitial.id);
-    } else if (existingInitial != null && initialAmountCents != null) {
-      await _transactionRepository.updateTransaction(
-        id: existingInitial.id,
-        accountId: current.id,
-        categoryId: null,
-        amountMinor: initialAmountCents,
-        currencyCode: currencyCode,
-        description: _initialBalanceDescription,
-        date: existingInitial.date,
-        type: existingInitial.type,
-        status: existingInitial.status,
-        tags: const [],
-        createdAt: existingInitial.createdAt,
-      );
-    } else if (existingInitial == null && initialAmountCents != null) {
-      await _transactionRepository.createTransaction(
-        id: _uuid.v4(),
-        accountId: current.id,
-        categoryId: null,
-        amountMinor: initialAmountCents,
-        currencyCode: currencyCode,
-        description: _initialBalanceDescription,
-        date: _toDateString(DateTime.now()),
-        type: initialBalanceType,
-        status: 'cleared',
-        tags: const [],
-      );
+    if (typeFlipped) {
+      if (existingInitial != null) {
+        await _transactionRepository.deleteTransaction(existingInitial.id);
+      }
+      if (initialAmountCents != null) {
+        await _transactionRepository.createTransaction(
+          id: _uuid.v4(),
+          accountId: current.id,
+          categoryId: null,
+          amountMinor: initialAmountCents,
+          currencyCode: currencyCode,
+          description: _initialBalanceDescription,
+          date: existingInitial?.date ?? _toDateString(DateTime.now()),
+          type: newInitialType,
+          status: 'cleared',
+          tags: const [],
+        );
+      }
+    } else {
+      if (existingInitial != null && initialAmountCents == null) {
+        await _transactionRepository.deleteTransaction(existingInitial.id);
+      } else if (existingInitial != null && initialAmountCents != null) {
+        await _transactionRepository.updateTransaction(
+          id: existingInitial.id,
+          accountId: current.id,
+          categoryId: null,
+          amountMinor: initialAmountCents,
+          currencyCode: currencyCode,
+          description: _initialBalanceDescription,
+          date: existingInitial.date,
+          type: existingInitial.type,
+          status: existingInitial.status,
+          tags: const [],
+          createdAt: existingInitial.createdAt,
+        );
+      } else if (existingInitial == null && initialAmountCents != null) {
+        await _transactionRepository.createTransaction(
+          id: _uuid.v4(),
+          accountId: current.id,
+          categoryId: null,
+          amountMinor: initialAmountCents,
+          currencyCode: currencyCode,
+          description: _initialBalanceDescription,
+          date: _toDateString(DateTime.now()),
+          type: newInitialType,
+          status: 'cleared',
+          tags: const [],
+        );
+      }
     }
 
     await _reloadAll();

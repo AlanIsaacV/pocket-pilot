@@ -58,6 +58,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     ('investment', 'Inversión', Icons.trending_up_rounded),
     ('crypto', 'Cripto', Icons.currency_bitcoin),
     ('loan', 'Préstamo', Icons.request_quote_outlined),
+    ('other', 'Otra', Icons.account_balance_wallet_outlined),
   ];
 
   bool get _isEditMode => widget.account != null;
@@ -118,6 +119,24 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
   bool get _isCreditCard => _selectedType == 'credit_card';
   bool get _isLoan => _selectedType == 'loan';
   bool get _requiresSpecialFields => _isCreditCard || _isLoan;
+
+  void _clearOrphanedFields(String newType) {
+    final needsCreditFields = newType == 'credit_card' || newType == 'loan';
+    final needsStatementDay = newType == 'credit_card';
+    final needsTermMonths = newType == 'loan';
+
+    if (!needsCreditFields) {
+      _creditLimitController.clear();
+      _paymentDueDayController.clear();
+      _interestRateController.clear();
+    }
+    if (!needsStatementDay) {
+      _statementDayController.clear();
+    }
+    if (!needsTermMonths) {
+      _termMonthsController.clear();
+    }
+  }
 
   Future<void> _loadCurrencyOptions() async {
     final db = context.read<DatabaseHelper>();
@@ -253,6 +272,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
       if (_isEditMode) {
         await vm.updateAccount(
           current: widget.account!,
+          type: _selectedType,
           name: name,
           currencyCode: _selectedCurrencyCode,
           creditLimitCents: creditLimitCents,
@@ -450,14 +470,14 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
               const SizedBox(height: 24),
               _SectionLabel('Tipo de cuenta'),
               const SizedBox(height: 12),
-              if (_isEditMode)
-                _AccountTypeBadge(type: _selectedType)
-              else
-                _AccountTypeSelector(
-                  selected: _selectedType,
-                  onSelected: (type) => setState(() => _selectedType = type),
-                  types: _accountTypes,
-                ),
+              _AccountTypeSelector(
+                selected: _selectedType,
+                onSelected: (type) => setState(() {
+                  _selectedType = type;
+                  _clearOrphanedFields(type);
+                }),
+                types: _accountTypes,
+              ),
               const SizedBox(height: 24),
               _SectionLabel('Moneda de la cuenta'),
               const SizedBox(height: 8),
@@ -710,81 +730,6 @@ class _AccountTypeSelector extends StatelessWidget {
   }
 }
 
-class _AccountTypeBadge extends StatelessWidget {
-  final String type;
-
-  const _AccountTypeBadge({required this.type});
-
-  @override
-  Widget build(BuildContext context) {
-    final icon = _iconForType(type);
-    final label = _labelForType(type);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-        borderRadius: AppTheme.radiusFull,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.surfaceContainerHigh,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  IconData _iconForType(String type) {
-    switch (type) {
-      case 'bank':
-        return Icons.account_balance_outlined;
-      case 'credit_card':
-        return Icons.credit_card_outlined;
-      case 'cash':
-        return Icons.payments_outlined;
-      case 'investment':
-        return Icons.trending_up_rounded;
-      case 'loan':
-        return Icons.request_quote_outlined;
-      case 'crypto':
-        return Icons.currency_bitcoin;
-      default:
-        return Icons.account_balance_wallet_outlined;
-    }
-  }
-
-  String _labelForType(String type) {
-    switch (type) {
-      case 'bank':
-        return 'Banco';
-      case 'credit_card':
-        return 'Tarjeta de crédito';
-      case 'cash':
-        return 'Efectivo';
-      case 'investment':
-        return 'Inversión';
-      case 'loan':
-        return 'Préstamo';
-      case 'crypto':
-        return 'Criptomonedas';
-      default:
-        return 'Otra cuenta';
-    }
-  }
-}
 
 class _ScrollableBottomSheet extends StatelessWidget {
   final String title;

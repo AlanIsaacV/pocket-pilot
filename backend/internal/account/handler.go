@@ -167,6 +167,10 @@ func fromProto(p *pb.Account, a *Account) error {
 		v := p.TermMonths
 		a.TermMonths = &v
 	}
+	if p.DeletedAt != nil {
+		t := p.DeletedAt.AsTime()
+		a.DeletedAt = &t
+	}
 	return nil
 }
 
@@ -238,7 +242,7 @@ func (h *Handler) UpsertAccount(ctx context.Context, req *pb.UpsertAccountReques
 	}, nil
 }
 
-func (h *Handler) DeleteAccount(ctx context.Context, req *pb.DeleteAccountRequest) (*emptypb.Empty, error) {
+func (h *Handler) ArchiveAccount(ctx context.Context, req *pb.ArchiveAccountRequest) (*emptypb.Empty, error) {
 	userID, err := middleware.UserIDFromCtx(ctx)
 	if err != nil {
 		return nil, err
@@ -257,7 +261,7 @@ func (h *Handler) DeleteAccount(ctx context.Context, req *pb.DeleteAccountReques
 	}
 
 	if err := h.repo.SoftDelete(ctx, id, userID, deletedAt); err != nil {
-		return nil, status.Errorf(codes.Internal, "delete account: %v", err)
+		return nil, status.Errorf(codes.Internal, "archive account: %v", err)
 	}
 	return &emptypb.Empty{}, nil
 }

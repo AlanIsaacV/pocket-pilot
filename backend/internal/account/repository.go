@@ -90,13 +90,13 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 			userID, updatedSince,
 		)
 	} else {
-		// Full sync: return all active records with pagination.
+		// Full sync: return all records (active + archived) with pagination.
 		rows, err = r.pool.Query(ctx,
 			`SELECT id, user_id, name, type, currency_code, credit_limit_cents,
 				statement_day, payment_due_day, interest_rate_apr,
 				term_months, created_at, updated_at, deleted_at
 			 FROM accounts
-			 WHERE user_id = $1 AND deleted_at IS NULL
+			 WHERE user_id = $1
 			 ORDER BY created_at DESC
 			 LIMIT $2 OFFSET $3`,
 			userID, limit, offset,
@@ -131,8 +131,8 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 //   - conflictResolved=true:  the server had a newer version; returned account is the server's.
 func (r *Repository) Upsert(ctx context.Context, a *Account) (*Account, bool, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO accounts (id, user_id, name, type, currency_code, credit_limit_cents, statement_day, payment_due_day, interest_rate_apr, term_months, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		INSERT INTO accounts (id, user_id, name, type, currency_code, credit_limit_cents, statement_day, payment_due_day, interest_rate_apr, term_months, created_at, updated_at, deleted_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		ON CONFLICT (id) DO UPDATE SET
 			name              = EXCLUDED.name,
 			type              = EXCLUDED.type,
@@ -142,7 +142,8 @@ func (r *Repository) Upsert(ctx context.Context, a *Account) (*Account, bool, er
 			payment_due_day   = EXCLUDED.payment_due_day,
 			interest_rate_apr = EXCLUDED.interest_rate_apr,
 			term_months       = EXCLUDED.term_months,
-			updated_at        = EXCLUDED.updated_at
+			updated_at        = EXCLUDED.updated_at,
+			deleted_at        = EXCLUDED.deleted_at
 		WHERE accounts.updated_at < EXCLUDED.updated_at
 		RETURNING id, user_id, name, type, currency_code, credit_limit_cents,
 			statement_day, payment_due_day, interest_rate_apr,
@@ -151,7 +152,7 @@ func (r *Repository) Upsert(ctx context.Context, a *Account) (*Account, bool, er
 		a.CurrencyCode,
 		a.CreditLimitCents, a.StatementDay, a.PaymentDueDay,
 		a.InterestRateApr, a.TermMonths,
-		a.CreatedAt, a.UpdatedAt,
+		a.CreatedAt, a.UpdatedAt, a.DeletedAt,
 	)
 
 	result, err := r.scan(row)

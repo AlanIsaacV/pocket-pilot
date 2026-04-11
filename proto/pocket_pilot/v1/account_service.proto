@@ -45,8 +45,8 @@ service AccountService {
   // con conflict_resolved = true.
   rpc UpsertAccount(UpsertAccountRequest) returns (UpsertAccountResponse);
 
-  // Elimina lógicamente una cuenta (soft delete con LWW por deleted_at).
-  rpc DeleteAccount(DeleteAccountRequest) returns (google.protobuf.Empty);
+  // Archiva lógicamente una cuenta (soft delete con LWW por deleted_at).
+  rpc ArchiveAccount(ArchiveAccountRequest) returns (google.protobuf.Empty);
 }
 
 message ListAccountsRequest {
@@ -76,7 +76,7 @@ message UpsertAccountResponse {
   bool conflict_resolved = 2;
 }
 
-message DeleteAccountRequest {
+message ArchiveAccountRequest {
   string id = 1;
   // Timestamp de la eliminación en el cliente, usado para LWW.
   google.protobuf.Timestamp deleted_at = 2;

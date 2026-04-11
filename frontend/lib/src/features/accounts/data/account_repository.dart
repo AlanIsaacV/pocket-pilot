@@ -85,7 +85,10 @@ class AccountRepository {
     );
   }
 
-  Future<void> deleteAccount(String id) async {
+  Future<List<AccountModel>> getArchivedAccounts() =>
+      _local.getArchivedAccounts();
+
+  Future<void> archiveAccount(String id) async {
     final now = DateTime.now().toUtc();
     final current = await _local.getById(id);
 
@@ -100,6 +103,19 @@ class AccountRepository {
       entityId: id,
       operation: 'delete',
       payload: jsonEncode({'deleted_at': deletedAt.toIso8601String()}),
+    );
+  }
+
+  Future<void> restoreAccount(String id) async {
+    final now = DateTime.now().toUtc();
+    await _local.restore(id, now);
+    final model = await _local.getById(id);
+    if (model == null) return;
+    await _outbox.enqueue(
+      entityType: 'account',
+      entityId: id,
+      operation: 'upsert',
+      payload: jsonEncode(model.toServerMap()),
     );
   }
 }

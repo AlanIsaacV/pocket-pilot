@@ -18,6 +18,8 @@ class AccountModel {
   final DateTime updatedAt;
   final DateTime? deletedAt;
 
+  bool get isArchived => deletedAt != null;
+
   const AccountModel({
     required this.id,
     required this.name,

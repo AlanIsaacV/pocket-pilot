@@ -48,6 +48,17 @@ class AccountLocalStore {
     return AccountModel.fromMap(rows.first);
   }
 
+  /// Retorna todas las cuentas archivadas, ordenadas por fecha de archivado descendente.
+  Future<List<AccountModel>> getArchivedAccounts() async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'accounts',
+      where: 'deleted_at IS NOT NULL',
+      orderBy: 'deleted_at DESC',
+    );
+    return rows.map(AccountModel.fromMap).toList();
+  }
+
   // ----------------------------------------------------------
   // WRITE
   // ----------------------------------------------------------
@@ -82,6 +93,20 @@ class AccountLocalStore {
     await db.update(
       'accounts',
       {'deleted_at': deletedAt.toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Restaura una cuenta archivada: limpia deleted_at y actualiza updated_at.
+  Future<void> restore(String id, DateTime updatedAt) async {
+    final db = await _db.database;
+    await db.update(
+      'accounts',
+      {
+        'deleted_at': null,
+        'updated_at': updatedAt.toIso8601String(),
+      },
       where: 'id = ?',
       whereArgs: [id],
     );

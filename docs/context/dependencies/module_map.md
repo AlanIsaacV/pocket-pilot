@@ -19,7 +19,8 @@ This document outlines the dependencies between internal modules and external li
     - Transaction templates module (`features/transaction_templates`) depends on `SyncOutbox`, generated gRPC stubs, and local stores for template sync.
     - Scheduled generator depends on template repository/store, transaction local store, account/category local stores, and `SyncOutbox` (for generated upsert events).
     - Scheduled generation orchestrator depends on `SyncService` and scheduled generator; app lifecycle calls orchestrator (not direct sync) for resume/start scheduled cycles.
-    - Shared form widgets (`form_widgets.dart`) are imported by both `TransactionFormScreen` and `TransferFormScreen`.
+    - CSV import (`features/csv_import`) depends on `AccountLocalStore`, `CategoryLocalStore`, `TagLocalStore`, `TagRepository`, `AccountRepository`, `CategoryRepository`, `SyncOutbox`, `CsvImportService`, `CsvImportRepository`. Route scope injects all via `CsvImportRouteScope`.
+    - Shared form widgets (`form_widgets.dart`) are imported by `TransactionFormScreen`, `TransferFormScreen`, and `CsvMappingScreen`.
     - Shared AppBar form actions (`ui/widgets/form_app_bar_actions.dart`) are imported by `TransactionFormScreen`, `TransferFormScreen`, `AccountFormScreen`, `CategoryFormScreen`, and `CurrencyPreferencesScreen`.
 
 ## Key External Libraries
@@ -38,3 +39,8 @@ This document outlines the dependencies between internal modules and external li
 - `google_sign_in`: Google OIDC id_token for social login.
 - `sign_in_with_apple`: Apple identity token for social login (iOS only).
 - `flutter_secure_storage`: Encrypted storage for auth tokens.
+- `csv`: CSV parsing for import feature.
+
+### Scripts (Python)
+- `pdfplumber`: PDF text extraction for bank statement parsing.
+- `uv`: Project/dependency management.

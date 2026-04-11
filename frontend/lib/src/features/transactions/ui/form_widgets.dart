@@ -304,11 +304,13 @@ class SheetItem extends StatelessWidget {
   final IconData? icon;
   final String label;
   final VoidCallback onTap;
+  final Widget? trailing;
 
   const SheetItem({
     this.icon,
     required this.label,
     required this.onTap,
+    this.trailing,
     super.key,
   });
 
@@ -329,14 +331,17 @@ class SheetItem extends StatelessWidget {
               ),
               const SizedBox(width: 12),
             ],
-            Text(
-              label,
-              style: GoogleFonts.ibmPlexSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface,
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.ibmPlexSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
             ),
+            ?trailing,
           ],
         ),
       ),

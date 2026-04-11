@@ -20,6 +20,9 @@ Before starting any task, identify the relevant domain (Backend, Frontend, or Pr
 - [architecture/financial_nature_and_auto_charge.md](architecture/financial_nature_and_auto_charge.md) - Financial nature classification (REQUIRED, OBLIGATION, LIFESTYLE, ACTIVE, PASSIVE, WINDFALL), default-with-override pattern on categories/transactions, auto charge indicator and active/inactive toggle on transaction templates, generator compliance.
 - [architecture/proactive_notifications.md](architecture/proactive_notifications.md) - Offline-first proactive notifications: date projection engine from accounts/templates, persistent notification center with read/deleted state (migration 004), OS local notification scheduler (64-day window, idempotent clean-slate), bell widget with badge, deep linking.
 
+### Utility Scripts
+- [architecture/frontend_flutter.md#python-scripts-bank-statement-parser](architecture/frontend_flutter.md#python-scripts-bank-statement-parser) - Python scripts for parsing bank statement PDFs (BBVA TC) into CSV format for app import. Located in `scripts/`.
+
 ### Development Conventions
 - [conventions/coding_standards.md](conventions/coding_standards.md) - Naming conventions, error handling, and style guides for Go and Dart.
 - [conventions/proto_guidelines.md](conventions/proto_guidelines.md) - Rules for defining gRPC services and messages.

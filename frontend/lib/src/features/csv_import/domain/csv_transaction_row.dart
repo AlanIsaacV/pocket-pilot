@@ -12,6 +12,8 @@ class CsvTransactionRow {
   final String? categoryName;
   final List<String> tagNames;
   final String notes;
+  final String nature;
+  final int installmentsCount;
 
   const CsvTransactionRow({
     required this.date,
@@ -23,5 +25,7 @@ class CsvTransactionRow {
     this.categoryName,
     required this.tagNames,
     required this.notes,
+    this.nature = '',
+    this.installmentsCount = 1,
   });
 }

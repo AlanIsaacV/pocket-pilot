@@ -34,6 +34,9 @@ class CsvImportService {
   ];
 
   static const _validTypes = {'EXPENSE', 'INCOME', 'TRANSFER'};
+  static const _validNatures = {
+    'required', 'obligation', 'lifestyle', 'active', 'passive', 'windfall',
+  };
 
   // ----------------------------------------------------------
   // Fase 1: Extracción
@@ -65,6 +68,14 @@ class CsvImportService {
           'esperado "${_expectedHeaders[i]}", encontrado "${headers[i]}".',
         );
       }
+    }
+
+    // Detect optional columns by name.
+    int? natureCol;
+    int? installmentsCol;
+    for (var i = _expectedHeaders.length; i < headers.length; i++) {
+      if (headers[i] == 'nature') natureCol = i;
+      if (headers[i] == 'installments_count') installmentsCol = i;
     }
 
     final rows = <CsvTransactionRow>[];
@@ -127,6 +138,31 @@ class CsvImportService {
         );
       }
 
+      // Parse optional nature column.
+      var nature = '';
+      if (natureCol != null && raw.length > natureCol) {
+        final rawNature = raw[natureCol].toString().trim().toLowerCase();
+        if (rawNature.isNotEmpty && _validNatures.contains(rawNature)) {
+          nature = rawNature;
+        }
+      }
+
+      // Parse optional installments_count column.
+      var installmentsCount = 1;
+      if (installmentsCol != null && raw.length > installmentsCol) {
+        final rawInstallments = raw[installmentsCol].toString().trim();
+        if (rawInstallments.isNotEmpty) {
+          final parsed = int.tryParse(rawInstallments);
+          if (parsed == null || parsed < 1) {
+            throw FormatException(
+              'Fila $rowNum: installments_count inválido "$rawInstallments". '
+              'Debe ser un entero positivo.',
+            );
+          }
+          installmentsCount = parsed;
+        }
+      }
+
       rows.add(CsvTransactionRow(
         date: raw[0].toString().trim(),
         type: type,
@@ -137,6 +173,8 @@ class CsvImportService {
         categoryName: categoryName,
         tagNames: parsedTags,
         notes: raw[8].toString().trim(),
+        nature: nature,
+        installmentsCount: installmentsCount,
       ));
 
       // Recolectar nombres únicos.
@@ -227,7 +265,8 @@ class CsvImportService {
           'template_id': null,
           'yield_id': null,
           'amount_cents': amountCents,
-          'installments_count': 1,
+          'installments_count': row.installmentsCount,
+          'nature': row.nature,
           'currency_code': row.currencyCode,
           'status': 'cleared',
           'tags': jsonEncode(tagIds),
@@ -270,7 +309,8 @@ class CsvImportService {
           'yield_id': null,
           'type': dbType,
           'amount_cents': amountCents,
-          'installments_count': 1,
+          'installments_count': row.installmentsCount,
+          'nature': row.nature,
           'currency_code': row.currencyCode,
           'status': 'cleared',
           'tags': jsonEncode(tagIds),

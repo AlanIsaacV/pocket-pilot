@@ -22,6 +22,7 @@ class CsvMappingScreen extends StatefulWidget {
 
 class _CsvMappingScreenState extends State<CsvMappingScreen> {
   bool _loading = true;
+  final Set<String> _expandedCategoryIds = {};
 
   @override
   void initState() {
@@ -69,19 +70,6 @@ class _CsvMappingScreenState extends State<CsvMappingScreen> {
                     const SizedBox(height: 8),
                     ...result.uniqueCategoryNames.map(
                       (name) => _buildCategoryTile(context, vm, name),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                  if (result != null &&
-                      result.uniqueTagNames.isNotEmpty) ...[
-                    _buildSectionHeader(
-                      context,
-                      'Tags',
-                      vm.unmappedTagCount,
-                    ),
-                    const SizedBox(height: 8),
-                    ...result.uniqueTagNames.map(
-                      (name) => _buildTagTile(context, vm, name),
                     ),
                   ],
                 ],
@@ -196,7 +184,7 @@ class _CsvMappingScreenState extends State<CsvMappingScreen> {
   }
 
   // ----------------------------------------------------------
-  // Account mapping tile
+  // Account mapping tile + picker
   // ----------------------------------------------------------
 
   Widget _buildAccountTile(
@@ -226,6 +214,15 @@ class _CsvMappingScreenState extends State<CsvMappingScreen> {
       builder: (ctx) => ScrollableBottomSheet(
         title: 'Seleccionar cuenta para "$csvName"',
         children: [
+          SheetItem(
+            icon: Icons.bolt_rounded,
+            label: 'Crear "$csvName" como cuenta (bank)',
+            onTap: () async {
+              Navigator.of(ctx).pop();
+              await vm.quickCreateAccountAndMap(csvName);
+            },
+          ),
+          const Divider(height: 1),
           ...vm.existingAccounts.map(
             (account) => SheetItem(
               icon: accountIconForType(account.type),
@@ -236,12 +233,13 @@ class _CsvMappingScreenState extends State<CsvMappingScreen> {
               },
             ),
           ),
+          const Divider(height: 1),
           SheetItem(
             icon: Icons.add_circle_outline_rounded,
-            label: 'Crear nueva cuenta',
+            label: 'Crear cuenta manualmente',
             onTap: () async {
               Navigator.of(ctx).pop();
-              await context.push('/accounts/new');
+              await context.push('/accounts/new', extra: csvName);
               if (!mounted) return;
               await vm.refreshAccounts();
             },
@@ -252,7 +250,7 @@ class _CsvMappingScreenState extends State<CsvMappingScreen> {
   }
 
   // ----------------------------------------------------------
-  // Category mapping tile
+  // Category mapping tile + hierarchical picker
   // ----------------------------------------------------------
 
   Widget _buildCategoryTile(
@@ -279,88 +277,103 @@ class _CsvMappingScreenState extends State<CsvMappingScreen> {
   ) async {
     await showFormBottomSheet(
       context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: 'Seleccionar categoría para "$csvName"',
-        children: [
-          ...vm.existingCategories.map(
-            (category) => SheetItem(
-              icon: category.icon.isNotEmpty
-                  ? CategoryIconData.iconFromHex(category.icon)
-                  : Icons.category_outlined,
-              label: category.name,
-              onTap: () {
-                vm.updateCategoryMapping(csvName, category.id);
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => ScrollableBottomSheet(
+          title: 'Seleccionar categoría para "$csvName"',
+          children: [
+            SheetItem(
+              icon: Icons.bolt_rounded,
+              label: 'Crear "$csvName" como categoría',
+              onTap: () async {
                 Navigator.of(ctx).pop();
+                await vm.quickCreateCategoryAndMap(csvName);
               },
             ),
-          ),
-          SheetItem(
-            icon: Icons.add_circle_outline_rounded,
-            label: 'Crear nueva categoría',
-            onTap: () async {
-              Navigator.of(ctx).pop();
-              await context.push('/categories/new');
-              if (!mounted) return;
-              await vm.refreshCategories();
-            },
-          ),
-        ],
+            const Divider(height: 1),
+            ..._buildCategoryTreeItems(
+              ctx, vm, csvName, vm.categoryTree, setSheetState,
+            ),
+            const Divider(height: 1),
+            SheetItem(
+              icon: Icons.add_circle_outline_rounded,
+              label: 'Crear categoría manualmente',
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                await context.push(
+                  '/categories/new',
+                  extra: <String, dynamic>{'initialName': csvName},
+                );
+                if (!mounted) return;
+                await vm.refreshCategories();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // ----------------------------------------------------------
-  // Tag mapping tile
-  // ----------------------------------------------------------
-
-  Widget _buildTagTile(
-    BuildContext context,
+  List<Widget> _buildCategoryTreeItems(
+    BuildContext ctx,
     CsvImportViewModel vm,
     String csvName,
+    List<CategoryNode> nodes,
+    StateSetter setSheetState,
   ) {
-    final mappedId = vm.tagIdMap[csvName];
-    final matched = mappedId != null
-        ? vm.existingTags.where((t) => t.id == mappedId).firstOrNull
-        : null;
+    final widgets = <Widget>[];
+    for (final node in nodes) {
+      final cat = node.category;
+      final isExpanded = _expandedCategoryIds.contains(cat.id);
+      final icon = cat.icon.isNotEmpty
+          ? CategoryIconData.iconFromHex(cat.icon)
+          : Icons.category_outlined;
 
-    return _MappingTile(
-      csvName: csvName,
-      matchedName: matched?.name,
-      onTap: () => _showTagPicker(context, vm, csvName),
-    );
-  }
-
-  Future<void> _showTagPicker(
-    BuildContext context,
-    CsvImportViewModel vm,
-    String csvName,
-  ) async {
-    await showFormBottomSheet(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: 'Seleccionar tag para "$csvName"',
-        children: [
-          ...vm.existingTags.map(
-            (tag) => SheetItem(
-              icon: Icons.label_outline_rounded,
-              label: tag.name,
-              onTap: () {
-                vm.updateTagMapping(csvName, tag.id);
-                Navigator.of(ctx).pop();
-              },
-            ),
-          ),
-          SheetItem(
-            icon: Icons.add_circle_outline_rounded,
-            label: 'Crear "$csvName" como nuevo tag',
-            onTap: () async {
+      widgets.add(
+        Padding(
+          padding: EdgeInsets.only(left: node.depth * 16.0),
+          child: SheetItem(
+            icon: icon,
+            label: cat.name,
+            trailing: node.hasChildren
+                ? GestureDetector(
+                    onTap: () {
+                      setSheetState(() {
+                        if (isExpanded) {
+                          _expandedCategoryIds.remove(cat.id);
+                        } else {
+                          _expandedCategoryIds.add(cat.id);
+                        }
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Icon(
+                        isExpanded
+                            ? Icons.expand_less_rounded
+                            : Icons.expand_more_rounded,
+                        size: 20,
+                        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  )
+                : null,
+            onTap: () {
+              vm.updateCategoryMapping(csvName, cat.id);
               Navigator.of(ctx).pop();
-              await vm.createTagAndMap(csvName);
             },
           ),
-        ],
-      ),
-    );
+        ),
+      );
+
+      if (node.hasChildren && isExpanded) {
+        widgets.addAll(
+          _buildCategoryTreeItems(
+            ctx, vm, csvName, node.children, setSheetState,
+          ),
+        );
+      }
+    }
+    return widgets;
   }
 }
 

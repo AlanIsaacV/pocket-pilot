@@ -238,3 +238,73 @@ UI files live in `features/yield_configs/ui/`:
 - `term_days`: optional. Required for `at_maturity` frequency.
 - `auto_renew`: boolean toggle (default false).
 - `status`: active / paused / completed (default `active`). All values stored lowercase.
+
+## CSV Import
+
+Feature at `features/csv_import/` implements a 3-phase pipeline: Extract → Map → Insert.
+
+### CSV Format (11 columns, last 2 optional)
+
+```
+date,type,amount,currency,account,destination_account,category,tags,notes[,nature][,installments_count]
+```
+
+- Base 9 columns are required. `nature` and `installments_count` are detected by header name (case-insensitive).
+- `nature`: valid values from `FinancialNature` enum (`required|obligation|lifestyle|active|passive|windfall`). Invalid → `""`.
+- `installments_count`: positive integer, default `1`. Invalid → `FormatException`.
+
+### Entity Mapping Behavior
+
+| Entity | Mapping | Blocks import? | Auto-create on import? |
+|--------|---------|----------------|------------------------|
+| **Accounts** | Manual (bottom sheet with quick-create + manual create) | Yes | No |
+| **Categories** | Manual (hierarchical bottom sheet with quick-create + manual create) | No | Yes (inferred type, grey color, "label" icon) |
+| **Tags** | Automatic (no UI section) | No | Yes (created silently) |
+
+- `allMapped` only checks `unmappedAccountCount == 0`.
+- Auto-creation happens in `importBatch()` before building the insert batch.
+
+### Quick-Create Pattern
+
+Account and category bottom sheets have a "bolt" quick-create action at the top that creates the entity with defaults inferred from the CSV data:
+- **Account:** name from CSV, type `bank`, currency inferred from most-frequent currency in CSV rows for that account.
+- **Category:** name from CSV, type inferred from transaction types (all EXPENSE→expense, any INCOME→income, mixed→expense), grey color, "label" icon, no parent.
+
+### Manual Create Pre-fill
+
+Both account and category manual create buttons navigate to their respective form screens passing `initialName` as route extra:
+- `/accounts/new` — extra is `String` (initialName) or `AccountModel` (edit mode).
+- `/categories/new` — extra is `CategoryModel` (parent), `Map<String, dynamic>` (with `initialName` and optional `parent`), or `null`.
+
+### Category Hierarchy in Picker
+
+`CategoryNode` class (defined in `csv_import_view_model.dart`) wraps `CategoryModel` with `children` list and `depth` int. Tree built recursively from flat list using `parentId` grouping. UI state for expand/collapse (`Set<String> _expandedCategoryIds`) lives in `_CsvMappingScreenState`. Tap on row → select, tap on chevron → expand/collapse.
+
+### DI (Route Scope)
+
+`CsvImportRouteScope` provides `CsvImportViewModel` with: `CsvImportService`, `CsvImportRepository`, `AccountLocalStore`, `CategoryLocalStore`, `TagLocalStore`, `TagRepository`, `AccountRepository`, `CategoryRepository`.
+
+## Python Scripts (Bank Statement Parser)
+
+Standalone Python scripts in `scripts/` parse bank statement PDFs into the CSV format above. Not an app feature — utility scripts run locally via `uv`.
+
+### Architecture
+
+```
+scripts/
+├── pyproject.toml              # uv project: pdfplumber>=0.11
+├── parse_statement.py          # CLI: parse_statement.py <pdf> [--account NAME] [--output PATH]
+├── parsers/
+│   ├── __init__.py             # detect_bank() + parser registry
+│   ├── base.py                 # Transaction dataclass + StatementParser ABC
+│   └── bbva_tc.py              # BBVA credit card (text regex, not table extraction)
+├── categorizer.py              # 130+ keyword→category mappings (first match wins)
+└── csv_writer.py               # Transaction list → 11-column CSV
+```
+
+### Key Behaviors
+
+- **Bank detection:** reads first page text, matches keywords to select parser.
+- **BBVA TC parser:** `pdfplumber` + `page.extract_text()` + line-by-line regex. Spanish month map (`ene→1..dic→12`). Skips MSI monthly installment payments (`NN DE NN` prefix) but keeps original purchases (`A XX MESES S/I`) with extracted `installments_count`.
+- **Categorizer:** ordered `(keyword, category)` tuples matched against uppercase concept. More specific keywords first. Unmatched → empty string.
+- **Extending:** add `parsers/<bank>.py` implementing `StatementParser`, register in `parsers/__init__.py`.

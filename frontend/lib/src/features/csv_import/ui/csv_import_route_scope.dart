@@ -11,6 +11,8 @@ import 'package:pocket_pilot/src/features/csv_import/data/csv_import_repository.
 import 'package:pocket_pilot/src/features/csv_import/data/csv_import_service.dart';
 import 'package:pocket_pilot/src/features/csv_import/ui/csv_import_view_model.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
+import 'package:pocket_pilot/src/features/accounts/data/account_repository.dart';
+import 'package:pocket_pilot/src/features/categories/data/category_repository.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_repository.dart';
 
 class CsvImportRouteScope extends StatelessWidget {
@@ -30,6 +32,8 @@ class CsvImportRouteScope extends StatelessWidget {
         final localStore = CsvImportLocalStore(db: db);
         final repository = CsvImportRepository(local: localStore);
         final tagRepository = TagRepository(local: tagStore, outbox: outbox);
+        final accountRepository = AccountRepository(local: accountStore, outbox: outbox);
+        final categoryRepository = CategoryRepository(local: categoryStore, outbox: outbox);
 
         return CsvImportViewModel(
           service: service,
@@ -38,6 +42,8 @@ class CsvImportRouteScope extends StatelessWidget {
           categoryStore: categoryStore,
           tagStore: tagStore,
           tagRepository: tagRepository,
+          accountRepository: accountRepository,
+          categoryRepository: categoryRepository,
         );
       },
       child: child,

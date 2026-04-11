@@ -255,8 +255,13 @@ GoRouter buildRouter(AuthProvider authProvider) {
             routes: [
               GoRoute(
                 path: 'new',
-                builder: (context, state) =>
-                    const AccountsRouteScope(child: AccountFormScreen()),
+                builder: (context, state) => AccountsRouteScope(
+                  child: AccountFormScreen(
+                    initialName: state.extra is String
+                        ? state.extra as String
+                        : null,
+                  ),
+                ),
               ),
               GoRoute(
                 path: ':accountId/edit',
@@ -360,9 +365,23 @@ GoRouter buildRouter(AuthProvider authProvider) {
         routes: [
           GoRoute(
             path: 'new',
-            builder: (context, state) => CategoriesRouteScope(
-              child: CategoryFormScreen(parent: state.extra as CategoryModel?),
-            ),
+            builder: (context, state) {
+              final extra = state.extra;
+              CategoryModel? parent;
+              String? initialName;
+              if (extra is CategoryModel) {
+                parent = extra;
+              } else if (extra is Map<String, dynamic>) {
+                parent = extra['parent'] as CategoryModel?;
+                initialName = extra['initialName'] as String?;
+              }
+              return CategoriesRouteScope(
+                child: CategoryFormScreen(
+                  parent: parent,
+                  initialName: initialName,
+                ),
+              );
+            },
           ),
           GoRoute(
             path: ':categoryId/edit',

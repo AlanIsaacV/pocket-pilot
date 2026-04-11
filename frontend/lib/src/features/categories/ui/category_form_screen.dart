@@ -24,7 +24,15 @@ class CategoryFormScreen extends StatefulWidget {
   /// Categoría padre (solo en creación).
   final CategoryModel? parent;
 
-  const CategoryFormScreen({this.category, this.parent, super.key});
+  /// Nombre inicial para pre-llenar (solo en creación desde CSV import).
+  final String? initialName;
+
+  const CategoryFormScreen({
+    this.category,
+    this.parent,
+    this.initialName,
+    super.key,
+  });
 
   @override
   State<CategoryFormScreen> createState() => _CategoryFormScreenState();
@@ -65,6 +73,9 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
           ? _hexToColor(parent.color)
           : AppColors.categoryPresets.first;
       _selectedIcon = CategoryIconData.commonIcons.first;
+      if (widget.initialName != null) {
+        _nameController.text = widget.initialName!;
+      }
     }
   }
 

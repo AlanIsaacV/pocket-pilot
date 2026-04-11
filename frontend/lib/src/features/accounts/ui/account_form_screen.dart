@@ -25,8 +25,9 @@ import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
 class AccountFormScreen extends StatefulWidget {
   final AccountModel? account;
+  final String? initialName;
 
-  const AccountFormScreen({this.account, super.key});
+  const AccountFormScreen({this.account, this.initialName, super.key});
 
   @override
   State<AccountFormScreen> createState() => _AccountFormScreenState();
@@ -66,6 +67,9 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     super.initState();
     final account = widget.account;
     if (account == null) {
+      if (widget.initialName != null) {
+        _nameController.text = widget.initialName!;
+      }
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _loadCurrencyOptions(),
       );

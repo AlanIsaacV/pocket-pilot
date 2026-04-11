@@ -928,22 +928,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                     onOpenPicker: _openCategoryPicker,
                   ),
 
-                  // Naturaleza
-                  DetailRow(
-                    icon: Icons.style_outlined,
-                    label: 'Naturaleza',
-                    value: _natureDisplayLabel(_nature),
-                    onTap: _showNatureSheet,
-                  ),
-
-                  if (_canUseInstallments)
-                    DetailRow(
-                      icon: Icons.credit_card_rounded,
-                      label: 'Meses sin intereses',
-                      value: _installmentsDisplayLabel(_installmentsCount),
-                      onTap: _showInstallmentsSheet,
-                    ),
-
                   // Nota
                   NoteField(
                     controller: _noteController,
@@ -975,6 +959,22 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                       if (picked != null) setState(() => _date = picked);
                     },
                   ),
+
+                  // Naturaleza
+                  DetailRow(
+                    icon: Icons.style_outlined,
+                    label: 'Naturaleza',
+                    value: _natureDisplayLabel(_nature),
+                    onTap: _showNatureSheet,
+                  ),
+
+                  if (_canUseInstallments)
+                    DetailRow(
+                      icon: Icons.credit_card_rounded,
+                      label: 'Meses sin intereses',
+                      value: _installmentsDisplayLabel(_installmentsCount),
+                      onTap: _showInstallmentsSheet,
+                    ),
 
                   // Tags
                   TagsSection(

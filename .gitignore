@@ -28,3 +28,8 @@ frontend/lib/src/generated/
 !.env.example
 
 __debug*
+
+
+__pycache__/
+*.pdf
+*.csv

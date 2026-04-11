@@ -18,6 +18,36 @@ import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/notification_bell.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
+const _typeOrder = [
+  'bank',
+  'cash',
+  'credit_card',
+  'loan',
+  'investment',
+  'crypto',
+  'other',
+];
+
+const _typeLabels = {
+  'bank': 'Banco',
+  'cash': 'Efectivo',
+  'credit_card': 'Tarjeta de credito',
+  'loan': 'Prestamo',
+  'investment': 'Inversion',
+  'crypto': 'Criptomonedas',
+  'other': 'Otra cuenta',
+};
+
+const _typeIcons = {
+  'bank': Icons.account_balance_outlined,
+  'cash': Icons.payments_outlined,
+  'credit_card': Icons.credit_card_outlined,
+  'loan': Icons.request_quote_outlined,
+  'investment': Icons.trending_up_rounded,
+  'crypto': Icons.currency_bitcoin,
+  'other': Icons.account_balance_wallet_outlined,
+};
+
 class AccountsScreen extends StatefulWidget {
   const AccountsScreen({super.key});
 
@@ -171,6 +201,10 @@ class _AccountsListTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AccountsViewModel>(
       builder: (context, vm, _) {
+        final byType = vm.accountsByType;
+        final archivedByType = vm.archivedAccountsByType;
+        final hasArchived = archivedByType.isNotEmpty;
+
         return Column(
           children: [
             if (vm.isSyncing && !vm.isLoading)
@@ -184,52 +218,119 @@ class _AccountsListTab extends StatelessWidget {
             Expanded(
               child: PpScreenState(
                 isLoading: vm.isLoading,
-                errorMessage: vm.accounts.isEmpty ? vm.errorMessage : null,
-                isEmpty: vm.accounts.isEmpty,
+                errorMessage:
+                    vm.accounts.isEmpty && !hasArchived
+                        ? vm.errorMessage
+                        : null,
+                isEmpty: vm.accounts.isEmpty && !hasArchived,
                 emptyIcon: Icons.account_balance_wallet_outlined,
                 emptyLabel: 'No tienes cuentas aun',
                 emptySubLabel: 'Presiona + para agregar una',
                 onRefresh: vm.refresh,
-                child: ListView.builder(
+                child: CustomScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                  itemCount: vm.accounts.length,
-                  itemBuilder: (context, index) {
-                    final account = vm.accounts[index];
-                    return Dismissible(
-                      key: ValueKey(account.id),
-                      direction: DismissDirection.endToStart,
-                      background: _DeleteBackground(),
-                      confirmDismiss: (_) =>
-                          _confirmDelete(context, account.name),
-                      onDismissed: (_) async {
-                        try {
-                          await vm.deleteAccount(account.id);
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Cuenta "${account.name}" eliminada',
-                              ),
+                  slivers: [
+                    // ── Active accounts grouped by type ──
+                    for (final type in _typeOrder)
+                      if (byType.containsKey(type)) ...[
+                        _SectionHeader(
+                          title: _typeLabels[type] ?? type,
+                          color: Theme.of(context).colorScheme.onSurface,
+                          icon: _typeIcons[type] ??
+                              Icons.account_balance_wallet_outlined,
+                        ),
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final account = byType[type]![index];
+                                return Dismissible(
+                                  key: ValueKey(account.id),
+                                  direction: DismissDirection.endToStart,
+                                  background: _ArchiveBackground(),
+                                  confirmDismiss: (_) =>
+                                      _confirmArchive(context, account.name),
+                                  onDismissed: (_) async {
+                                    try {
+                                      await vm.archiveAccount(account.id);
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Cuenta "${account.name}" archivada',
+                                          ),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'No se pudo archivar la cuenta: $e',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  child: _AccountCard(
+                                    account: account,
+                                    onTap: () =>
+                                        _onAccountTap(context, account),
+                                  ),
+                                );
+                              },
+                              childCount: byType[type]!.length,
                             ),
-                          );
-                        } catch (e) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'No se pudo eliminar la cuenta: $e',
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      child: _AccountCard(
-                        account: account,
-                        onTap: () => _onAccountTap(context, account),
+                          ),
+                        ),
+                      ],
+
+                    // ── Archived accounts section ──
+                    if (hasArchived) ...[
+                      _SectionHeader(
+                        title: 'Archivadas',
+                        color:
+                            Theme.of(context).colorScheme.onSurfaceVariant,
+                        icon: Icons.visibility_off_outlined,
                       ),
-                    );
-                  },
+                      for (final type in _typeOrder)
+                        if (archivedByType.containsKey(type)) ...[
+                          _SectionHeader(
+                            title: _typeLabels[type] ?? type,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                            icon: _typeIcons[type] ??
+                                Icons.account_balance_wallet_outlined,
+                          ),
+                          SliverPadding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            sliver: SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final account =
+                                      archivedByType[type]![index];
+                                  return _ArchivedAccountCard(
+                                    account: account,
+                                    onRestore: () =>
+                                        vm.restoreAccount(account.id),
+                                  );
+                                },
+                                childCount: archivedByType[type]!.length,
+                              ),
+                            ),
+                          ),
+                        ],
+                    ],
+
+                    const SliverToBoxAdapter(child: SizedBox(height: 96)),
+                  ],
                 ),
               ),
             ),
@@ -240,19 +341,21 @@ class _AccountsListTab extends StatelessWidget {
   }
 
   void _onAccountTap(BuildContext context, AccountModel account) {
-    context.push('/accounts/${account.id}/edit', extra: account).then((result) {
+    context
+        .push('/accounts/${account.id}/edit', extra: account)
+        .then((result) {
       if (result == true && context.mounted) {
         context.read<AccountsViewModel>().loadOnAppear();
       }
     });
   }
 
-  Future<bool?> _confirmDelete(BuildContext context, String accountName) {
+  Future<bool?> _confirmArchive(BuildContext context, String accountName) {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Eliminar cuenta'),
-        content: Text('Se eliminara la cuenta "$accountName".'),
+        title: const Text('Archivar cuenta'),
+        content: Text('Se archivara la cuenta "$accountName".'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -260,10 +363,7 @@ class _AccountsListTab extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
+            child: const Text('Archivar'),
           ),
         ],
       ),
@@ -386,16 +486,60 @@ class _AccountCard extends StatelessWidget {
   }
 }
 
-class _DeleteBackground extends StatelessWidget {
+// ============================================================
+// Header de sección
+// ============================================================
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final Color color;
+  final IconData icon;
+
+  const _SectionHeader({
+    required this.title,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 14),
+            const SizedBox(width: 6),
+            Text(
+              title.toUpperCase(),
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.2,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Background de swipe "Archivar"
+// ============================================================
+
+class _ArchiveBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.18),
+        color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.18),
         borderRadius: AppTheme.radiusMedium,
         border: Border.all(
-          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
+          color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.5),
         ),
       ),
       alignment: Alignment.centerRight,
@@ -404,19 +548,97 @@ class _DeleteBackground extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Eliminar',
+            'Archivar',
             style: GoogleFonts.ibmPlexSans(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.error,
+              color: Theme.of(context).colorScheme.tertiary,
             ),
           ),
           const SizedBox(width: 6),
           Icon(
-            Icons.delete_outline_rounded,
-            color: Theme.of(context).colorScheme.error,
+            Icons.archive_outlined,
+            color: Theme.of(context).colorScheme.tertiary,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Tarjeta de cuenta archivada
+// ============================================================
+
+class _ArchivedAccountCard extends StatelessWidget {
+  final AccountModel account;
+  final VoidCallback onRestore;
+
+  const _ArchivedAccountCard({
+    required this.account,
+    required this.onRestore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = _typeIcons[account.type] ??
+        Icons.account_balance_wallet_outlined;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: AppTheme.radiusFull,
+          border: Border.all(
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            width: 1,
+          ),
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 2,
+          ),
+          leading: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
+              borderRadius: AppTheme.radiusFull,
+            ),
+            child: Icon(
+              icon,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              size: 18,
+            ),
+          ),
+          title: Text(
+            account.name,
+            style: GoogleFonts.ibmPlexSans(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          trailing: TextButton(
+            onPressed: onRestore,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'RESTAURAR',
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.primary,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

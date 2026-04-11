@@ -2,6 +2,7 @@ import 'package:fixnum/fixnum.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
+import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/transaction_template_service.pbgrpc.dart';
 
 class TransactionTemplateRemoteService {
@@ -33,6 +34,8 @@ class TransactionTemplateRemoteService {
       name: map['name'] as String,
       accountId: map['account_id'] as String,
       type: map['type'] as String,
+      nature: CategoryModel.stringToFinancialNature(
+          map['nature'] as String? ?? ''),
       currencyCode: map['currency_code'] as String,
       description: map['description'] as String? ?? '',
       createdAt: Timestamp.fromDateTime(

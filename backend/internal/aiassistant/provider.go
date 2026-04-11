@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 
 	"google.golang.org/genai"
@@ -74,7 +74,7 @@ func (g *GeminiProvider) Chat(ctx context.Context, messages []*AIMessageInput, t
 
 	resp, err := g.client.Models.GenerateContent(ctx, geminiModel, contents, config)
 	if err != nil {
-		log.Printf("[ERROR] Gemini GenerateContent error: %v", err)
+		slog.Error("gemini GenerateContent failed", "error", err)
 		return nil, fmt.Errorf("gemini generate: %w", err)
 	}
 
@@ -112,8 +112,8 @@ func (g *GeminiProvider) buildContents(messages []*AIMessageInput) ([]*genai.Con
 					toolNameByCallID[msg.ToolCall.ID] = msg.ToolCall.Name
 				}
 
-				log.Printf("[DEBUG] buildContents assistant tool_call=%q thoughtSigLen=%d",
-					msg.ToolCall.Name, len(msg.ToolCall.ThoughtSignature))
+				slog.Debug("buildContents assistant tool_call",
+					"name", msg.ToolCall.Name, "thought_sig_len", len(msg.ToolCall.ThoughtSignature))
 
 				// Attach thought signature directly to the function call part
 				// (Gemini requires it on the functionCall part, not a separate thought part).
@@ -200,10 +200,10 @@ func (g *GeminiProvider) parseResponse(resp *genai.GenerateContentResponse) (*LL
 
 	parts := resp.Candidates[0].Content.Parts
 
-	// Debug: log all parts from response
 	for i, part := range parts {
-		log.Printf("[DEBUG] parseResponse part[%d]: Thought=%v, ThoughtSigLen=%d, HasFunctionCall=%v, Text=%q",
-			i, part.Thought, len(part.ThoughtSignature), part.FunctionCall != nil, part.Text)
+		slog.Debug("parseResponse part",
+			"index", i, "thought", part.Thought, "thought_sig_len", len(part.ThoughtSignature),
+			"has_function_call", part.FunctionCall != nil, "text", part.Text)
 	}
 
 	// Extract thought signature (required for thinking models).
@@ -215,7 +215,7 @@ func (g *GeminiProvider) parseResponse(resp *genai.GenerateContentResponse) (*LL
 			thoughtSig = part.ThoughtSignature
 		}
 	}
-	log.Printf("[DEBUG] parseResponse: extracted thoughtSig len=%d", len(thoughtSig))
+	slog.Debug("parseResponse: extracted thoughtSig", "len", len(thoughtSig))
 
 	functionCalls := resp.FunctionCalls()
 	if len(functionCalls) > 0 {

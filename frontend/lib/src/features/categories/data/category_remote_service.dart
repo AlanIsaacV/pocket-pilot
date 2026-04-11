@@ -1,6 +1,7 @@
 import 'package:grpc/grpc.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/category_service.pbgrpc.dart';
+import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
 
 class CategoryRemoteService {
@@ -35,6 +36,8 @@ class CategoryRemoteService {
         icon: map['icon'] as String? ?? '',
         color: map['color'] as String? ?? '',
         parentId: map['parent_id'] as String? ?? '',
+        defaultNature: CategoryModel.stringToFinancialNature(
+            map['default_nature'] as String? ?? ''),
         createdAt: Timestamp.fromDateTime(
             map['created_at'] != null
                 ? DateTime.parse(map['created_at'] as String).toUtc()

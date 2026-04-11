@@ -2,7 +2,7 @@ package aiassistant
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -82,7 +82,7 @@ func (h *Handler) Chat(ctx context.Context, req *pb.AIChatRequest) (*pb.AIChatRe
 	}
 
 	if err := h.repo.RecordUsage(ctx, userID, llmResp.Usage.PromptTokens, llmResp.Usage.CompletionTokens); err != nil {
-		log.Printf("aiassistant: failed to record usage for user=%s: %v", userID, err)
+		slog.Error("aiassistant: failed to record usage", "user_id", userID, "error", err)
 	}
 
 	resp := &pb.AIChatResponse{
@@ -116,7 +116,7 @@ func (h *Handler) ReportUnsupportedTool(ctx context.Context, req *pb.ReportUnsup
 	}
 
 	if err := h.repo.RecordUnsupportedToolCall(ctx, userID, req.GetUserIntent(), req.GetReason()); err != nil {
-		log.Printf("aiassistant: failed to record unsupported tool report: %v", err)
+		slog.Error("aiassistant: failed to record unsupported tool report", "error", err)
 	}
 
 	return &emptypb.Empty{}, nil

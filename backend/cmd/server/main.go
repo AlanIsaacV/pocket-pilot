@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -33,17 +33,19 @@ import (
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("config: %v", err)
+		slog.Error("config", "error", err)
+		os.Exit(1)
 	}
 
 	ctx := context.Background()
 
 	pool, err := database.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("database: %v", err)
+		slog.Error("database", "error", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
-	log.Println("connected to PostgreSQL")
+	slog.Info("connected to PostgreSQL")
 
 	// Wire up repositories and handlers
 	accountHandler := account.NewHandler(account.NewRepository(pool))
@@ -69,9 +71,12 @@ func main() {
 	authRepo := auth.NewRepository(pool)
 	authHandler := auth.NewHandler(authRepo, verifier, tokenService)
 
-	// gRPC server with JWT auth interceptor.
+	// gRPC server with chained interceptors: auth first, then logging.
 	srv := grpc.NewServer(
-		grpc.UnaryInterceptor(middleware.NewUnaryAuthInterceptor(cfg.JWTSecret)),
+		grpc.ChainUnaryInterceptor(
+			middleware.NewUnaryAuthInterceptor(cfg.JWTSecret),
+			middleware.NewUnaryLoggingInterceptor(),
+		),
 	)
 	pb.RegisterAccountServiceServer(srv, accountHandler)
 	pb.RegisterCategoryServiceServer(srv, categoryHandler)
@@ -89,7 +94,8 @@ func main() {
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPCPort))
 	if err != nil {
-		log.Fatalf("listen: %v", err)
+		slog.Error("listen", "error", err)
+		os.Exit(1)
 	}
 
 	// Graceful shutdown on CTRL+C or SIGTERM
@@ -97,12 +103,13 @@ func main() {
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-quit
-		log.Println("shutting down...")
+		slog.Info("shutting down...")
 		srv.GracefulStop()
 	}()
 
-	log.Printf("gRPC server listening on :%s", cfg.GRPCPort)
+	slog.Info("gRPC server listening", "port", cfg.GRPCPort)
 	if err := srv.Serve(lis); err != nil {
-		log.Fatalf("serve: %v", err)
+		slog.Error("serve", "error", err)
+		os.Exit(1)
 	}
 }

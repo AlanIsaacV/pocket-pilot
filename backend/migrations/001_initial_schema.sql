@@ -45,7 +45,7 @@ CREATE TABLE accounts (
 CREATE INDEX idx_accounts_user_id ON accounts (user_id) WHERE deleted_at IS NULL;
 
 
-CREATE TYPE nature_type AS ENUM ('required','obligation','lifestyle','active','passive','windfall', 'unspecified');
+CREATE TYPE nature_type AS ENUM ('required','obligation','lifestyle','active','passive','windfall', '');
 CREATE TYPE category_type AS ENUM ('income', 'expense');
 CREATE TABLE categories (
     id             uuid PRIMARY KEY       DEFAULT gen_random_uuid(),
@@ -55,7 +55,7 @@ CREATE TABLE categories (
     color          TEXT,
     parent_id      uuid REFERENCES categories (id),
     type           category_type NOT NULL,
-    default_nature nature_type   NOT NULL DEFAULT 'unspecified',
+    default_nature nature_type,
     created_at     timestamptz   NOT NULL DEFAULT NOW(),
     updated_at     timestamptz   NOT NULL DEFAULT NOW(),
     deleted_at     timestamptz
@@ -109,7 +109,7 @@ CREATE TABLE transaction_templates (
     to_account_id  uuid REFERENCES accounts (id),
     category_id    uuid REFERENCES categories (id),
     type           transaction_type NOT NULL,
-    nature         nature_type      NOT NULL DEFAULT 'unspecified',
+    nature         nature_type,
     amount_cents   BIGINT,
     currency_code  TEXT             NOT NULL,
     tags           TEXT[],
@@ -143,7 +143,7 @@ CREATE TABLE transactions (
     template_id           uuid REFERENCES transaction_templates (id),
     yield_id              uuid REFERENCES yield_configs (id),
     type                  transaction_type NOT NULL,
-    nature                nature_type      NOT NULL DEFAULT 'unspecified',
+    nature                nature_type,
     amount_cents          BIGINT           NOT NULL,
     installments_count    INTEGER          NOT NULL DEFAULT 1,
     currency_code         TEXT             NOT NULL,

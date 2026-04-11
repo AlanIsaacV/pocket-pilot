@@ -366,6 +366,12 @@
         "name": "taxes",
         "default_nature": "obligation",
         "icon": "receipt_long"
+      },
+      {
+        "id": "bb54da17-e0f9-4cae-a5f0-96171de54ce2",
+        "name": "Prestamos",
+        "default_nature": "obligation",
+        "icon": "account_balance"
       }
     ]
   },
@@ -475,20 +481,17 @@
     "id": "207e9842-56fc-4c2d-9a1c-2c063bcd9756",
     "name": "Otros",
     "type": "expense",
-    "default_nature": "unspecified",
     "color": "#9E9E9E",
     "icon": "help_outline",
     "children": [
       {
         "id": "bb893cb8-339b-4c42-b641-3bfa059c1aa9",
         "name": "Transferencias",
-        "default_nature": "unspecified",
         "icon": "swap_horiz"
       },
       {
         "id": "d1c9e5b8-8f3a-4c6e-9b2a-7a1e5f6d8c9a",
         "name": "Ajustes de Saldo",
-        "default_nature": "unspecified",
         "icon": "flight"
       }
     ]

@@ -49,6 +49,8 @@ class TransactionRemoteService {
         id: map['id'] as String,
         accountId: map['account_id'] as String,
         type: TransactionModel.stringToTransactionType(map['type'] as String),
+        nature: TransactionModel.stringToFinancialNature(
+            map['nature'] as String? ?? ''),
         amountCents: Int64(map['amount_cents'] as int),
         installmentsCount: installmentsCount,
         currencyCode: map['currency_code'] as String,

@@ -75,7 +75,7 @@ func financialNatureToString(n pb.FinancialNature) string {
 	case pb.FinancialNature_NATURE_WINDFALL:
 		return "windfall"
 	default:
-		return "unspecified"
+		return ""
 	}
 }
 

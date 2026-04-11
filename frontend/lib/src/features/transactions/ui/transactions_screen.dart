@@ -1,5 +1,5 @@
 // ============================================================
-// TransactionsScreen — Lista de transacciones agrupada por mes
+// TransactionsScreen — Transacciones, Plantillas, Rendimientos y Deudas con tabs
 // ============================================================
 
 import 'package:flutter/material.dart';
@@ -11,16 +11,42 @@ import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
+import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_view_model.dart';
+import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_templates_list_tab.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/widgets/filter_sheet.dart';
+import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_view_model.dart';
+import 'package:pocket_pilot/src/features/yield_configs/ui/yield_configs_list_tab.dart';
+import 'package:pocket_pilot/src/features/debts/ui/debt_view_model.dart';
+import 'package:pocket_pilot/src/features/debts/ui/debts_list_tab.dart';
 import 'package:pocket_pilot/src/ui/widgets/notification_bell.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
-class TransactionsScreen extends StatelessWidget {
+class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});
+
+  @override
+  State<TransactionsScreen> createState() => _TransactionsScreenState();
+}
+
+class _TransactionsScreenState extends State<TransactionsScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,55 +54,34 @@ class TransactionsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Transacciones'),
         actions: const [NotificationBell()],
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Transacciones'),
+            Tab(text: 'Plantillas'),
+            Tab(text: 'Rendimientos'),
+            Tab(text: 'Deudas'),
+          ],
+          labelStyle: GoogleFonts.ibmPlexSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: GoogleFonts.ibmPlexSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+          ),
+          indicatorSize: TabBarIndicatorSize.label,
+          dividerColor: Colors.transparent,
+        ),
       ),
-      body: Consumer<TransactionsViewModel>(
-        builder: (context, vm, _) {
-          final filterVM = context.watch<TransactionFilterViewModel>();
-          final hasFilters = filterVM.resolvedFilter.hasAdvancedFilters ||
-              filterVM.activePageIndex != 0 ||
-              filterVM.quickSelection != QuickRange.d30;
-
-          return Stack(
-            children: [
-              Column(
-                children: [
-                  if (vm.isSyncing && !vm.isLoading)
-                    LinearProgressIndicator(
-                      color: Theme.of(context).colorScheme.primary,
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainer,
-                      minHeight: 2,
-                    ),
-                  Expanded(
-                    child: PpScreenState(
-                      isLoading: vm.isLoading,
-                      errorMessage: vm.transactions.isEmpty
-                          ? vm.errorMessage
-                          : null,
-                      isEmpty: vm.transactions.isEmpty,
-                      emptyIcon: hasFilters
-                          ? Icons.filter_list_off_rounded
-                          : Icons.receipt_long_outlined,
-                      emptyLabel: hasFilters
-                          ? 'No hay transacciones con estos filtros'
-                          : 'No hay transacciones aún',
-                      emptySubLabel: hasFilters
-                          ? 'Intenta cambiar los filtros'
-                          : 'Presiona + para registrar una',
-                      onRefresh: vm.refresh,
-                      child: _TransactionList(
-                        transactions: vm.transactions,
-                        vm: vm,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const FilterSheet(),
-            ],
-          );
-        },
+      body: TabBarView(
+        controller: _tabController,
+        children: const [
+          _TransactionsListTab(),
+          TransactionTemplatesListTab(),
+          YieldConfigsListTab(),
+          DebtsListTab(),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddOptions(context),
@@ -88,6 +93,9 @@ class TransactionsScreen extends StatelessWidget {
 
   void _showAddOptions(BuildContext context) {
     final vm = context.read<TransactionsViewModel>();
+    final templateVM = context.read<TransactionTemplateViewModel>();
+    final yieldVM = context.read<YieldConfigViewModel>();
+    final debtVM = context.read<DebtViewModel>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -148,7 +156,11 @@ class TransactionsScreen extends StatelessWidget {
                 label: 'Nueva plantilla',
                 onTap: () {
                   Navigator.of(context).pop();
-                  context.push('/templates/new');
+                  context.push('/transactions/templates/new').then((result) {
+                    if (result == true && context.mounted) {
+                      templateVM.loadOnAppear();
+                    }
+                  });
                 },
               ),
               SheetItem(
@@ -156,13 +168,90 @@ class TransactionsScreen extends StatelessWidget {
                 label: 'Nuevo rendimiento',
                 onTap: () {
                   Navigator.of(context).pop();
-                  context.push('/yields/new');
+                  context.push('/transactions/yields/new').then((result) {
+                    if (result == true && context.mounted) {
+                      yieldVM.loadOnAppear();
+                    }
+                  });
+                },
+              ),
+              SheetItem(
+                icon: Icons.handshake_outlined,
+                label: 'Agregar deuda',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.push('/transactions/debts/new').then((result) {
+                    if (result == true && context.mounted) {
+                      debtVM.refresh();
+                    }
+                  });
                 },
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+// ============================================================
+// Tab de transacciones (contenido original)
+// ============================================================
+
+class _TransactionsListTab extends StatelessWidget {
+  const _TransactionsListTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<TransactionsViewModel>(
+      builder: (context, vm, _) {
+        final filterVM = context.watch<TransactionFilterViewModel>();
+        final hasFilters = filterVM.resolvedFilter.hasAdvancedFilters ||
+            filterVM.activePageIndex != 0 ||
+            filterVM.quickSelection != QuickRange.d30;
+
+        return Stack(
+          children: [
+            Column(
+              children: [
+                if (vm.isSyncing && !vm.isLoading)
+                  LinearProgressIndicator(
+                    color: Theme.of(context).colorScheme.primary,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainer,
+                    minHeight: 2,
+                  ),
+                Expanded(
+                  child: PpScreenState(
+                    isLoading: vm.isLoading,
+                    errorMessage: vm.transactions.isEmpty
+                        ? vm.errorMessage
+                        : null,
+                    isEmpty: vm.transactions.isEmpty,
+                    emptyIcon: hasFilters
+                        ? Icons.filter_list_off_rounded
+                        : Icons.receipt_long_outlined,
+                    emptyLabel: hasFilters
+                        ? 'No hay transacciones con estos filtros'
+                        : 'No hay transacciones aún',
+                    emptySubLabel: hasFilters
+                        ? 'Intenta cambiar los filtros'
+                        : 'Presiona + para registrar una',
+                    onRefresh: vm.refresh,
+                    child: _TransactionList(
+                      transactions: vm.transactions,
+                      vm: vm,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const FilterSheet(),
+          ],
+        );
+      },
     );
   }
 }

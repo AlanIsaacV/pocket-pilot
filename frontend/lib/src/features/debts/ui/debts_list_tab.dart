@@ -140,7 +140,7 @@ class _DebtCard extends StatelessWidget {
         borderRadius: AppTheme.radiusMedium,
         onTap: () {
           context
-              .push('/accounts/debts/${contact.accountId}', extra: contact)
+              .push('/transactions/debts/${contact.accountId}', extra: contact)
               .then((result) {
                 if (result == true && context.mounted) {
                   context.read<DebtViewModel>().refresh();

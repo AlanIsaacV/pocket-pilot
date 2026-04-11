@@ -47,8 +47,6 @@ import 'package:pocket_pilot/src/features/categories/ui/category_form_screen.dar
 import 'package:pocket_pilot/src/features/transaction_templates/domain/transaction_template.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_form_route_scope.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_form_screen.dart';
-import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_route_scope.dart';
-import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_templates_screen.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/category_picker_screen.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_form_route_scope.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_form_screen.dart';
@@ -61,8 +59,6 @@ import 'package:pocket_pilot/src/features/user_preferences/ui/user_preferences_r
 import 'package:pocket_pilot/src/features/yield_configs/domain/yield_config.dart';
 import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_form_route_scope.dart';
 import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_form_screen.dart';
-import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_route_scope.dart';
-import 'package:pocket_pilot/src/features/yield_configs/ui/yield_configs_screen.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_route_scope.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/home/home_screen.dart';
@@ -157,6 +153,99 @@ GoRouter buildRouter(AuthProvider authProvider) {
                   );
                 },
               ),
+              // --- Plantillas (antes en /templates) ---
+              GoRoute(
+                path: 'templates/new',
+                builder: (context, state) {
+                  final prefill = state.extra as Map<String, dynamic>?;
+                  return TransactionTemplateFormRouteScope(
+                    child: TransactionTemplateFormScreen(prefill: prefill),
+                  );
+                },
+                routes: [
+                  GoRoute(
+                    path: 'category',
+                    builder: (context, state) {
+                      final extra = state.extra as Map<String, dynamic>?;
+                      return TransactionTemplateFormRouteScope(
+                        child: CategoryPickerScreen(
+                          type: extra?['type'] as String? ?? 'expense',
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: 'templates/:templateId/edit',
+                builder: (context, state) => TransactionTemplateFormRouteScope(
+                  child: TransactionTemplateFormScreen(
+                    template: state.extra as TransactionTemplateModel?,
+                  ),
+                ),
+                routes: [
+                  GoRoute(
+                    path: 'category',
+                    builder: (context, state) {
+                      final extra = state.extra as Map<String, dynamic>?;
+                      return TransactionTemplateFormRouteScope(
+                        child: CategoryPickerScreen(
+                          type: extra?['type'] as String? ?? 'expense',
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              // --- Rendimientos (antes en /yields) ---
+              GoRoute(
+                path: 'yields/new',
+                builder: (context, state) =>
+                    const YieldConfigFormRouteScope(child: YieldConfigFormScreen()),
+              ),
+              GoRoute(
+                path: 'yields/:yieldId/edit',
+                builder: (context, state) => YieldConfigFormRouteScope(
+                  child: YieldConfigFormScreen(
+                    config: state.extra as YieldConfigModel?,
+                  ),
+                ),
+              ),
+              // --- Deudas (antes en /accounts/debts) ---
+              GoRoute(
+                path: 'debts/new',
+                builder: (context, state) {
+                  ContactBalance? contact;
+                  TransactionModel? transferOut;
+                  TransactionModel? transferIn;
+
+                  final extra = state.extra;
+                  if (extra is ContactBalance) {
+                    contact = extra;
+                  } else if (extra is Map<String, dynamic>) {
+                    contact = extra['contact'] as ContactBalance?;
+                    transferOut = extra['out'] as TransactionModel?;
+                    transferIn = extra['in'] as TransactionModel?;
+                  }
+
+                  return TransactionsRouteScope(
+                    child: DebtFormScreen(
+                      contact: contact,
+                      transferOut: transferOut,
+                      transferIn: transferIn,
+                    ),
+                  );
+                },
+              ),
+              GoRoute(
+                path: 'debts/:accountId',
+                builder: (context, state) => TransactionsRouteScope(
+                  child: DebtDetailScreen(
+                    accountId: state.pathParameters['accountId']!,
+                    initialContact: state.extra as ContactBalance?,
+                  ),
+                ),
+              ),
             ],
           ),
           GoRoute(
@@ -233,40 +322,6 @@ GoRouter buildRouter(AuthProvider authProvider) {
                   ),
                 ],
               ),
-              GoRoute(
-                path: 'debts/new',
-                builder: (context, state) {
-                  ContactBalance? contact;
-                  TransactionModel? transferOut;
-                  TransactionModel? transferIn;
-
-                  final extra = state.extra;
-                  if (extra is ContactBalance) {
-                    contact = extra;
-                  } else if (extra is Map<String, dynamic>) {
-                    contact = extra['contact'] as ContactBalance?;
-                    transferOut = extra['out'] as TransactionModel?;
-                    transferIn = extra['in'] as TransactionModel?;
-                  }
-
-                  return AccountsRouteScope(
-                    child: DebtFormScreen(
-                      contact: contact,
-                      transferOut: transferOut,
-                      transferIn: transferIn,
-                    ),
-                  );
-                },
-              ),
-              GoRoute(
-                path: 'debts/:accountId',
-                builder: (context, state) => AccountsRouteScope(
-                  child: DebtDetailScreen(
-                    accountId: state.pathParameters['accountId']!,
-                    initialContact: state.extra as ContactBalance?,
-                  ),
-                ),
-              ),
             ],
           ),
           GoRoute(
@@ -319,73 +374,7 @@ GoRouter buildRouter(AuthProvider authProvider) {
           ),
         ],
       ),
-      GoRoute(
-        path: '/templates',
-        builder: (context, state) => const TransactionTemplateRouteScope(
-          child: TransactionTemplatesScreen(),
-        ),
-      ),
-      GoRoute(
-        path: '/templates/new',
-        builder: (context, state) {
-          final prefill = state.extra as Map<String, dynamic>?;
-          return TransactionTemplateFormRouteScope(
-            child: TransactionTemplateFormScreen(prefill: prefill),
-          );
-        },
-        routes: [
-          GoRoute(
-            path: 'category',
-            builder: (context, state) {
-              final extra = state.extra as Map<String, dynamic>?;
-              return TransactionTemplateFormRouteScope(
-                child: CategoryPickerScreen(
-                  type: extra?['type'] as String? ?? 'expense',
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      GoRoute(
-        path: '/templates/:templateId/edit',
-        builder: (context, state) => TransactionTemplateFormRouteScope(
-          child: TransactionTemplateFormScreen(
-            template: state.extra as TransactionTemplateModel?,
-          ),
-        ),
-        routes: [
-          GoRoute(
-            path: 'category',
-            builder: (context, state) {
-              final extra = state.extra as Map<String, dynamic>?;
-              return TransactionTemplateFormRouteScope(
-                child: CategoryPickerScreen(
-                  type: extra?['type'] as String? ?? 'expense',
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      GoRoute(
-        path: '/yields',
-        builder: (context, state) =>
-            const YieldConfigRouteScope(child: YieldConfigsScreen()),
-      ),
-      GoRoute(
-        path: '/yields/new',
-        builder: (context, state) =>
-            const YieldConfigFormRouteScope(child: YieldConfigFormScreen()),
-      ),
-      GoRoute(
-        path: '/yields/:yieldId/edit',
-        builder: (context, state) => YieldConfigFormRouteScope(
-          child: YieldConfigFormScreen(
-            config: state.extra as YieldConfigModel?,
-          ),
-        ),
-      ),
+      // Templates y Yields movidos bajo /transactions como child routes
       GoRoute(
         path: '/settings/currency',
         builder: (context, state) =>

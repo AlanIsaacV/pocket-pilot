@@ -604,7 +604,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     }
     final amountCents = _amountCalculator.getAmountMinorForSaveRounded2();
     await context.push<bool>(
-      '/templates/new',
+      '/transactions/templates/new',
       extra: {
         'type': _type,
         'accountId': _selectedAccount!.id,

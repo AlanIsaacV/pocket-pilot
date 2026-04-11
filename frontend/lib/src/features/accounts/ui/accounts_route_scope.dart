@@ -31,9 +31,6 @@ import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
 import 'package:pocket_pilot/src/features/budgets/data/budget_local_store.dart';
 import 'package:pocket_pilot/src/features/budgets/data/budget_repository.dart';
 import 'package:pocket_pilot/src/features/budgets/ui/budget_view_model.dart';
-import 'package:pocket_pilot/src/features/debts/data/debt_local_store.dart';
-import 'package:pocket_pilot/src/features/debts/data/debt_repository.dart';
-import 'package:pocket_pilot/src/features/debts/ui/debt_view_model.dart';
 import 'package:pocket_pilot/src/features/goals/data/goal_local_store.dart';
 import 'package:pocket_pilot/src/features/goals/data/goal_repository.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
@@ -119,58 +116,6 @@ class AccountsRouteScope extends StatelessWidget {
               repository: repository,
               syncService: syncService,
             )..loadOnAppear();
-          },
-        ),
-        ChangeNotifierProvider(
-          create: (ctx) {
-            final db = ctx.read<DatabaseHelper>();
-            final outbox = ctx.read<SyncOutbox>();
-            final syncService = ctx.read<SyncService>();
-
-            final debtLocal = DebtLocalStore(db: db);
-            final accountLocal = AccountLocalStore(db: db);
-            final txnLocal = TransactionLocalStore(db: db);
-
-            final accountRepo = AccountRepository(
-              local: accountLocal,
-              outbox: outbox,
-            );
-            final txnRepo = TransactionRepository(
-              local: txnLocal,
-              outbox: outbox,
-            );
-            final debtRepo = DebtRepository(
-              transactionRepo: txnRepo,
-              accountRepo: accountRepo,
-              debtLocal: debtLocal,
-            );
-
-            return DebtViewModel(
-              repository: debtRepo,
-              syncService: syncService,
-            )..loadOnAppear();
-          },
-        ),
-        Provider(
-          create: (ctx) {
-            final db = ctx.read<DatabaseHelper>();
-            final outbox = ctx.read<SyncOutbox>();
-
-            final debtLocal = DebtLocalStore(db: db);
-            final accountLocal = AccountLocalStore(db: db);
-            final txnLocal = TransactionLocalStore(db: db);
-
-            return DebtRepository(
-              transactionRepo: TransactionRepository(
-                local: txnLocal,
-                outbox: outbox,
-              ),
-              accountRepo: AccountRepository(
-                local: accountLocal,
-                outbox: outbox,
-              ),
-              debtLocal: debtLocal,
-            );
           },
         ),
       ],

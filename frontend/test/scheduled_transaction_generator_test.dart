@@ -251,14 +251,12 @@ class _FakeAccounts implements AccountLookup {
 
 class _FakeCategories implements CategoryLookup {
   final Set<String> _activeIds;
-  final Map<String, String> _natures;
 
-  _FakeCategories(this._activeIds, [this._natures = const {}]);
+  _FakeCategories(this._activeIds);
 
   @override
   Future<bool> isActiveById(String id) async => _activeIds.contains(id);
 
   @override
-  Future<String> getDefaultNatureById(String id) async =>
-      _natures[id] ?? '';
+  Future<String> getDefaultNatureById(String id) async => '';
 }

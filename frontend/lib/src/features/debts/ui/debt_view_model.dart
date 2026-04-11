@@ -22,6 +22,7 @@ class DebtViewModel extends ChangeNotifier {
   String? errorMessage;
 
   DateTime? _lastSyncAt;
+  bool _disposed = false;
 
   DebtViewModel({
     required DebtRepository repository,
@@ -50,6 +51,16 @@ class DebtViewModel extends ChangeNotifier {
     return null;
   }
 
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void _safeNotify() {
+    if (!_disposed) notifyListeners();
+  }
+
   void loadOnAppear() {
     unawaited(_loadLocalThenMaybeSync());
   }
@@ -66,7 +77,7 @@ class DebtViewModel extends ChangeNotifier {
 
   Future<void> _reloadLocal() async {
     contacts = await _repository.getContactsBalances();
-    notifyListeners();
+    _safeNotify();
   }
 
   Future<void> _loadLocalThenMaybeSync() async {
@@ -86,7 +97,7 @@ class DebtViewModel extends ChangeNotifier {
   Future<void> _runSync() async {
     isLoading = contacts.isEmpty;
     isSyncing = true;
-    notifyListeners();
+    _safeNotify();
 
     try {
       await _syncService.sync();
@@ -98,7 +109,7 @@ class DebtViewModel extends ChangeNotifier {
     } finally {
       isLoading = false;
       isSyncing = false;
-      notifyListeners();
+      _safeNotify();
     }
   }
 }

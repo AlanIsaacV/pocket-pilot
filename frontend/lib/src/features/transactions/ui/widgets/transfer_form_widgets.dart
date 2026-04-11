@@ -27,6 +27,7 @@ class TransferCard extends StatelessWidget {
   final VoidCallback onAmountTap;
 
   const TransferCard({
+    super.key,
     required this.label,
     required this.account,
     required this.amountInput,
@@ -195,7 +196,7 @@ class TransferModeToggle extends StatelessWidget {
   final bool isRateMode;
   final ValueChanged<bool> onChanged;
 
-  const TransferModeToggle({required this.isRateMode, required this.onChanged});
+  const TransferModeToggle({super.key, required this.isRateMode, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -232,6 +233,7 @@ class TransferModeTab extends StatelessWidget {
   final VoidCallback onTap;
 
   const TransferModeTab({
+    super.key,
     required this.label,
     required this.isSelected,
     required this.onTap,
@@ -280,7 +282,7 @@ class TransferSplitDatesRow extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
 
-  const TransferSplitDatesRow({required this.value, required this.onChanged});
+  const TransferSplitDatesRow({super.key, required this.value, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {

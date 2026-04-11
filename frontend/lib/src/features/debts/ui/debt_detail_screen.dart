@@ -153,7 +153,7 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
             ? FloatingActionButton(
                 onPressed: () {
                   final vm = context.read<DebtViewModel>();
-                  context.push('/accounts/debts/new', extra: c).then((
+                  context.push('/transactions/debts/new', extra: c).then((
                     result,
                   ) async {
                     if (result == true && mounted) {
@@ -227,7 +227,7 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
 
     if (!mounted) return;
     final result = await context.push<bool>(
-      '/accounts/debts/new',
+      '/transactions/debts/new',
       extra: {'contact': _contact, 'out': pair.out, 'in': pair.inTxn},
     );
 

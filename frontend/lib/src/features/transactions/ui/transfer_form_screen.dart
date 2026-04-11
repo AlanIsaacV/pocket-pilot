@@ -723,7 +723,7 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
     }
     final parsedAmount = double.tryParse(_amountOutInput) ?? 0;
     final amountCents = parsedAmount > 0 ? (parsedAmount * 100).round() : null;
-    await context.push<bool>('/templates/new', extra: {
+    await context.push<bool>('/transactions/templates/new', extra: {
       'type': 'transfer_out',
       'accountId': _fromAccount!.id,
       'toAccountId': _toAccount?.id,

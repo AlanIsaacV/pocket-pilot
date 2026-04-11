@@ -655,8 +655,8 @@ class _TransactionTemplateFormScreenState
 
   Future<void> _openCategoryPicker() async {
     final basePath = _isEditMode
-        ? '/templates/${widget.template!.id}/edit/category'
-        : '/templates/new/category';
+        ? '/transactions/templates/${widget.template!.id}/edit/category'
+        : '/transactions/templates/new/category';
     final result = await context.push<CategoryModel>(
       basePath,
       extra: {'type': _type},

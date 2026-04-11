@@ -31,7 +31,7 @@ class TransactionTypeToggle extends StatelessWidget {
   final String value;
   final ValueChanged<String> onChanged;
 
-  const TransactionTypeToggle({required this.value, required this.onChanged});
+  const TransactionTypeToggle({super.key, required this.value, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +70,7 @@ class TransactionTypeOption extends StatelessWidget {
   final VoidCallback onTap;
 
   const TransactionTypeOption({
+    super.key,
     required this.label,
     required this.icon,
     required this.isSelected,
@@ -135,6 +136,7 @@ class TransactionCategorySection extends StatelessWidget {
   final VoidCallback onOpenPicker;
 
   const TransactionCategorySection({
+    super.key,
     required this.selectedCategory,
     required this.recentCategories,
     required this.onSelect,

@@ -24,6 +24,7 @@ class TransactionsViewModel extends ChangeNotifier {
   String? errorMessage;
 
   DateTime? _lastSyncAt;
+  bool _disposed = false;
 
   TransactionsViewModel({
     required TransactionRepository repository,
@@ -41,8 +42,13 @@ class TransactionsViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _filterViewModel.removeListener(_onFilterChanged);
     super.dispose();
+  }
+
+  void _safeNotify() {
+    if (!_disposed) notifyListeners();
   }
 
   // ----------------------------------------------------------
@@ -100,7 +106,7 @@ class TransactionsViewModel extends ChangeNotifier {
     transactions = await _repository.getTransactions(
       filter: _filterViewModel.resolvedFilter,
     );
-    notifyListeners();
+    _safeNotify();
   }
 
   Future<void> _loadLocalThenMaybeSync() async {
@@ -120,7 +126,7 @@ class TransactionsViewModel extends ChangeNotifier {
   Future<void> _runSync() async {
     isLoading = transactions.isEmpty;
     isSyncing = true;
-    notifyListeners();
+    _safeNotify();
 
     try {
       await _syncService.sync();
@@ -134,7 +140,7 @@ class TransactionsViewModel extends ChangeNotifier {
     } finally {
       isLoading = false;
       isSyncing = false;
-      notifyListeners();
+      _safeNotify();
     }
   }
 

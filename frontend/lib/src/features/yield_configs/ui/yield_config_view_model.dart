@@ -26,12 +26,23 @@ class YieldConfigViewModel extends ChangeNotifier {
   String? errorMessage;
 
   DateTime? _lastSyncAt;
+  bool _disposed = false;
 
   YieldConfigViewModel({
     required YieldConfigRepository repository,
     required SyncService syncService,
   })  : _repository = repository,
         _syncService = syncService;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void _safeNotify() {
+    if (!_disposed) notifyListeners();
+  }
 
   // ----------------------------------------------------------
   // API pública — carga & sync
@@ -54,7 +65,7 @@ class YieldConfigViewModel extends ChangeNotifier {
 
   Future<void> _reloadLocal() async {
     configs = await _repository.getConfigs();
-    notifyListeners();
+    _safeNotify();
   }
 
   Future<void> _loadLocalThenMaybeSync() async {
@@ -74,7 +85,7 @@ class YieldConfigViewModel extends ChangeNotifier {
   Future<void> _runSync() async {
     isLoading = configs.isEmpty;
     isSyncing = true;
-    notifyListeners();
+    _safeNotify();
 
     try {
       await _syncService.sync();
@@ -86,7 +97,7 @@ class YieldConfigViewModel extends ChangeNotifier {
     } finally {
       isLoading = false;
       isSyncing = false;
-      notifyListeners();
+      _safeNotify();
     }
   }
 }

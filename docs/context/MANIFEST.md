@@ -16,12 +16,13 @@ Before starting any task, identify the relevant domain (Backend, Frontend, or Pr
 - [architecture/yield_configs_and_interest_generation.md](architecture/yield_configs_and_interest_generation.md) - Yield config schema/contracts, local interest generation with deterministic UUIDv5, maturity/auto-renew behavior, `transactions.yield_id` linkage, and sync order integration.
 - [architecture/goals_and_liquidity.md](architecture/goals_and_liquidity.md) - Goals schema/contracts, computed properties (progress, monthly quota, overdue), liquidity concept (deferred), and integration points for when liquidity is available.
 - [architecture/budgets.md](architecture/budgets.md) - Budgets schema/contracts (with visual-only `currency_code`), dynamic spend calculation from transactions, BudgetStatus DTO, UI integration as third tab in AccountsScreen, category picker via `CategoryPickerScreen`.
+- [architecture/accounts.md](architecture/accounts.md) - Account types (type-specific fields, editable type with orphaned field cleanup), archive/restore (soft-delete reinterpretation, no permanent deletion), accounts screen structure (type-grouped sections, archived section with restore).
 - [architecture/auth.md](architecture/auth.md) - Custom auth with Google/Apple social login, JWKS validation, JWT access tokens, refresh token rotation, account linking by email, DB wipe on user change, platform-specific login (Apple iOS only).
 - [architecture/financial_nature_and_auto_charge.md](architecture/financial_nature_and_auto_charge.md) - Financial nature classification (REQUIRED, OBLIGATION, LIFESTYLE, ACTIVE, PASSIVE, WINDFALL), default-with-override pattern on categories/transactions, auto charge indicator and active/inactive toggle on transaction templates, generator compliance.
 - [architecture/proactive_notifications.md](architecture/proactive_notifications.md) - Offline-first proactive notifications: date projection engine from accounts/templates, persistent notification center with read/deleted state (migration 004), OS local notification scheduler (64-day window, idempotent clean-slate), bell widget with badge, deep linking.
 
 ### Utility Scripts
-- [architecture/frontend_flutter.md#python-scripts-bank-statement-parser](architecture/frontend_flutter.md#python-scripts-bank-statement-parser) - Python scripts for parsing bank statement PDFs (BBVA TC) into CSV format for app import. Located in `scripts/`.
+- [architecture/frontend_flutter.md#python-scripts-bank-statement-parser](architecture/frontend_flutter.md#python-scripts-bank-statement-parser) - Python scripts for parsing bank statement PDFs (BBVA TC, BBVA Debit, RappiCard) into CSV format for app import. Located in `scripts/`.
 
 ### Development Conventions
 - [conventions/coding_standards.md](conventions/coding_standards.md) - Naming conventions, error handling, and style guides for Go and Dart.

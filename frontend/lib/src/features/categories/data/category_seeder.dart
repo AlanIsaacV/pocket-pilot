@@ -82,6 +82,7 @@ class CategorySeeder {
         parentId: null,
         inheritedType: null,
         inheritedColor: '',
+        inheritedNature: '',
         now: now,
         models: models,
       );
@@ -99,6 +100,7 @@ class CategorySeeder {
     required String? parentId,
     required String? inheritedType,
     required String inheritedColor,
+    required String inheritedNature,
     required DateTime now,
     required List<CategoryModel> models,
   }) {
@@ -107,6 +109,7 @@ class CategorySeeder {
     final type = node['type'] as String? ?? inheritedType!;
     final rawColor = node['color'] as String? ?? inheritedColor;
     final color = rawColor.replaceAll('#', '');
+    final defaultNature = node['default_nature'] as String? ?? inheritedNature;
 
     models.add(CategoryModel(
       id: id,
@@ -115,6 +118,7 @@ class CategorySeeder {
       icon: CategoryIconData.resolveIcon(node['icon'] as String? ?? ''),
       color: color,
       parentId: parentId,
+      defaultNature: defaultNature,
       createdAt: now,
       updatedAt: now,
     ));
@@ -126,6 +130,7 @@ class CategorySeeder {
         parentId: id,
         inheritedType: type,
         inheritedColor: color,
+        inheritedNature: defaultNature,
         now: now,
         models: models,
       );

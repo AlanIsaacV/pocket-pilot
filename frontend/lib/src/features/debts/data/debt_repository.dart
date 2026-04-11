@@ -276,5 +276,5 @@ class DebtRepository {
       _debtLocal.searchContacts(query);
 
   Future<void> forgiveDebt(String accountId) =>
-      _accountRepo.deleteAccount(accountId);
+      _accountRepo.archiveAccount(accountId);
 }

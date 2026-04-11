@@ -296,8 +296,8 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar cuenta'),
-        content: Text('Se eliminará la cuenta "${account.name}".'),
+        title: const Text('Archivar cuenta'),
+        content: Text('Se archivará la cuenta "${account.name}".'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -305,10 +305,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
+            child: const Text('Archivar'),
           ),
         ],
       ),
@@ -317,13 +314,13 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
 
     setState(() => _isSaving = true);
     try {
-      await context.read<AccountsViewModel>().deleteAccount(account.id);
+      await context.read<AccountsViewModel>().archiveAccount(account.id);
       if (!mounted) return;
       context.pop(true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo eliminar la cuenta: $e')),
+        SnackBar(content: Text('No se pudo archivar la cuenta: $e')),
       );
     } finally {
       if (mounted) {

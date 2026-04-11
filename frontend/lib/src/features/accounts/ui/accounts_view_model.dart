@@ -31,6 +31,7 @@ class AccountsViewModel extends ChangeNotifier {
   final SyncService _syncService;
 
   List<AccountModel> accounts = [];
+  List<AccountModel> archivedAccounts = [];
   bool isLoading = false;
   bool isSyncing = false;
   String? errorMessage;
@@ -96,8 +97,7 @@ class AccountsViewModel extends ChangeNotifier {
       );
     }
 
-    accounts = await _loadAccounts();
-    _safeNotify();
+    await _reloadAll();
   }
 
   Future<void> updateAccount({
@@ -160,8 +160,7 @@ class AccountsViewModel extends ChangeNotifier {
       );
     }
 
-    accounts = await _loadAccounts();
-    _safeNotify();
+    await _reloadAll();
   }
 
   Future<int?> getInitialBalanceCents(AccountModel account) async {
@@ -173,10 +172,30 @@ class AccountsViewModel extends ChangeNotifier {
     return transaction?.amount;
   }
 
-  Future<void> deleteAccount(String id) async {
-    await _repository.deleteAccount(id);
-    accounts = await _loadAccounts();
-    _safeNotify();
+  Map<String, List<AccountModel>> get accountsByType {
+    final grouped = <String, List<AccountModel>>{};
+    for (final account in accounts) {
+      grouped.putIfAbsent(account.type, () => []).add(account);
+    }
+    return grouped;
+  }
+
+  Map<String, List<AccountModel>> get archivedAccountsByType {
+    final grouped = <String, List<AccountModel>>{};
+    for (final account in archivedAccounts) {
+      grouped.putIfAbsent(account.type, () => []).add(account);
+    }
+    return grouped;
+  }
+
+  Future<void> archiveAccount(String id) async {
+    await _repository.archiveAccount(id);
+    await _reloadAll();
+  }
+
+  Future<void> restoreAccount(String id) async {
+    await _repository.restoreAccount(id);
+    await _reloadAll();
   }
 
   @override
@@ -199,9 +218,20 @@ class AccountsViewModel extends ChangeNotifier {
         .toList();
   }
 
-  Future<void> _loadLocalThenMaybeSync() async {
+  Future<List<AccountModel>> _loadArchivedAccounts() async {
+    return (await _repository.getArchivedAccounts())
+        .where((a) => a.type != 'contact')
+        .toList();
+  }
+
+  Future<void> _reloadAll() async {
     accounts = await _loadAccounts();
+    archivedAccounts = await _loadArchivedAccounts();
     _safeNotify();
+  }
+
+  Future<void> _loadLocalThenMaybeSync() async {
+    await _reloadAll();
     await _maybeSyncRemote();
   }
 
@@ -222,6 +252,7 @@ class AccountsViewModel extends ChangeNotifier {
     try {
       await _syncService.sync();
       accounts = await _loadAccounts();
+      archivedAccounts = await _loadArchivedAccounts();
       _lastSyncAt = DateTime.now();
       errorMessage = null;
     } catch (e) {

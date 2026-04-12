@@ -297,14 +297,26 @@ scripts/
 ├── parsers/
 │   ├── __init__.py             # detect_bank() + parser registry
 │   ├── base.py                 # Transaction dataclass + StatementParser ABC
-│   └── bbva_tc.py              # BBVA credit card (text regex, not table extraction)
-├── categorizer.py              # 130+ keyword→category mappings (first match wins)
+│   ├── bbva_tc.py              # BBVA credit card
+│   ├── bbva_deb.py             # BBVA debit (Libretón)
+│   └── rappi.py                # RappiCard (Banorte)
+├── categorizer.py              # 190+ keyword→category mappings (first match wins)
 └── csv_writer.py               # Transaction list → 11-column CSV
 ```
 
+### Supported Banks
+
+| Bank ID    | Product              | Date format    | Type detection        | Account default |
+|------------|----------------------|----------------|-----------------------|-----------------|
+| `bbva_tc`  | BBVA credit card     | `DD-mmm-YYYY`  | `+`/`-` sign          | BBVA TC         |
+| `bbva_deb` | BBVA Libretón debit  | `DD/MMM` (no year) | Description keywords  | BBVA Deb        |
+| `rappi`    | RappiCard (Banorte)  | `YYYY-MM-DD`   | `+$`/`-$` sign        | Rappi           |
+
 ### Key Behaviors
 
-- **Bank detection:** reads first page text, matches keywords to select parser.
-- **BBVA TC parser:** `pdfplumber` + `page.extract_text()` + line-by-line regex. Spanish month map (`ene→1..dic→12`). Skips MSI monthly installment payments (`NN DE NN` prefix) but keeps original purchases (`A XX MESES S/I`) with extracted `installments_count`.
+- **Bank detection:** reads first page text, matches keywords to select parser. Checks "rappicard" first, then "bbva" sub-types.
+- **BBVA TC parser:** `page.extract_text()` + line-by-line regex. Spanish month map (`ene→1..dic→12`). Skips MSI installment payments (`NN DE NN` prefix) but keeps original purchases with `installments_count`.
+- **BBVA Deb parser:** full-text extraction (period header needed before parsing dates). Two-pass: collects section lines, then groups into multi-line transaction blocks. Year resolved from `Periodo DEL DD/MM/YYYY AL DD/MM/YYYY` header. Notes combine description + user concept from SPEI continuation lines (`"SPEI ENVIADO X | concept"`).
+- **Rappi parser:** page-by-page `extract_text()` + regex. ISO dates. Strips `; RFC: XXX` suffix from descriptions. Skips MSI section entirely.
 - **Categorizer:** ordered `(keyword, category)` tuples matched against uppercase concept. More specific keywords first. Unmatched → empty string.
-- **Extending:** add `parsers/<bank>.py` implementing `StatementParser`, register in `parsers/__init__.py`.
+- **Extending:** add `parsers/<bank>.py` implementing `StatementParser`, register in `parsers/__init__.py`, add default account in `parse_statement.py`.

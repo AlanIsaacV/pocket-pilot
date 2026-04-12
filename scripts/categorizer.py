@@ -27,6 +27,7 @@ KEYWORD_MAP = [
     ("AT&T", "Phone"),
     ("MOVISTAR", "Phone"),
     ("UNEFON", "Phone"),
+    ("TIEMPO AIRE", "Phone"),
 
     # ── Software & Cloud ──
     ("APPLE.COM", "Software"),
@@ -171,6 +172,7 @@ KEYWORD_MAP = [
     ("CINEMEX", "Cine"),
 
     # ── Gaming ──
+    ("MINECRAFT", "Videojuegos"),
     ("STEAM", "Videojuegos"),
     ("PLAYSTATION", "Videojuegos"),
     ("XBOX", "Videojuegos"),
@@ -186,6 +188,7 @@ KEYWORD_MAP = [
 
     # ── Payments to card ──
     ("PAGO TDC", "Transferencias"),
+    ("PAGO POR SPEI", "Transferencias"),
     ("BMOVIL", "Transferencias"),
     ("SPEI", "Transferencias"),
     ("TRANSFERENCIA", "Transferencias"),

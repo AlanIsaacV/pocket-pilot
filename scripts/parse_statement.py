@@ -11,6 +11,8 @@ from parsers import detect_bank, get_parser
 # Default account names per bank
 DEFAULT_ACCOUNTS = {
     "bbva_tc": "BBVA TC",
+    "bbva_deb": "BBVA Deb",
+    "rappi": "Rappi",
 }
 
 

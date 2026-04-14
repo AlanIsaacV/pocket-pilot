@@ -58,6 +58,40 @@ Appears under "Gastos por naturaleza" with label "Ajuste" and `catSapphire` colo
 
 Used by: `transaction_form_screen.dart`, `transaction_template_form_screen.dart`, `dashboard_screen.dart` (`_NatureSpendBreakdown`).
 
+## Navigation & Editing
+
+### Transaction Tap Routing (`_handleTransactionTap`)
+
+Adjustments must open in the **transaction editor**, never in the account editor. The routing logic checks `nature == 'adjustment'` *before* the initial-balance heuristic to short-circuit the entire flow:
+
+```
+tap → isTransfer? → transfer editor
+    → nature == 'adjustment'? → transaction editor  ← guard
+    → isInitialBalance? → account editor
+    → otherwise → transaction editor
+```
+
+### Initial-Balance Detection (`isInitialBalanceTransaction` / `queryInitialBalanceRow`)
+
+Both initial balances and adjustments share `categoryId = null` + `linkedTransactionId = null` + potentially the same `type`. Without filtering, the `queryInitialBalanceRow` SQL (which returns the oldest matching row) can return an adjustment instead of the real initial balance.
+
+**Guards in place (three layers):**
+1. `_handleTransactionTap`: skips the initial-balance check entirely when `nature == 'adjustment'`
+2. `isInitialBalanceTransaction` (view model): early-returns `false` when `nature == 'adjustment'`
+3. `queryInitialBalanceRow` (SQL): `COALESCE(nature, '') != 'adjustment'` excludes adjustments from the candidate set
+
+### Transaction Form (`TransactionFormScreen`)
+
+Adjustments and initial balances have `categoryId = null`. The form allows saving without a category via `_isCategoryOptional`:
+- `nature == 'adjustment'` → true
+- Edit mode with original `categoryId == null` → true (covers initial balances)
+
+When `_isCategoryOptional` is true, the category picker section is hidden.
+
+## CreditCardOracle Integration
+
+The oracle's `_isPayment()` method excludes income adjustments (`nature == 'adjustment'`). Positive income adjustments represent prior-period balance corrections, not actual payments for the current cycle. Expense adjustments are still counted as charges (they represent unregistered purchases). This requires the `nature` field on `CreditCardMovementDTO`.
+
 ## Backward Compatibility
 
 Existing adjustment transactions retain `nature: ''` — only new adjustments get `'adjustment'`. No data migration is required. Old adjustments appear as "Sin definir" in the nature breakdown and "Sin categoría" in the transaction list.

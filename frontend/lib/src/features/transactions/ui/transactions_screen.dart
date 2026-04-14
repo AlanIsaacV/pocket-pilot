@@ -393,25 +393,28 @@ class _TransactionList extends StatelessWidget {
       return;
     }
 
-    final account = await _findAccountById(context, transaction.accountId);
-    if (!context.mounted) return;
-
-    if (account != null) {
-      final isInitial = await vm.isInitialBalanceTransaction(
-        transaction: transaction,
-        accountType: account.type,
-      );
+    // Adjustments always open in the transaction editor, never in account edit.
+    if (transaction.nature != 'adjustment') {
+      final account = await _findAccountById(context, transaction.accountId);
       if (!context.mounted) return;
 
-      if (isInitial) {
-        context.push('/accounts/${account.id}/edit', extra: account).then((
-          result,
-        ) {
-          if (result == true && context.mounted) {
-            vm.loadOnAppear();
-          }
-        });
-        return;
+      if (account != null) {
+        final isInitial = await vm.isInitialBalanceTransaction(
+          transaction: transaction,
+          accountType: account.type,
+        );
+        if (!context.mounted) return;
+
+        if (isInitial) {
+          context.push('/accounts/${account.id}/edit', extra: account).then((
+            result,
+          ) {
+            if (result == true && context.mounted) {
+              vm.loadOnAppear();
+            }
+          });
+          return;
+        }
       }
     }
 

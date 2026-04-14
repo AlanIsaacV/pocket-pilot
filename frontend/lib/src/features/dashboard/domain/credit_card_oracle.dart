@@ -81,8 +81,8 @@ class CreditCardOracle {
     required int statementDay,
     required int paymentDueDay,
   }) {
-    final dueDate = _clampedDate(month.year, month.month, paymentDueDay);
-    final closeCurr = _latestCloseOnOrBefore(dueDate, statementDay);
+    // The billing cycle closing in the target month.
+    final closeCurr = _clampedDate(month.year, month.month, statementDay);
     final closePrevMonth = _addMonths(closeCurr, -1);
     final closePrev = _clampedDate(
       closePrevMonth.year,
@@ -90,13 +90,16 @@ class CreditCardOracle {
       statementDay,
     );
 
+    // Can only count charges that have already happened.
+    final chargeCutoff = nowUtc.isBefore(closeCurr) ? nowUtc : closeCurr;
+
     var gross = 0;
     for (final movement in movements) {
-      if (!_isCharge(movement.type)) continue;
+      if (!_isCharge(movement)) continue;
       final txDate = DateTime.parse(movement.date).toUtc();
 
       if (movement.installmentsCount == 1) {
-        if (txDate.isAfter(closePrev) && !txDate.isAfter(closeCurr)) {
+        if (txDate.isAfter(closePrev) && !txDate.isAfter(chargeCutoff)) {
           gross += movement.amountCents;
         }
         continue;
@@ -113,16 +116,18 @@ class CreditCardOracle {
       }
     }
 
-    final monthStart = DateTime.utc(month.year, month.month, 1);
-    final paymentWindowEnd = nowUtc.isBefore(dueDate) ? nowUtc : dueDate;
+    // Payments made after the previous cycle's due date reduce the upcoming
+    // obligation.  Anything before that date is assumed to cover a prior bill.
+    final prevDueDate = _clampedDate(month.year, month.month, paymentDueDay);
+    final paymentWindowEnd = nowUtc.isBefore(closeCurr) ? nowUtc : closeCurr;
 
     var payments = 0;
-    if (!paymentWindowEnd.isBefore(monthStart)) {
+    if (!paymentWindowEnd.isBefore(prevDueDate)) {
       for (final movement in movements) {
-        if (!_isPayment(movement.type)) continue;
+        if (!_isPayment(movement)) continue;
         final txDate = DateTime.parse(movement.date).toUtc();
         final inWindow =
-            !txDate.isBefore(monthStart) && !txDate.isAfter(paymentWindowEnd);
+            !txDate.isBefore(prevDueDate) && !txDate.isAfter(paymentWindowEnd);
         if (inWindow) {
           payments += movement.amountCents;
         }
@@ -148,7 +153,7 @@ class CreditCardOracle {
 
     var gross = 0;
     for (final movement in movements) {
-      if (!_isCharge(movement.type)) continue;
+      if (!_isCharge(movement)) continue;
       final txDate = DateTime.parse(movement.date).toUtc();
 
       if (movement.installmentsCount == 1) {
@@ -183,7 +188,7 @@ class CreditCardOracle {
     var payments = 0;
     if (!paymentWindowEnd.isBefore(monthStart)) {
       for (final movement in movements) {
-        if (!_isPayment(movement.type)) continue;
+        if (!_isPayment(movement)) continue;
         final txDate = DateTime.parse(movement.date).toUtc();
         final inWindow =
             !txDate.isBefore(monthStart) && !txDate.isAfter(paymentWindowEnd);
@@ -197,13 +202,6 @@ class CreditCardOracle {
     return net > 0 ? net : 0;
   }
 
-  DateTime _latestCloseOnOrBefore(DateTime date, int statementDay) {
-    final closeThisMonth = _clampedDate(date.year, date.month, statementDay);
-    if (!closeThisMonth.isAfter(date)) return closeThisMonth;
-    final prev = _addMonths(date, -1);
-    return _clampedDate(prev.year, prev.month, statementDay);
-  }
-
   DateTime _firstCloseOnOrAfter(DateTime txDate, int statementDay) {
     final closeThisMonth = _clampedDate(
       txDate.year,
@@ -215,10 +213,16 @@ class CreditCardOracle {
     return _clampedDate(next.year, next.month, statementDay);
   }
 
-  static bool _isCharge(String type) =>
-      type == 'expense' || type == 'transfer_out';
-  static bool _isPayment(String type) =>
-      type == 'income' || type == 'transfer_in';
+  static bool _isCharge(CreditCardMovementDTO m) =>
+      m.type == 'expense' || m.type == 'transfer_out';
+
+  /// Income adjustments represent prior-period balance corrections, not
+  /// actual payments for the current cycle.
+  static bool _isPayment(CreditCardMovementDTO m) {
+    if (m.type != 'income' && m.type != 'transfer_in') return false;
+    if (m.nature == 'adjustment') return false;
+    return true;
+  }
 
   static int _installmentAmount({
     required int amountCents,

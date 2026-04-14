@@ -45,7 +45,7 @@ CREATE TABLE accounts (
 CREATE INDEX idx_accounts_user_id ON accounts (user_id) WHERE deleted_at IS NULL;
 
 
-CREATE TYPE nature_type AS ENUM ('required','obligation','lifestyle','active','passive','windfall', '');
+CREATE TYPE nature_type AS ENUM ('required','obligation','lifestyle','active','passive','windfall','adjustment','');
 CREATE TYPE category_type AS ENUM ('income', 'expense');
 CREATE TABLE categories (
     id             uuid PRIMARY KEY       DEFAULT gen_random_uuid(),

@@ -289,7 +289,8 @@ class DashboardLocalStore {
         t.type,
         t.amount_cents,
         t.installments_count,
-        t.date
+        t.date,
+        t.nature
       FROM transactions t
       INNER JOIN accounts a ON a.id = t.account_id
       WHERE ${where.toString()}

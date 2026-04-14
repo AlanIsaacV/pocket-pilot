@@ -36,7 +36,31 @@ DashboardLocalStore (SQL queries)
 
 ## Credit Card Payment Calculation
 
-`CreditCardOracle.estimateNetMonthlyObligation()` returns both `netByCurrency` (used by metrics for safe-to-spend) and `netByAccountId` (used by the credit card section). The oracle estimates charges for the current statement cycle, accounts for installments (MSI), and deducts payments made so far.
+`CreditCardOracle.estimateNetMonthlyObligation()` returns both `netByCurrency` (used by metrics for safe-to-spend) and `netByAccountId` (used by the credit card section).
+
+### Cycle Mode (statement_day + payment_due_day defined)
+
+The oracle estimates the **currently accumulating** billing cycle — charges since the last statement date through the next statement date.
+
+For `targetMonth = April`, `statementDay = 24`, `paymentDueDay = 14`:
+- `closeCurr` = Apr 24 (statement date of target month)
+- `closePrev` = Mar 24 (previous statement date)
+- **Charge window**: (Mar 24, min(now, Apr 24)] — one-shot charges + MSI installments
+- **Payment window**: [Apr 14, min(now, Apr 24)] — only payments after the previous due date count (earlier payments are assumed to cover the prior bill)
+
+Key rules:
+- **`chargeCutoff = min(now, closeCurr)`**: mid-cycle projections only count charges up to today
+- **`_isCharge(m)`**: `expense` or `transfer_out` (includes expense adjustments)
+- **`_isPayment(m)`**: `income` or `transfer_in`, **excluding** `nature == 'adjustment'` (positive adjustments are prior-period corrections, not current payments)
+- **MSI**: `_firstCloseOnOrAfter(txDate, statementDay)` determines which statement cycle each installment lands in; `_installmentAmount()` assigns the residual to the first installment
+
+### Fallback Calendar Mode (no statement/payment days)
+
+Uses previous calendar month for charges, current month for payments. Same `_isCharge`/`_isPayment` rules.
+
+### Data Flow
+
+`CreditCardMovementDTO` includes `nature` (from `t.nature` in `getCreditCardMovementsForProjection` SQL) to support the adjustment filtering.
 
 ## Tag Query
 

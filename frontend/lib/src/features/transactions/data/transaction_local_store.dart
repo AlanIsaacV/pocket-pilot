@@ -59,6 +59,7 @@ class TransactionLocalStore {
   /// - mismo tipo esperado segun la cuenta,
   /// - sin categoria,
   /// - no es transferencia (linked_transaction_id NULL),
+  /// - no es ajuste de saldo (nature != 'adjustment'),
   /// - activa (deleted_at IS NULL).
   ///
   /// Si hay mas de una candidata, retorna la mas antigua.
@@ -70,7 +71,7 @@ class TransactionLocalStore {
     final rows = await db.query(
       'transactions',
       where:
-          'account_id = ? AND type = ? AND category_id IS NULL AND linked_transaction_id IS NULL AND deleted_at IS NULL',
+          "account_id = ? AND type = ? AND category_id IS NULL AND linked_transaction_id IS NULL AND deleted_at IS NULL AND COALESCE(nature, '') != 'adjustment'",
       whereArgs: [accountId, type],
       orderBy: 'created_at ASC, id ASC',
       limit: 1,

@@ -79,6 +79,7 @@ class TransactionsViewModel extends ChangeNotifier {
     if (transaction.isTransfer) return false;
     if (transaction.categoryId != null) return false;
     if (transaction.linkedTransactionId != null) return false;
+    if (transaction.nature == 'adjustment') return false;
 
     final expectedType = _initialBalanceTypeForAccount(accountType);
     if (transaction.type != expectedType) return false;

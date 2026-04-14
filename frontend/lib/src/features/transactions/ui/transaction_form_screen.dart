@@ -549,7 +549,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         await repo.updateTransaction(
           id: widget.transaction!.id,
           accountId: _selectedAccount!.id,
-          categoryId: _selectedCategory!.id,
+          categoryId: _selectedCategory?.id,
           templateId: widget.transaction!.templateId,
           type: _type,
           amountMinor: amountCents,
@@ -566,7 +566,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         await repo.createTransaction(
           id: _uuid.v4(),
           accountId: _selectedAccount!.id,
-          categoryId: _selectedCategory!.id,
+          categoryId: _selectedCategory?.id,
           type: _type,
           amountMinor: amountCents,
           installmentsCount: installmentsCount,
@@ -688,10 +688,16 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     return '$count meses';
   }
 
+  bool get _isCategoryOptional {
+    if (_nature == 'adjustment') return true;
+    if (_isEditMode && widget.transaction!.categoryId == null) return true;
+    return false;
+  }
+
   bool get _canSave =>
       _amountCalculator.getAmountMinorForSaveRounded2() != 0 &&
       _selectedAccount != null &&
-      _selectedCategory != null &&
+      (_selectedCategory != null || _isCategoryOptional) &&
       !_isSaving;
 
   bool _isDigit(int codeUnit) => codeUnit >= 48 && codeUnit <= 57;
@@ -897,19 +903,20 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                     onTap: _showAccountSheet,
                   ),
 
-                  // Categoría
-                  TransactionCategorySection(
-                    selectedCategory: _selectedCategory,
-                    recentCategories: _recentCategories,
-                    onSelect: (c) {
-                      _commitPendingAmountIfAny();
-                      setState(() {
-                        _selectedCategory = c;
-                        _nature = c.defaultNature;
-                      });
-                    },
-                    onOpenPicker: _openCategoryPicker,
-                  ),
+                  // Categoría (hidden for adjustments / initial balances)
+                  if (!_isCategoryOptional)
+                    TransactionCategorySection(
+                      selectedCategory: _selectedCategory,
+                      recentCategories: _recentCategories,
+                      onSelect: (c) {
+                        _commitPendingAmountIfAny();
+                        setState(() {
+                          _selectedCategory = c;
+                          _nature = c.defaultNature;
+                        });
+                      },
+                      onOpenPicker: _openCategoryPicker,
+                    ),
 
                   // Nota
                   NoteField(

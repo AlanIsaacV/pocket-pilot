@@ -2,6 +2,8 @@ import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/account_balance_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/category_spend_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_account_cycle_dto.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/nature_spend_dto.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/tag_spend_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_movement_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/goal_target_dto.dart';
 
@@ -109,6 +111,108 @@ class DashboardLocalStore {
       GROUP BY t.category_id, t.currency_code
     ''', args);
     return rows.map(CategorySpendDTO.fromMap).toList();
+  }
+
+  /// Returns the net spend per nature for the given date range.
+  ///
+  /// Same accounting rules as [getMonthlySpendByCategory] but grouped
+  /// by `t.nature` instead of category.
+  Future<List<NatureSpendDTO>> getMonthlySpendByNature(
+    String startDate,
+    String endDate, {
+    Set<String>? accountIds,
+    String? currencyCode,
+  }) async {
+    final db = await _db.database;
+    final where = StringBuffer(
+      "t.deleted_at IS NULL"
+      " AND t.status = 'cleared'"
+      " AND t.type IN ('expense', 'income')"
+      ' AND t.date >= ?'
+      ' AND t.date <= ?',
+    );
+    final args = <dynamic>[startDate, endDate];
+
+    if (accountIds != null && accountIds.isNotEmpty) {
+      final placeholders = List.filled(accountIds.length, '?').join(',');
+      where.write(' AND t.account_id IN ($placeholders)');
+      args.addAll(accountIds);
+    }
+
+    if (currencyCode != null) {
+      where.write(' AND t.currency_code = ?');
+      args.add(currencyCode);
+    }
+
+    final rows = await db.rawQuery('''
+      SELECT
+        t.nature,
+        t.currency_code,
+        COALESCE(SUM(
+          CASE
+            WHEN t.type = 'expense' THEN t.amount_cents
+            WHEN t.type = 'income' THEN -t.amount_cents
+            ELSE 0
+          END
+        ), 0) AS spent_cents
+      FROM transactions t
+      WHERE ${where.toString()}
+      GROUP BY t.nature, t.currency_code
+    ''', args);
+    return rows.map(NatureSpendDTO.fromMap).toList();
+  }
+
+  /// Returns the net spend per tag for the given date range.
+  ///
+  /// Uses `json_each` to flatten the JSON tags array so each tag
+  /// produces its own row. Same accounting rules as the category
+  /// and nature variants.
+  Future<List<TagSpendDTO>> getMonthlySpendByTag(
+    String startDate,
+    String endDate, {
+    Set<String>? accountIds,
+    String? currencyCode,
+  }) async {
+    final db = await _db.database;
+    final where = StringBuffer(
+      "t.deleted_at IS NULL"
+      " AND t.status = 'cleared'"
+      " AND t.type IN ('expense', 'income')"
+      ' AND t.date >= ?'
+      ' AND t.date <= ?'
+      " AND t.tags IS NOT NULL"
+      " AND t.tags != '[]'"
+      " AND t.tags != ''",
+    );
+    final args = <dynamic>[startDate, endDate];
+
+    if (accountIds != null && accountIds.isNotEmpty) {
+      final placeholders = List.filled(accountIds.length, '?').join(',');
+      where.write(' AND t.account_id IN ($placeholders)');
+      args.addAll(accountIds);
+    }
+
+    if (currencyCode != null) {
+      where.write(' AND t.currency_code = ?');
+      args.add(currencyCode);
+    }
+
+    final rows = await db.rawQuery('''
+      SELECT
+        j.value AS tag_name,
+        t.currency_code,
+        COALESCE(SUM(
+          CASE
+            WHEN t.type = 'expense' THEN t.amount_cents
+            WHEN t.type = 'income' THEN -t.amount_cents
+            ELSE 0
+          END
+        ), 0) AS spent_cents
+      FROM transactions t, json_each(t.tags) j
+      WHERE ${where.toString()}
+      GROUP BY j.value, t.currency_code
+    ''', args);
+    return rows.map(TagSpendDTO.fromMap).toList();
   }
 
   /// Returns the sum of `target_amount_cents` for all active goals,

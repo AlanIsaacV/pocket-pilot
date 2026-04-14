@@ -74,6 +74,8 @@ func financialNatureToString(n pb.FinancialNature) string {
 		return "passive"
 	case pb.FinancialNature_NATURE_WINDFALL:
 		return "windfall"
+	case pb.FinancialNature_NATURE_ADJUSTMENT:
+		return "adjustment"
 	default:
 		return ""
 	}
@@ -93,6 +95,8 @@ func stringToFinancialNature(s string) pb.FinancialNature {
 		return pb.FinancialNature_NATURE_PASSIVE
 	case "windfall":
 		return pb.FinancialNature_NATURE_WINDFALL
+	case "adjustment":
+		return pb.FinancialNature_NATURE_ADJUSTMENT
 	default:
 		return pb.FinancialNature_NATURE_UNSPECIFIED
 	}

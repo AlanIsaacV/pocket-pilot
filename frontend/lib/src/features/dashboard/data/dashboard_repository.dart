@@ -2,8 +2,11 @@ import 'package:pocket_pilot/src/features/dashboard/data/dashboard_local_store.d
 import 'package:pocket_pilot/src/features/dashboard/domain/account_balance_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/category_spend_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_oracle.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_payment_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/dashboard_metrics.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/goal_target_dto.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/nature_spend_dto.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/tag_spend_dto.dart';
 
 class DashboardRepository {
   final DashboardLocalStore _local;
@@ -28,6 +31,30 @@ class DashboardRepository {
     Set<String>? accountIds,
     String? currencyCode,
   }) => _local.getMonthlySpendByCategory(
+    startDate,
+    endDate,
+    accountIds: accountIds,
+    currencyCode: currencyCode,
+  );
+
+  Future<List<NatureSpendDTO>> getMonthlySpendByNature(
+    String startDate,
+    String endDate, {
+    Set<String>? accountIds,
+    String? currencyCode,
+  }) => _local.getMonthlySpendByNature(
+    startDate,
+    endDate,
+    accountIds: accountIds,
+    currencyCode: currencyCode,
+  );
+
+  Future<List<TagSpendDTO>> getMonthlySpendByTag(
+    String startDate,
+    String endDate, {
+    Set<String>? accountIds,
+    String? currencyCode,
+  }) => _local.getMonthlySpendByTag(
     startDate,
     endDate,
     accountIds: accountIds,
@@ -116,6 +143,56 @@ class DashboardRepository {
         safeToSpendCents: safeToSpend,
         buyingPowerCents: buyingPower,
       );
+    }
+
+    return result;
+  }
+
+  /// Returns the estimated monthly payment for each credit card.
+  ///
+  /// Cross-references the oracle's per-account obligations with account
+  /// balances to provide card names and currency codes.
+  Future<List<CreditCardPaymentDTO>> getCreditCardPayments({
+    Set<String>? accountIds,
+  }) async {
+    final balances = await _local.getBalancesPerAccount(accountIds: accountIds);
+    final now = _nowProvider().toUtc();
+    final month = DateTime.utc(now.year, now.month, 1);
+    final monthEnd = DateTime.utc(now.year, now.month + 1, 0);
+    final maxDate = _formatDate(monthEnd);
+
+    final cardAccounts = await _local.getCreditCardAccounts(
+      accountIds: accountIds,
+    );
+    final cardMovements = await _local.getCreditCardMovementsForProjection(
+      maxDate,
+      accountIds: accountIds,
+    );
+
+    final oracleResult = _oracle.estimateNetMonthlyObligation(
+      targetMonth: month,
+      now: now,
+      accounts: cardAccounts,
+      movements: cardMovements,
+    );
+
+    final balanceByAccountId = <String, AccountBalanceDTO>{};
+    for (final b in balances) {
+      if (b.accountType == 'credit_card') {
+        balanceByAccountId[b.accountId] = b;
+      }
+    }
+
+    final result = <CreditCardPaymentDTO>[];
+    for (final entry in oracleResult.netByAccountId.entries) {
+      final balance = balanceByAccountId[entry.key];
+      if (balance == null) continue;
+      result.add(CreditCardPaymentDTO(
+        accountId: entry.key,
+        accountName: balance.accountName,
+        currencyCode: balance.currencyCode,
+        estimatedPaymentCents: entry.value,
+      ));
     }
 
     return result;

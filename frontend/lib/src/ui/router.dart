@@ -268,6 +268,7 @@ GoRouter buildRouter(AuthProvider authProvider) {
                 builder: (context, state) => AccountsRouteScope(
                   child: AccountFormScreen(
                     account: state.extra as AccountModel?,
+                    accountId: state.pathParameters['accountId'],
                   ),
                 ),
               ),

@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
+import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/accounts_view_model.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
@@ -25,9 +26,15 @@ import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
 class AccountFormScreen extends StatefulWidget {
   final AccountModel? account;
+  final String? accountId;
   final String? initialName;
 
-  const AccountFormScreen({this.account, this.initialName, super.key});
+  const AccountFormScreen({
+    this.account,
+    this.accountId,
+    this.initialName,
+    super.key,
+  });
 
   @override
   State<AccountFormScreen> createState() => _AccountFormScreenState();
@@ -50,6 +57,8 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
   );
   bool _isSaving = false;
   bool _isLoadingInitialBalance = false;
+  bool _isLoadingAccount = false;
+  AccountModel? _loadedAccount;
 
   static const _accountTypes = [
     ('cash', 'Efectivo', Icons.payments_outlined),
@@ -61,12 +70,20 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     ('other', 'Otra', Icons.account_balance_wallet_outlined),
   ];
 
-  bool get _isEditMode => widget.account != null;
+  AccountModel? get _effectiveAccount => widget.account ?? _loadedAccount;
+  bool get _isEditMode => _effectiveAccount != null;
 
   @override
   void initState() {
     super.initState();
     final account = widget.account;
+
+    if (account == null && widget.accountId != null) {
+      _isLoadingAccount = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadAccountById());
+      return;
+    }
+
     if (account == null) {
       if (widget.initialName != null) {
         _nameController.text = widget.initialName!;
@@ -77,6 +94,12 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
       return;
     }
 
+    _populateFromAccount(account);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCurrencyOptions());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadInitialBalance());
+  }
+
+  void _populateFromAccount(AccountModel account) {
     _selectedType = account.type;
     _selectedCurrencyCode = account.currencyCode;
     if (!_allowedCurrencies.contains(_selectedCurrencyCode)) {
@@ -99,9 +122,24 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     if (account.termMonths != null) {
       _termMonthsController.text = account.termMonths.toString();
     }
+  }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCurrencyOptions());
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadInitialBalance());
+  Future<void> _loadAccountById() async {
+    final db = context.read<DatabaseHelper>();
+    final store = AccountLocalStore(db: db);
+    final account = await store.getById(widget.accountId!);
+    if (!mounted) return;
+
+    if (account == null) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+
+    _loadedAccount = account;
+    _populateFromAccount(account);
+    setState(() => _isLoadingAccount = false);
+    _loadCurrencyOptions();
+    _loadInitialBalance();
   }
 
   @override
@@ -212,7 +250,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     try {
       final amountCents = await context
           .read<AccountsViewModel>()
-          .getInitialBalanceCents(widget.account!);
+          .getInitialBalanceCents(_effectiveAccount!);
       if (!mounted || amountCents == null) return;
 
       final amount = amountCents / 100;
@@ -274,7 +312,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     try {
       if (_isEditMode) {
         await vm.updateAccount(
-          current: widget.account!,
+          current: _effectiveAccount!,
           type: _selectedType,
           name: name,
           currencyCode: _selectedCurrencyCode,
@@ -315,7 +353,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
   Future<void> _onDelete() async {
     if (!_isEditMode || _isSaving || _isLoadingInitialBalance) return;
 
-    final account = widget.account!;
+    final account = _effectiveAccount!;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -353,7 +391,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
   }
 
   Future<void> _onAdjustBalance() async {
-    final account = widget.account!;
+    final account = _effectiveAccount!;
     final result = await showFormBottomSheet<bool>(
       context: context,
       builder: (_) => AdjustBalanceSheet(
@@ -420,6 +458,18 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingAccount) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditMode ? 'Editar cuenta' : 'Nueva cuenta'),

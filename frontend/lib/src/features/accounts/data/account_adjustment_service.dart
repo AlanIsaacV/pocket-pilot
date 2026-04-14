@@ -47,6 +47,7 @@ class AccountAdjustmentService {
       amountMinor: difference.abs(),
       currencyCode: currencyCode,
       description: 'Ajuste manual de saldo',
+      nature: 'adjustment',
       date: now.toIso8601String().substring(0, 10),
       type: difference > 0 ? 'income' : 'expense',
       status: 'cleared',

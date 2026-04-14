@@ -140,6 +140,8 @@ class CategoryModel {
         return 'passive';
       case FinancialNature.NATURE_WINDFALL:
         return 'windfall';
+      case FinancialNature.NATURE_ADJUSTMENT:
+        return 'adjustment';
       default:
         return '';
     }
@@ -159,6 +161,8 @@ class CategoryModel {
         return FinancialNature.NATURE_PASSIVE;
       case 'windfall':
         return FinancialNature.NATURE_WINDFALL;
+      case 'adjustment':
+        return FinancialNature.NATURE_ADJUSTMENT;
       default:
         return FinancialNature.NATURE_UNSPECIFIED;
     }

@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:pocket_pilot/src/core/constants/nature_labels.dart';
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
@@ -695,24 +696,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
   bool _isDigit(int codeUnit) => codeUnit >= 48 && codeUnit <= 57;
 
-  static String _natureDisplayLabel(String nature) {
-    switch (nature) {
-      case 'required':
-        return 'Necesario';
-      case 'obligation':
-        return 'Obligacion';
-      case 'lifestyle':
-        return 'Estilo de vida';
-      case 'active':
-        return 'Activo';
-      case 'passive':
-        return 'Pasivo';
-      case 'windfall':
-        return 'Extraordinario';
-      default:
-        return 'Sin definir';
-    }
-  }
 
   void _showNatureSheet() {
     _commitPendingAmountIfAny();
@@ -964,7 +947,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   DetailRow(
                     icon: Icons.style_outlined,
                     label: 'Naturaleza',
-                    value: _natureDisplayLabel(_nature),
+                    value: natureDisplayLabel(_nature),
                     onTap: _showNatureSheet,
                   ),
 

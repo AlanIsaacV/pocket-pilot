@@ -26,4 +26,5 @@ enum FinancialNature {
   NATURE_ACTIVE      = 4; // Ingresos: salario, freelance
   NATURE_PASSIVE     = 5; // Ingresos: rendimientos, rentas
   NATURE_WINDFALL    = 6; // Ingresos: bonos, regalos, ventas ocasionales
+  NATURE_ADJUSTMENT  = 7; // Ajustes manuales de saldo
 }

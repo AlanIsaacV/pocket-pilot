@@ -4,7 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:pocket_pilot/src/features/dashboard/data/dashboard_repository.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/account_balance_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/category_spend_dto.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_payment_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/dashboard_metrics.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/nature_spend_dto.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/tag_spend_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
 
 class DashboardViewModel extends ChangeNotifier {
@@ -13,7 +16,10 @@ class DashboardViewModel extends ChangeNotifier {
 
   Map<String, DashboardMetrics> metricsByCurrency = {};
   List<AccountBalanceDTO> accountBalances = [];
+  List<CreditCardPaymentDTO> creditCardPayments = [];
   List<CategorySpendDTO> monthlySpend = [];
+  List<NatureSpendDTO> monthlySpendByNature = [];
+  List<TagSpendDTO> monthlySpendByTag = [];
   bool isLoading = false;
   String? errorMessage;
 
@@ -47,6 +53,14 @@ class DashboardViewModel extends ChangeNotifier {
     return metricsByCurrency.keys.toList()..sort();
   }
 
+  List<CreditCardPaymentDTO> get filteredCreditCardPayments {
+    final cc = selectedCurrency;
+    if (cc == null) return creditCardPayments;
+    return creditCardPayments
+        .where((p) => p.currencyCode == cc)
+        .toList();
+  }
+
   List<AccountBalanceDTO> get filteredAccountBalances {
     final cc = selectedCurrency;
     if (cc == null) return accountBalances;
@@ -55,8 +69,27 @@ class DashboardViewModel extends ChangeNotifier {
 
   List<CategorySpendDTO> get filteredMonthlySpend {
     final cc = selectedCurrency;
-    if (cc == null) return monthlySpend;
-    return monthlySpend.where((s) => s.currencyCode == cc).toList();
+    return monthlySpend
+        .where(
+          (s) => s.categoryId != null && (cc == null || s.currencyCode == cc),
+        )
+        .toList();
+  }
+
+  List<NatureSpendDTO> get filteredMonthlySpendByNature {
+    final cc = selectedCurrency;
+    if (cc == null) return monthlySpendByNature;
+    return monthlySpendByNature
+        .where((s) => s.currencyCode == cc)
+        .toList();
+  }
+
+  List<TagSpendDTO> get filteredMonthlySpendByTag {
+    final cc = selectedCurrency;
+    if (cc == null) return monthlySpendByTag;
+    return monthlySpendByTag
+        .where((s) => s.currencyCode == cc)
+        .toList();
   }
 
   // --- Public API ---
@@ -95,7 +128,20 @@ class DashboardViewModel extends ChangeNotifier {
       final results = await Future.wait([
         _repository.calculateAllMetrics(accountIds: filterAccountIds),
         _repository.getBalancesPerAccount(accountIds: filterAccountIds),
+        _repository.getCreditCardPayments(accountIds: filterAccountIds),
         _repository.getMonthlySpendByCategory(
+          _filterVM.dateFrom,
+          _filterVM.dateTo,
+          accountIds: filterAccountIds,
+          currencyCode: _filterVM.currencyCode,
+        ),
+        _repository.getMonthlySpendByNature(
+          _filterVM.dateFrom,
+          _filterVM.dateTo,
+          accountIds: filterAccountIds,
+          currencyCode: _filterVM.currencyCode,
+        ),
+        _repository.getMonthlySpendByTag(
           _filterVM.dateFrom,
           _filterVM.dateTo,
           accountIds: filterAccountIds,
@@ -105,7 +151,10 @@ class DashboardViewModel extends ChangeNotifier {
 
       metricsByCurrency = results[0] as Map<String, DashboardMetrics>;
       accountBalances = results[1] as List<AccountBalanceDTO>;
-      monthlySpend = results[2] as List<CategorySpendDTO>;
+      creditCardPayments = results[2] as List<CreditCardPaymentDTO>;
+      monthlySpend = results[3] as List<CategorySpendDTO>;
+      monthlySpendByNature = results[4] as List<NatureSpendDTO>;
+      monthlySpendByTag = results[5] as List<TagSpendDTO>;
       errorMessage = null;
     } catch (e) {
       errorMessage = e.toString();

@@ -537,7 +537,14 @@ class _TransactionTile extends StatelessWidget {
     final Color amountColor;
     final IconData icon;
 
-    if (transaction.isTransfer) {
+    final isAdjustment =
+        transaction.nature == 'adjustment' && transaction.categoryId == null;
+
+    if (isAdjustment) {
+      iconBgColor = cs.secondary.withValues(alpha: 0.1);
+      amountColor = cs.onSurfaceVariant;
+      icon = Icons.sync_alt_rounded;
+    } else if (transaction.isTransfer) {
       iconBgColor = cs.secondary.withValues(alpha: 0.1);
       amountColor = transaction.isTransferIn ? cs.primary : cs.onSurfaceVariant;
       icon = Icons.swap_horiz_rounded;
@@ -558,9 +565,14 @@ class _TransactionTile extends StatelessWidget {
     final date = transaction.parsedDate;
     final formattedDate = '${date.day} ${_monthAbbr(date.month)} ${date.year}';
 
-    final categoryName = transaction.isTransfer
-        ? 'Transferencia'
-        : category?.name ?? 'Sin categoría';
+    final String categoryName;
+    if (isAdjustment) {
+      categoryName = 'Ajuste de saldo';
+    } else if (transaction.isTransfer) {
+      categoryName = 'Transferencia';
+    } else {
+      categoryName = category?.name ?? 'Sin categoría';
+    }
 
     final accountName = account?.name;
     final description = transaction.description;

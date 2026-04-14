@@ -185,6 +185,8 @@ class TransactionTemplateModel {
         return 'passive';
       case FinancialNature.NATURE_WINDFALL:
         return 'windfall';
+      case FinancialNature.NATURE_ADJUSTMENT:
+        return 'adjustment';
       default:
         return '';
     }

@@ -7,11 +7,15 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/core/constants/nature_labels.dart';
 import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/account_balance_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/category_spend_dto.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_payment_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/dashboard_metrics.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/nature_spend_dto.dart';
+import 'package:pocket_pilot/src/features/dashboard/domain/tag_spend_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_view_model.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
@@ -82,6 +86,18 @@ class DashboardScreen extends StatelessWidget {
                           label: 'Sin datos disponibles',
                         ),
 
+                      if (vm.filteredCreditCardPayments.isNotEmpty) ...[
+                        const SizedBox(height: 28),
+                        _SectionHeader(title: 'Tarjetas de crédito'),
+                        const SizedBox(height: 12),
+                        ...vm.filteredCreditCardPayments.map(
+                          (card) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _CreditCardPaymentCard(payment: card),
+                          ),
+                        ),
+                      ],
+
                       const SizedBox(height: 28),
                       _SectionHeader(title: 'Cuentas'),
                       const SizedBox(height: 12),
@@ -108,6 +124,32 @@ class DashboardScreen extends StatelessWidget {
                         )
                       else
                         _SpendBreakdown(items: vm.filteredMonthlySpend),
+
+                      const SizedBox(height: 20),
+                      _SectionHeader(title: 'Gastos por naturaleza'),
+                      const SizedBox(height: 12),
+                      if (vm.filteredMonthlySpendByNature.isEmpty)
+                        _EmptyHint(
+                          icon: Icons.style_outlined,
+                          label: 'Sin gastos este mes',
+                        )
+                      else
+                        _NatureSpendBreakdown(
+                          items: vm.filteredMonthlySpendByNature,
+                        ),
+
+                      const SizedBox(height: 20),
+                      _SectionHeader(title: 'Gastos por etiqueta'),
+                      const SizedBox(height: 12),
+                      if (vm.filteredMonthlySpendByTag.isEmpty)
+                        _EmptyHint(
+                          icon: Icons.label_outlined,
+                          label: 'Sin etiquetas este mes',
+                        )
+                      else
+                        _TagSpendBreakdown(
+                          items: vm.filteredMonthlySpendByTag,
+                        ),
                     ]),
                   ),
                 ),
@@ -412,6 +454,83 @@ class _AccountCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isNegative = balance.balanceCents < 0;
 
+    return InkWell(
+      borderRadius: AppTheme.radiusMedium,
+      onTap: () =>
+          context.push('/accounts/${balance.accountId}/edit'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainer,
+          borderRadius: AppTheme.radiusMedium,
+          border: Border.all(color: cs.surfaceContainerHigh, width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.12),
+                borderRadius: AppTheme.radiusSmall,
+              ),
+              child: Icon(
+                _accountIcon(balance.accountType),
+                size: 20,
+                color: cs.primary,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    balance.accountName,
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  Text(
+                    _accountTypeLabel(balance.accountType),
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              _formatAmount(balance.balanceCents, balance.currencyCode),
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: isNegative ? cs.error : cs.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Credit card payment card
+// ============================================================
+
+class _CreditCardPaymentCard extends StatelessWidget {
+  final CreditCardPaymentDTO payment;
+
+  const _CreditCardPaymentCard({required this.payment});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -425,13 +544,13 @@ class _AccountCard extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: 0.12),
+              color: AppColors.catPeach.withValues(alpha: 0.12),
               borderRadius: AppTheme.radiusSmall,
             ),
             child: Icon(
-              _accountIcon(balance.accountType),
+              Icons.credit_card_outlined,
               size: 20,
-              color: cs.primary,
+              color: AppColors.catPeach,
             ),
           ),
           const SizedBox(width: 14),
@@ -440,7 +559,7 @@ class _AccountCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  balance.accountName,
+                  payment.accountName,
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -448,7 +567,7 @@ class _AccountCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  _accountTypeLabel(balance.accountType),
+                  'Pago estimado',
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 12,
                     color: cs.onSurfaceVariant,
@@ -458,11 +577,13 @@ class _AccountCard extends StatelessWidget {
             ),
           ),
           Text(
-            _formatAmount(balance.balanceCents, balance.currencyCode),
+            _formatAmount(payment.estimatedPaymentCents, payment.currencyCode),
             style: GoogleFonts.ibmPlexSans(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: isNegative ? cs.error : cs.onSurface,
+              color: payment.estimatedPaymentCents > 0
+                  ? cs.error
+                  : cs.onSurface,
             ),
           ),
         ],
@@ -578,6 +699,243 @@ class _SpendBreakdown extends StatelessWidget {
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 '+${sorted.length - 6} más',
+                style: GoogleFonts.ibmPlexSans(
+                  fontSize: 12,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Nature spend breakdown
+// ============================================================
+
+class _NatureSpendBreakdown extends StatelessWidget {
+  final List<NatureSpendDTO> items;
+
+  const _NatureSpendBreakdown({required this.items});
+
+  static const _natureColors = <String, Color>{
+    'required': AppColors.catRed,
+    'obligation': AppColors.catPeach,
+    'lifestyle': AppColors.catMauve,
+    'active': AppColors.catGreen,
+    'passive': AppColors.catTeal,
+    'windfall': AppColors.catYellow,
+    'adjustment': AppColors.catSapphire,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    final sorted = items.where((i) => i.spentCents > 0).toList()
+      ..sort((a, b) => b.spentCents.compareTo(a.spentCents));
+
+    if (sorted.isEmpty) {
+      return _EmptyHint(
+        icon: Icons.style_outlined,
+        label: 'Sin gastos este mes',
+      );
+    }
+
+    final totalSpent = sorted.fold(0, (sum, i) => sum + i.spentCents);
+    final currency = sorted.first.currencyCode;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: AppTheme.radiusMedium,
+        border: Border.all(color: cs.surfaceContainerHigh, width: 1),
+      ),
+      child: Column(
+        children: [
+          ClipRRect(
+            borderRadius: AppTheme.radiusFull,
+            child: SizedBox(
+              height: 8,
+              child: Row(
+                children: sorted.map((item) {
+                  final fraction =
+                      totalSpent > 0 ? item.spentCents / totalSpent : 0.0;
+                  return Expanded(
+                    flex: (fraction * 1000).round().clamp(1, 1000),
+                    child: Container(
+                      color: _natureColors[item.nature] ?? cs.primary,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...sorted.map((item) {
+            final pct = totalSpent > 0
+                ? (item.spentCents / totalSpent * 100).round()
+                : 0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: _natureColors[item.nature] ?? cs.primary,
+                      borderRadius:
+                          const BorderRadius.all(Radius.circular(3)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      natureDisplayLabel(item.nature),
+                      style: GoogleFonts.ibmPlexSans(
+                        fontSize: 13,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '$pct%',
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    _formatAmount(item.spentCents, currency),
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Tag spend breakdown
+// ============================================================
+
+class _TagSpendBreakdown extends StatelessWidget {
+  final List<TagSpendDTO> items;
+
+  const _TagSpendBreakdown({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final palette = AppColors.categoryPresets;
+
+    final sorted = items.where((i) => i.spentCents > 0).toList()
+      ..sort((a, b) => b.spentCents.compareTo(a.spentCents));
+
+    if (sorted.isEmpty) {
+      return _EmptyHint(
+        icon: Icons.label_outlined,
+        label: 'Sin etiquetas este mes',
+      );
+    }
+
+    final totalSpent = sorted.fold(0, (sum, i) => sum + i.spentCents);
+    final currency = sorted.first.currencyCode;
+
+    Color colorFor(String tag) =>
+        palette[tag.hashCode.abs() % palette.length];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: AppTheme.radiusMedium,
+        border: Border.all(color: cs.surfaceContainerHigh, width: 1),
+      ),
+      child: Column(
+        children: [
+          ClipRRect(
+            borderRadius: AppTheme.radiusFull,
+            child: SizedBox(
+              height: 8,
+              child: Row(
+                children: sorted.map((item) {
+                  final fraction =
+                      totalSpent > 0 ? item.spentCents / totalSpent : 0.0;
+                  return Expanded(
+                    flex: (fraction * 1000).round().clamp(1, 1000),
+                    child: Container(color: colorFor(item.tagName)),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...sorted.take(8).map((item) {
+            final pct = totalSpent > 0
+                ? (item.spentCents / totalSpent * 100).round()
+                : 0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: colorFor(item.tagName),
+                      borderRadius:
+                          const BorderRadius.all(Radius.circular(3)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      item.tagName,
+                      style: GoogleFonts.ibmPlexSans(
+                        fontSize: 13,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '$pct%',
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    _formatAmount(item.spentCents, currency),
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (sorted.length > 8)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '+${sorted.length - 8} más',
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 12,
                   color: cs.onSurfaceVariant,

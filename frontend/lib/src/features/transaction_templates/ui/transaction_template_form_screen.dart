@@ -15,6 +15,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:pocket_pilot/src/core/constants/nature_labels.dart';
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
@@ -674,22 +675,7 @@ class _TransactionTemplateFormScreenState
   // ----------------------------------------------------------
 
   static String _natureDisplayLabel(String nature) {
-    switch (nature) {
-      case 'required':
-        return 'Necesario';
-      case 'obligation':
-        return 'Obligacion';
-      case 'lifestyle':
-        return 'Estilo de vida';
-      case 'active':
-        return 'Activo';
-      case 'passive':
-        return 'Pasivo';
-      case 'windfall':
-        return 'Extraordinario';
-      default:
-        return 'Sin definir';
-    }
+    return natureDisplayLabel(nature);
   }
 
   void _showNatureSheet() {

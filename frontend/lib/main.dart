@@ -109,7 +109,11 @@ Future<void> main() async {
   );
   await authProvider.init();
 
-  final authInterceptor = AuthInterceptor(tokenStore: tokenStore);
+  final authInterceptor = AuthInterceptor(
+    tokenStore: tokenStore,
+    authService: authService,
+    authProvider: authProvider,
+  );
   GrpcClient.init(interceptors: [authInterceptor]);
 
   // Construir grafo de dependencias de sync.

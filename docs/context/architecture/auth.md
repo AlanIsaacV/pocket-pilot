@@ -46,13 +46,21 @@ These tables deviate from the standard project convention (`user_id` + `deleted_
 Auth lives in `lib/src/core/auth/` (infrastructure, not a syncable feature):
 
 - `token_store.dart` — `flutter_secure_storage` wrapper. Stores `access_token`, `refresh_token`, `user_id`. Has `getEmail()` that decodes JWT payload to extract email claim.
-- `auth_service.dart` — Calls native SDKs + gRPC `AuthService`. Methods: `loginWithGoogle()`, `loginWithApple()`, `authenticate()`, `refresh()`, `logout()`, `revokeAllSessions()`.
-- `auth_provider.dart` — `ChangeNotifier` with `isAuthenticated` state. Used as `refreshListenable` in `go_router` for redirect guard.
-- `auth_retry.dart` — Wraps gRPC calls with automatic token refresh on `UNAUTHENTICATED`. Uses `Completer`-based lock to serialize concurrent refresh attempts.
+- `auth_service.dart` — Calls native SDKs + gRPC `AuthService`. Methods: `loginWithGoogle()`, `loginWithApple()`, `authenticate()`, `refresh()`, `logout()`, `revokeAllSessions()`. Its internal `AuthServiceClient` is built **without** interceptors, so the `/RefreshToken` RPC bypasses `AuthInterceptor` (prevents recursive refresh loops).
+- `auth_provider.dart` — `ChangeNotifier` with `isAuthenticated` state. Used as `refreshListenable` in `go_router` for redirect guard. Exposes `forceLogout()` used by `AuthInterceptor` when the refresh token is invalid/revoked.
+- `auth_retry.dart` — **Deprecated / dead code.** Was designed as a per-call wrapper with response-side retry on `UNAUTHENTICATED`, but was never wired into any repository. Its logic (serialized refresh via `Completer`, `forceLogout` fallback) now lives inside `AuthInterceptor`. Kept only as reference; safe to delete.
 
 ### gRPC Interceptor (`core/grpc/auth_interceptor.dart`)
 
-Injects JWT from `TokenStore` into every request's metadata via `CallOptions.providers`. No longer hardcoded.
+Attaches the current access token to every outgoing request **and proactively refreshes it before sending** when it is expired or within 30 s of expiring (covers small client/server clock skew and network latency).
+
+Why proactive (pre-send) instead of reactive (retry on `UNAUTHENTICATED`): `gRPC-Dart`'s `ClientInterceptor.interceptUnary` must return a `ResponseFuture<R>` synchronously, and `ResponseFuture` can only be constructed from an internal `ClientCall`. Response-side retry therefore requires either wrapping every call site (the old `AuthRetry` approach) or re-issuing the invocation manually. Refreshing inside `CallOptions.providers` achieves the same guarantee automatically for every RPC, avoids a wasted round-trip, and keeps the interceptor bidirectionless.
+
+Key properties:
+- Decodes `exp` from the JWT payload (`base64Url` decode of the middle segment). If `exp` can't be parsed, the request is sent anyway and the server decides — defensive fallback.
+- Serializes concurrent refreshes with a single `Completer<bool>`: during heavy sync, only one `/RefreshToken` RPC is issued; all other in-flight calls await the same completer.
+- On refresh failure (refresh token expired, revoked, or network error), calls `AuthProvider.forceLogout()` and throws `GrpcError.unauthenticated('Session expired. Please log in again.')`.
+- Wired in `main.dart` as `AuthInterceptor(tokenStore, authService, authProvider)` and passed to `GrpcClient.init(interceptors: [...])`.
 
 ### GrpcClient (`core/grpc/grpc_client.dart`)
 

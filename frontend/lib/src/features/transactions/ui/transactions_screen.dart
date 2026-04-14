@@ -10,6 +10,9 @@ import 'package:provider/provider.dart';
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
+import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
+import 'package:pocket_pilot/src/features/categories/domain/category.dart';
+import 'package:pocket_pilot/src/features/categories/ui/category_icon_data.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_view_model.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_templates_list_tab.dart';
@@ -199,8 +202,39 @@ class _TransactionsScreenState extends State<TransactionsScreen>
 // Tab de transacciones (contenido original)
 // ============================================================
 
-class _TransactionsListTab extends StatelessWidget {
+class _TransactionsListTab extends StatefulWidget {
   const _TransactionsListTab();
+
+  @override
+  State<_TransactionsListTab> createState() => _TransactionsListTabState();
+}
+
+class _TransactionsListTabState extends State<_TransactionsListTab> {
+  Map<String, CategoryModel> _categoryMap = {};
+  Map<String, AccountModel> _accountMap = {};
+  bool _lookupsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLookups();
+  }
+
+  Future<void> _loadLookups() async {
+    final db = context.read<DatabaseHelper>();
+    final categoryStore = CategoryLocalStore(db: db);
+    final accountStore = AccountLocalStore(db: db);
+
+    final categories = await categoryStore.getCategories();
+    final accounts = await accountStore.getAccounts();
+
+    if (!mounted) return;
+    setState(() {
+      _categoryMap = {for (final c in categories) c.id: c};
+      _accountMap = {for (final a in accounts) a.id: a};
+      _lookupsLoaded = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -225,7 +259,7 @@ class _TransactionsListTab extends StatelessWidget {
                   ),
                 Expanded(
                   child: PpScreenState(
-                    isLoading: vm.isLoading,
+                    isLoading: vm.isLoading || !_lookupsLoaded,
                     errorMessage: vm.transactions.isEmpty
                         ? vm.errorMessage
                         : null,
@@ -243,6 +277,8 @@ class _TransactionsListTab extends StatelessWidget {
                     child: _TransactionList(
                       transactions: vm.transactions,
                       vm: vm,
+                      categoryMap: _categoryMap,
+                      accountMap: _accountMap,
                     ),
                   ),
                 ),
@@ -263,8 +299,15 @@ class _TransactionsListTab extends StatelessWidget {
 class _TransactionList extends StatelessWidget {
   final List<TransactionModel> transactions;
   final TransactionsViewModel vm;
+  final Map<String, CategoryModel> categoryMap;
+  final Map<String, AccountModel> accountMap;
 
-  const _TransactionList({required this.transactions, required this.vm});
+  const _TransactionList({
+    required this.transactions,
+    required this.vm,
+    required this.categoryMap,
+    required this.accountMap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -324,6 +367,10 @@ class _TransactionList extends StatelessWidget {
               },
               child: _TransactionTile(
                 transaction: t,
+                category: t.categoryId != null
+                    ? categoryMap[t.categoryId]
+                    : null,
+                account: accountMap[t.accountId],
                 onTap: () {
                   _handleTransactionTap(context, t);
                 },
@@ -471,9 +518,16 @@ class _MonthHeader extends StatelessWidget {
 
 class _TransactionTile extends StatelessWidget {
   final TransactionModel transaction;
+  final CategoryModel? category;
+  final AccountModel? account;
   final VoidCallback onTap;
 
-  const _TransactionTile({required this.transaction, required this.onTap});
+  const _TransactionTile({
+    required this.transaction,
+    required this.onTap,
+    this.category,
+    this.account,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -488,21 +542,29 @@ class _TransactionTile extends StatelessWidget {
       amountColor = transaction.isTransferIn ? cs.primary : cs.onSurfaceVariant;
       icon = Icons.swap_horiz_rounded;
     } else if (transaction.isIncome) {
-      iconBgColor = cs.primary.withValues(alpha: 0.1);
-      amountColor = cs.primary;
-      icon = Icons.arrow_downward_rounded;
+      iconBgColor = cs.onTertiary.withValues(alpha: 0.12);
+      amountColor = cs.onTertiary;
+      icon = category != null
+          ? CategoryIconData.iconFromHex(category!.icon)
+          : Icons.arrow_downward_rounded;
     } else {
       iconBgColor = cs.error.withValues(alpha: 0.1);
       amountColor = cs.error;
-      icon = Icons.arrow_upward_rounded;
+      icon = category != null
+          ? CategoryIconData.iconFromHex(category!.icon)
+          : Icons.arrow_upward_rounded;
     }
 
     final date = transaction.parsedDate;
     final formattedDate = '${date.day} ${_monthAbbr(date.month)} ${date.year}';
 
-    final subtitle = transaction.isTransfer
-        ? 'Transferencia · $formattedDate'
-        : formattedDate;
+    final categoryName = transaction.isTransfer
+        ? 'Transferencia'
+        : category?.name ?? 'Sin categoría';
+
+    final accountName = account?.name;
+    final description = transaction.description;
+    final tags = transaction.tags;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
@@ -511,45 +573,135 @@ class _TransactionTile extends StatelessWidget {
           color: cs.surfaceContainer,
           borderRadius: AppTheme.radiusMedium,
         ),
-        child: ListTile(
+        child: InkWell(
           onTap: onTap,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 0,
-          ),
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: iconBgColor,
-              borderRadius: AppTheme.radiusFull,
-            ),
-            child: Icon(icon, color: amountColor, size: 18),
-          ),
-          title: Text(
-            transaction.description.isNotEmpty
-                ? transaction.description
-                : 'Sin descripción',
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: cs.onSurface,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Text(
-            subtitle,
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 12,
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-          trailing: Text(
-            transaction.formattedAmount,
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: amountColor,
+          borderRadius: const BorderRadius.all(Radius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Icon
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    borderRadius: AppTheme.radiusFull,
+                  ),
+                  child: Icon(icon, color: amountColor, size: 17),
+                ),
+                const SizedBox(width: 12),
+                // Left side: category, account, description, tags
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Row 1: Category — Amount
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              categoryName,
+                              style: GoogleFonts.ibmPlexSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: cs.onSurface,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            transaction.formattedAmount,
+                            style: GoogleFonts.ibmPlexSans(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: amountColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      // Row 2: Account — Date
+                      Row(
+                        children: [
+                          if (accountName != null) ...[
+                            Expanded(
+                              child: Text(
+                                accountName,
+                                style: GoogleFonts.ibmPlexSans(
+                                  fontSize: 12,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ] else
+                            const Spacer(),
+                          Text(
+                            formattedDate,
+                            style: GoogleFonts.ibmPlexSans(
+                              fontSize: 12,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Row 3: Description (left) | Tags (right)
+                      if (tags.isNotEmpty || description.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (description.isNotEmpty)
+                              Expanded(
+                                child: Text(
+                                  description,
+                                  style: GoogleFonts.ibmPlexSans(
+                                    fontSize: 11,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              )
+                            else
+                              const Spacer(),
+                            if (tags.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Wrap(
+                                spacing: 4,
+                                runSpacing: 4,
+                                children: tags.map((tag) {
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: cs.surfaceContainerHighest,
+                                      borderRadius: AppTheme.radiusFull,
+                                    ),
+                                    child: Text(
+                                      tag,
+                                      style: GoogleFonts.ibmPlexSans(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),

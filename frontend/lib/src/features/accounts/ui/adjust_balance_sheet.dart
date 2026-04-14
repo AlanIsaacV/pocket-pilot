@@ -13,16 +13,21 @@ import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
 class AdjustBalanceSheet extends StatefulWidget {
   final String accountId;
   final String currencyCode;
+  final String accountType;
   final TransactionLocalStore transactionLocal;
   final AccountAdjustmentService adjustmentService;
 
   const AdjustBalanceSheet({
     required this.accountId,
     required this.currencyCode,
+    required this.accountType,
     required this.transactionLocal,
     required this.adjustmentService,
     super.key,
   });
+
+  bool get isDebtAccount =>
+      accountType == 'credit_card' || accountType == 'loan';
 
   @override
   State<AdjustBalanceSheet> createState() => _AdjustBalanceSheetState();
@@ -32,11 +37,13 @@ class _AdjustBalanceSheetState extends State<AdjustBalanceSheet> {
   bool _isLoading = true;
   int _currentBalanceCents = 0;
   String _inputAmount = '0';
+  bool _isNegative = false;
   bool _isAdjusting = false;
 
   @override
   void initState() {
     super.initState();
+    _isNegative = widget.isDebtAccount;
     _loadCurrentBalance();
   }
 
@@ -55,7 +62,11 @@ class _AdjustBalanceSheetState extends State<AdjustBalanceSheet> {
   // Computed values
   // -----------------------------------------------------------
 
-  double get _parsedAmount => double.tryParse(_inputAmount) ?? 0.0;
+  double get _parsedAmount {
+    final abs = double.tryParse(_inputAmount) ?? 0.0;
+    return _isNegative ? -abs : abs;
+  }
+
   int get _realBalanceCents => (_parsedAmount * 100).round();
   int get _differenceCents => _realBalanceCents - _currentBalanceCents;
 
@@ -219,13 +230,24 @@ class _AdjustBalanceSheetState extends State<AdjustBalanceSheet> {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              '$currency \$$_inputAmount',
-              style: GoogleFonts.ibmPlexSans(
-                fontSize: 32,
-                fontWeight: FontWeight.w700,
-                color: colors.primary,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${_isNegative ? '-' : ''}$currency \$$_inputAmount',
+                    style: GoogleFonts.ibmPlexSans(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                      color: colors.primary,
+                    ),
+                  ),
+                ),
+                IconButton.filledTonal(
+                  onPressed: () => setState(() => _isNegative = !_isNegative),
+                  icon: const Icon(Icons.exposure, size: 20),
+                  tooltip: 'Cambiar signo (+/-)',
+                ),
+              ],
             ),
             const SizedBox(height: 12),
 
@@ -287,18 +309,21 @@ class _AdjustBalanceSheetState extends State<AdjustBalanceSheet> {
     final diff = _differenceCents;
     final String text;
     final Color color;
+    final isDebt = widget.isDebtAccount;
 
     if (diff == 0) {
       text = 'Sin diferencia';
       color = colors.onSurfaceVariant;
     } else if (diff > 0) {
+      final label = isDebt ? 'más deuda' : 'ingreso';
       text =
-          'Diferencia: +${_formatCents(diff, widget.currencyCode)} (ingreso)';
-      color = colors.tertiary;
+          'Diferencia: +${_formatCents(diff, widget.currencyCode)} ($label)';
+      color = isDebt ? colors.error : colors.tertiary;
     } else {
+      final label = isDebt ? 'pago excedente' : 'gasto';
       text =
-          'Diferencia: ${_formatCents(diff, widget.currencyCode)} (gasto)';
-      color = colors.error;
+          'Diferencia: ${_formatCents(diff, widget.currencyCode)} ($label)';
+      color = isDebt ? colors.tertiary : colors.error;
     }
 
     return Text(

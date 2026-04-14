@@ -359,6 +359,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
       builder: (_) => AdjustBalanceSheet(
         accountId: account.id,
         currencyCode: account.currencyCode,
+        accountType: account.type,
         transactionLocal: context.read<TransactionLocalStore>(),
         adjustmentService: context.read<AccountAdjustmentService>(),
       ),

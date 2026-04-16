@@ -11,6 +11,7 @@ class AuthService {
   final TokenStore _tokenStore;
   final String? _googleServerClientId;
   late final AuthServiceClient _client;
+  bool _googleSignInInitialized = false;
 
   AuthService({
     TokenStore? tokenStore,
@@ -23,16 +24,17 @@ class AuthService {
 
   /// Signs in with Google and returns the OIDC id_token.
   Future<String> loginWithGoogle() async {
-    final googleSignIn = GoogleSignIn(
-      scopes: ['email'],
-      serverClientId: _googleServerClientId,
-    );
-    final account = await googleSignIn.signIn();
-    if (account == null) {
-      throw Exception('Google sign-in was cancelled by the user.');
+    final googleSignIn = GoogleSignIn.instance;
+    if (!_googleSignInInitialized) {
+      await googleSignIn.initialize(
+        serverClientId: _googleServerClientId,
+      );
+      _googleSignInInitialized = true;
     }
-    final auth = await account.authentication;
-    final idToken = auth.idToken;
+    final account = await googleSignIn.authenticate(
+      scopeHint: ['email'],
+    );
+    final idToken = account.authentication.idToken;
     if (idToken == null) {
       throw Exception('Google sign-in did not return an id_token.');
     }

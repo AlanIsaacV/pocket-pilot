@@ -47,7 +47,7 @@ class CsvImportService {
   /// Valida encabezados, tipos, y campos requeridos por fila.
   /// Lanza [FormatException] con número de fila si algo es inválido.
   CsvExtractionResult parseAndExtract(String csvContent) {
-    final parsed = const CsvToListConverter().convert(csvContent);
+    final parsed = const CsvDecoder().convert(csvContent);
 
     if (parsed.isEmpty) {
       throw const FormatException('El archivo CSV está vacío.');

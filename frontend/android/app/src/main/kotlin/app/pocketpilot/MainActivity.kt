@@ -1,4 +1,4 @@
-package com.example.pocket_pilot
+package app.pocketpilot
 
 import android.content.Intent
 import io.flutter.embedding.engine.FlutterEngine

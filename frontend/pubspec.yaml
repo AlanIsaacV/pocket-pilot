@@ -53,11 +53,11 @@ dependencies:
 
   # --- CSV ---
   # Parser de archivos CSV para la funcionalidad de importación.
-  csv: ^6.0.0
+  csv: ^8.0.0
 
   # --- File Picker ---
   # Selector de archivos nativo para importación de CSV.
-  file_picker: ^8.0.0
+  file_picker: ^11.0.2
 
   # --- Tipografía ---
   # google_fonts: descarga y cachea fuentes de Google Fonts en runtime.
@@ -74,16 +74,16 @@ dependencies:
   # google_sign_in: obtiene el OIDC id_token de Google.
   # sign_in_with_apple: obtiene el identity token de Apple.
   # flutter_secure_storage: almacenamiento cifrado para tokens.
-  google_sign_in: ^6.2.2
-  sign_in_with_apple: ^6.1.4
-  flutter_secure_storage: ^9.2.4
+  google_sign_in: ^7.2.0
+  sign_in_with_apple: ^7.0.1
+  flutter_secure_storage: ^10.0.0
 
   # --- Notificaciones locales ---
   # flutter_local_notifications: programa alertas del SO sin backend.
   # timezone + flutter_timezone: requeridos por zonedSchedule().
-  flutter_local_notifications: ^19.0.0
-  timezone: ^0.10.0
-  flutter_timezone: ^4.0.0
+  flutter_local_notifications: ^21.0.0
+  timezone: ^0.11.0
+  flutter_timezone: ^5.0.2
 
 dev_dependencies:
   flutter_test:

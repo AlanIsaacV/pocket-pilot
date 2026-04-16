@@ -29,8 +29,8 @@ class NotificationSchedulerService {
   Future<void> init() async {
     // 1. Timezone setup (required by zonedSchedule).
     tz.initializeTimeZones();
-    final timeZoneName = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timeZoneName));
+    final timezoneInfo = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timezoneInfo.identifier));
 
     // 2. Plugin initialization.
     const androidSettings = AndroidInitializationSettings(
@@ -47,7 +47,7 @@ class NotificationSchedulerService {
     );
 
     await _plugin.initialize(
-      initSettings,
+      settings: initSettings,
       onDidReceiveNotificationResponse: (_) {
         onNotificationTap?.call();
       },
@@ -144,13 +144,12 @@ class NotificationSchedulerService {
       );
 
       await _plugin.zonedSchedule(
-        id,
-        'Tienes movimientos próximos',
-        'Abre la aplicación para revisar tus pagos u obligaciones pendientes.',
-        scheduledDate,
-        notificationDetails,
+        id: id,
+        title: 'Tienes movimientos próximos',
+        body: 'Abre la aplicación para revisar tus pagos u obligaciones pendientes.',
+        scheduledDate: scheduledDate,
+        notificationDetails: notificationDetails,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        matchDateTimeComponents: null,
       );
     }
   }

@@ -130,7 +130,7 @@ class CsvImportViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv'],
       );

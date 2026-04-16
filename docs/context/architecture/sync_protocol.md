@@ -6,9 +6,9 @@ Pocket Pilot uses an offline-first strategy based on an Outbox pattern for write
 
 ### 1. Delta Pull (Pull)
 - **Mechanism:** The client maintains a `last_synced_at` timestamp for each entity type.
-- **Request:** The client calls `List<Entity>(updated_since=last_synced_at)`.
-- **Response:** The server returns all records (including soft-deleted ones) modified after that time.
-- **Pagination:** Delta requests are not paginated to ensure all changes are captured in one sync cycle. Full sync requests (where `updated_since` is nil) are paginated.
+- **Request:** The client calls `List<Entity>(updated_since=last_synced_at, page=PageRequest(page_size, page_token))`.
+- **Response:** The server returns all records (including soft-deleted ones) modified after that time, capped by `page_size`, plus a `PageResponse.next_page_token` when more records remain.
+- **Pagination:** ALL list endpoints are paginated on the backend (default `page_size=20`, max `100`). Both full sync (`updated_since=nil`) and delta sync must loop through pages until `next_page_token` is empty — otherwise only the first page is persisted and the remaining records are silently lost. Sync handlers accumulate `SyncItem`s across pages and commit a single `last_synced_at` derived from the server's `synced_at` timestamp of the final response.
 
 ### 2. Sync Outbox (Push)
 - **Mechanism:** Every local write (insert/update/delete) is enqueued in a `sync_outbox` table in SQLite.

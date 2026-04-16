@@ -25,28 +25,40 @@ class TransactionTemplateSyncHandler implements SyncHandler {
   @override
   Future<SyncPullResult> pull(DateTime? updatedSince) async {
     try {
-      final response = await _remote.listTemplates(updatedSince: updatedSince);
+      final allItems = <SyncItem>[];
+      late DateTime syncedAt;
+      String? pageToken;
 
-      final items = response.templates.map((proto) {
-        final model = TransactionTemplateModel.fromProto(proto);
-        final row = <String, dynamic>{
-          ...model.toMap(),
-          'deleted_at': proto.hasDeletedAt()
-              ? proto.deletedAt.toDateTime().toUtc().toIso8601String()
-              : null,
-        };
-
-        return SyncItem(
-          id: proto.id,
-          updatedAt: proto.updatedAt.toDateTime().toUtc(),
-          data: row,
+      do {
+        final response = await _remote.listTemplates(
+          updatedSince: updatedSince,
+          pageToken: pageToken,
         );
-      }).toList();
 
-      return SyncPullResult(
-        items: items,
-        syncedAt: response.syncedAt.toDateTime().toUtc(),
-      );
+        syncedAt = response.syncedAt.toDateTime().toUtc();
+
+        for (final proto in response.templates) {
+          final model = TransactionTemplateModel.fromProto(proto);
+          final row = <String, dynamic>{
+            ...model.toMap(),
+            'deleted_at': proto.hasDeletedAt()
+                ? proto.deletedAt.toDateTime().toUtc().toIso8601String()
+                : null,
+          };
+          allItems.add(SyncItem(
+            id: proto.id,
+            updatedAt: proto.updatedAt.toDateTime().toUtc(),
+            data: row,
+          ));
+        }
+
+        pageToken = response.hasPage() &&
+                response.page.nextPageToken.isNotEmpty
+            ? response.page.nextPageToken
+            : null;
+      } while (pageToken != null);
+
+      return SyncPullResult(items: allItems, syncedAt: syncedAt);
     } on GrpcError catch (e) {
       if (_isUnsupportedBackend(e)) {
         throw Exception(

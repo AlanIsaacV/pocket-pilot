@@ -1,5 +1,6 @@
 import 'package:grpc/grpc.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
+import 'package:pocket_pilot/src/generated/pocket_pilot/v1/common.pb.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/category_service.pbgrpc.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
@@ -14,9 +15,15 @@ class CategoryRemoteService {
     );
   }
 
-  Future<ListCategoriesResponse> listCategories({DateTime? updatedSince}) async {
+  Future<ListCategoriesResponse> listCategories({
+    DateTime? updatedSince,
+    String? pageToken,
+    int pageSize = 100,
+  }) async {
     try {
-      final request = ListCategoriesRequest();
+      final request = ListCategoriesRequest(
+        page: PageRequest(pageSize: pageSize, pageToken: pageToken ?? ''),
+      );
       if (updatedSince != null) {
         request.updatedSince = Timestamp.fromDateTime(updatedSince.toUtc());
       }

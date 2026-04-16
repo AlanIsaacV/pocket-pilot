@@ -2,6 +2,7 @@ import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 
+import 'package:pocket_pilot/src/generated/pocket_pilot/v1/common.pb.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/account_service.pbgrpc.dart';
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
@@ -16,9 +17,15 @@ class AccountRemoteService {
     );
   }
 
-  Future<ListAccountsResponse> listAccounts({DateTime? updatedSince}) async {
+  Future<ListAccountsResponse> listAccounts({
+    DateTime? updatedSince,
+    String? pageToken,
+    int pageSize = 100,
+  }) async {
     try {
-      final request = ListAccountsRequest();
+      final request = ListAccountsRequest(
+        page: PageRequest(pageSize: pageSize, pageToken: pageToken ?? ''),
+      );
       if (updatedSince != null) {
         request.updatedSince = Timestamp.fromDateTime(updatedSince.toUtc());
       }

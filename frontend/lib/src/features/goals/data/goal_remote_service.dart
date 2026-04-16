@@ -3,6 +3,7 @@ import 'package:grpc/grpc.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
+import 'package:pocket_pilot/src/generated/pocket_pilot/v1/common.pb.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/goal_service.pbgrpc.dart';
 
 class GoalRemoteService {
@@ -15,9 +16,15 @@ class GoalRemoteService {
     );
   }
 
-  Future<ListGoalsResponse> listGoals({DateTime? updatedSince}) async {
+  Future<ListGoalsResponse> listGoals({
+    DateTime? updatedSince,
+    String? pageToken,
+    int pageSize = 100,
+  }) async {
     try {
-      final request = ListGoalsRequest();
+      final request = ListGoalsRequest(
+        page: PageRequest(pageSize: pageSize, pageToken: pageToken ?? ''),
+      );
       if (updatedSince != null) {
         request.updatedSince = Timestamp.fromDateTime(updatedSince.toUtc());
       }

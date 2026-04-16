@@ -23,28 +23,40 @@ class TransactionSyncHandler implements SyncHandler {
 
   @override
   Future<SyncPullResult> pull(DateTime? updatedSince) async {
-    final response = await _remote.listTransactions(updatedSince: updatedSince);
+    final allItems = <SyncItem>[];
+    late DateTime syncedAt;
+    String? pageToken;
 
-    final items = response.transactions.map((proto) {
-      final model = TransactionModel.fromProto(proto);
-      final row = <String, dynamic>{
-        ...model.toMap(),
-        // fromProto/toMap doesn't carry deleted_at — add it from the proto.
-        'deleted_at': proto.hasDeletedAt()
-            ? proto.deletedAt.toDateTime().toUtc().toIso8601String()
-            : null,
-      };
-      return SyncItem(
-        id: proto.id,
-        updatedAt: proto.updatedAt.toDateTime().toUtc(),
-        data: row,
+    do {
+      final response = await _remote.listTransactions(
+        updatedSince: updatedSince,
+        pageToken: pageToken,
       );
-    }).toList();
 
-    return SyncPullResult(
-      items: items,
-      syncedAt: response.syncedAt.toDateTime().toUtc(),
-    );
+      syncedAt = response.syncedAt.toDateTime().toUtc();
+
+      for (final proto in response.transactions) {
+        final model = TransactionModel.fromProto(proto);
+        final row = <String, dynamic>{
+          ...model.toMap(),
+          'deleted_at': proto.hasDeletedAt()
+              ? proto.deletedAt.toDateTime().toUtc().toIso8601String()
+              : null,
+        };
+        allItems.add(SyncItem(
+          id: proto.id,
+          updatedAt: proto.updatedAt.toDateTime().toUtc(),
+          data: row,
+        ));
+      }
+
+      pageToken = response.hasPage() &&
+              response.page.nextPageToken.isNotEmpty
+          ? response.page.nextPageToken
+          : null;
+    } while (pageToken != null);
+
+    return SyncPullResult(items: allItems, syncedAt: syncedAt);
   }
 
   @override

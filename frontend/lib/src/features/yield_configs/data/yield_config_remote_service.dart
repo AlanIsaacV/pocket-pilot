@@ -3,6 +3,7 @@ import 'package:grpc/grpc.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 
 import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
+import 'package:pocket_pilot/src/generated/pocket_pilot/v1/common.pb.dart';
 import 'package:pocket_pilot/src/generated/pocket_pilot/v1/yield_config_service.pbgrpc.dart';
 
 class YieldConfigRemoteService {
@@ -15,9 +16,15 @@ class YieldConfigRemoteService {
     );
   }
 
-  Future<ListYieldConfigsResponse> listConfigs({DateTime? updatedSince}) async {
+  Future<ListYieldConfigsResponse> listConfigs({
+    DateTime? updatedSince,
+    String? pageToken,
+    int pageSize = 100,
+  }) async {
     try {
-      final request = ListYieldConfigsRequest();
+      final request = ListYieldConfigsRequest(
+        page: PageRequest(pageSize: pageSize, pageToken: pageToken ?? ''),
+      );
       if (updatedSince != null) {
         request.updatedSince = Timestamp.fromDateTime(updatedSince.toUtc());
       }

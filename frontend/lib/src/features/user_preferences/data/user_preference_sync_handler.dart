@@ -23,21 +23,34 @@ class UserPreferenceSyncHandler implements SyncHandler {
 
   @override
   Future<SyncPullResult> pull(DateTime? updatedSince) async {
-    final response = await _remote.listPreferences(updatedSince: updatedSince);
+    final allItems = <SyncItem>[];
+    late DateTime syncedAt;
+    String? pageToken;
 
-    final items = response.preferences.map((proto) {
-      final model = UserPreferenceModel.fromProto(proto);
-      return SyncItem(
-        id: model.prefKey,
-        updatedAt: model.updatedAt,
-        data: model.toMap(),
+    do {
+      final response = await _remote.listPreferences(
+        updatedSince: updatedSince,
+        pageToken: pageToken,
       );
-    }).toList();
 
-    return SyncPullResult(
-      items: items,
-      syncedAt: response.syncedAt.toDateTime().toUtc(),
-    );
+      syncedAt = response.syncedAt.toDateTime().toUtc();
+
+      for (final proto in response.preferences) {
+        final model = UserPreferenceModel.fromProto(proto);
+        allItems.add(SyncItem(
+          id: model.prefKey,
+          updatedAt: model.updatedAt,
+          data: model.toMap(),
+        ));
+      }
+
+      pageToken = response.hasPage() &&
+              response.page.nextPageToken.isNotEmpty
+          ? response.page.nextPageToken
+          : null;
+    } while (pageToken != null);
+
+    return SyncPullResult(items: allItems, syncedAt: syncedAt);
   }
 
   @override

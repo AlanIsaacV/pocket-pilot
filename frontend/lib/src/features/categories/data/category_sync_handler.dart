@@ -23,21 +23,34 @@ class CategorySyncHandler implements SyncHandler {
 
   @override
   Future<SyncPullResult> pull(DateTime? updatedSince) async {
-    final response = await _remote.listCategories(updatedSince: updatedSince);
+    final allItems = <SyncItem>[];
+    late DateTime syncedAt;
+    String? pageToken;
 
-    final items = response.categories.map((proto) {
-      final model = CategoryModel.fromProto(proto);
-      return SyncItem(
-        id: model.id,
-        updatedAt: model.updatedAt,
-        data: model.toMap(),
+    do {
+      final response = await _remote.listCategories(
+        updatedSince: updatedSince,
+        pageToken: pageToken,
       );
-    }).toList();
 
-    return SyncPullResult(
-      items: items,
-      syncedAt: response.syncedAt.toDateTime().toUtc(),
-    );
+      syncedAt = response.syncedAt.toDateTime().toUtc();
+
+      for (final proto in response.categories) {
+        final model = CategoryModel.fromProto(proto);
+        allItems.add(SyncItem(
+          id: model.id,
+          updatedAt: model.updatedAt,
+          data: model.toMap(),
+        ));
+      }
+
+      pageToken = response.hasPage() &&
+              response.page.nextPageToken.isNotEmpty
+          ? response.page.nextPageToken
+          : null;
+    } while (pageToken != null);
+
+    return SyncPullResult(items: allItems, syncedAt: syncedAt);
   }
 
   @override

@@ -30,7 +30,7 @@ class StatisticsLocalStore {
       '''
       SELECT
         c.id AS category_id,
-        c.name, c.color, c.icon, c.kind,
+        c.name, c.color, c.icon, c.type AS kind,
         COALESCE(SUM(CASE WHEN t.type = 'expense' THEN  t.amount_cents
                           WHEN t.type = 'income'  THEN -t.amount_cents
                           ELSE 0 END), 0) AS total_cents,
@@ -62,14 +62,7 @@ class StatisticsLocalStore {
       HAVING ABS(total_cents) > 0
       ORDER BY ABS(total_cents) DESC
       ''',
-      [
-        currentYm,
-        windowMid,
-        windowMid,
-        currencyCode,
-        windowStart,
-        windowEnd,
-      ],
+      [currentYm, windowMid, windowMid, currencyCode, windowStart, windowEnd],
     );
   }
 

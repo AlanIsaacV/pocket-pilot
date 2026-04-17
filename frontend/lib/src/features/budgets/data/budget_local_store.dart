@@ -17,6 +17,20 @@ class BudgetLocalStore {
     );
   }
 
+  /// Returns the row for the budget owning [categoryId], or `null` when
+  /// none exists (the table has `UNIQUE(category_id)` so at most one).
+  Future<Map<String, dynamic>?> findByCategory(String categoryId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'budgets',
+      where: 'category_id = ? AND deleted_at IS NULL',
+      whereArgs: [categoryId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first;
+  }
+
   Future<void> upsertRow(Map<String, dynamic> row) async {
     final db = await _db.database;
     await db.insert(

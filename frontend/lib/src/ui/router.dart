@@ -60,6 +60,8 @@ import 'package:pocket_pilot/src/features/yield_configs/domain/yield_config.dart
 import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_form_route_scope.dart';
 import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_form_screen.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_route_scope.dart';
+import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.dart';
+import 'package:pocket_pilot/src/features/statistics/ui/category_history_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/settings/settings_screen.dart';
@@ -96,6 +98,17 @@ GoRouter buildRouter(AuthProvider authProvider) {
             path: '/dashboard',
             builder: (context, state) =>
                 const DashboardRouteScope(child: DashboardScreen()),
+            routes: [
+              GoRoute(
+                path: 'statistics/category/:categoryId',
+                builder: (context, state) => DashboardRouteScope(
+                  child: CategoryHistoryScreen(
+                    categoryId: state.pathParameters['categoryId']!,
+                    initialSummary: state.extra as CategorySeriesDTO?,
+                  ),
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/transactions',

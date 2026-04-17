@@ -26,10 +26,16 @@ import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 class BudgetFormScreen extends StatefulWidget {
   final BudgetModel? budget;
   final String categoryRoute;
+  final String? initialCategoryId;
+  final int? initialLimitCents;
+  final String? initialCurrencyCode;
 
   const BudgetFormScreen({
     this.budget,
     this.categoryRoute = '/accounts/budgets/new/category',
+    this.initialCategoryId,
+    this.initialLimitCents,
+    this.initialCurrencyCode,
     super.key,
   });
 
@@ -61,6 +67,18 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
       _selectedCategoryId = budget.categoryId;
       _selectedCurrencyCode = budget.currencyCode;
       _selectedPeriod = budget.period;
+    } else {
+      // New-budget pre-fill via route params (e.g. from Statistics).
+      if (widget.initialLimitCents != null && widget.initialLimitCents! > 0) {
+        _limitController.text =
+            _formatInitial(widget.initialLimitCents! / 100);
+      }
+      if (widget.initialCategoryId != null) {
+        _selectedCategoryId = widget.initialCategoryId;
+      }
+      if (widget.initialCurrencyCode != null) {
+        _selectedCurrencyCode = widget.initialCurrencyCode!;
+      }
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCurrencyOptions();

@@ -285,8 +285,21 @@ GoRouter buildRouter(AuthProvider authProvider) {
               ),
               GoRoute(
                 path: 'budgets/new',
-                builder: (context, state) =>
-                    const AccountsRouteScope(child: BudgetFormScreen()),
+                builder: (context, state) {
+                  final q = state.uri.queryParameters;
+                  final categoryId = q['categoryId'];
+                  final suggested = int.tryParse(q['suggested'] ?? '');
+                  final currency = q['currency'];
+                  return AccountsRouteScope(
+                    child: BudgetFormScreen(
+                      initialCategoryId: categoryId,
+                      initialLimitCents: (suggested != null && suggested > 0)
+                          ? suggested
+                          : null,
+                      initialCurrencyCode: currency,
+                    ),
+                  );
+                },
                 routes: [
                   GoRoute(
                     path: 'category',

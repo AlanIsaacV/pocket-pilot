@@ -85,6 +85,11 @@ dependencies:
   timezone: ^0.11.0
   flutter_timezone: ^5.0.2
 
+  # --- Gráficas ---
+  # fl_chart: librería declarativa de Flutter para gráficas (barras, líneas, pie).
+  # Usada en la tab de Estadísticas del dashboard.
+  fl_chart: ^0.69.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -6,10 +6,10 @@ import 'package:pocket_pilot/src/features/dashboard/data/dashboard_repository.da
 import 'package:pocket_pilot/src/features/dashboard/domain/account_balance_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_account_cycle_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_movement_dto.dart';
-import 'package:pocket_pilot/src/features/dashboard/domain/goal_target_dto.dart';
+import 'package:pocket_pilot/src/features/goals/domain/goal.dart';
 
 void main() {
-  test('safe_to_spend subtracts net card obligation', () async {
+  test('safe_to_spend subtracts goal monthly quota and card obligation', () async {
     final local = _FakeDashboardLocalStore();
     final repository = DashboardRepository(
       local: local,
@@ -20,11 +20,10 @@ void main() {
     final mxn = metricsByCurrency['MXN']!;
 
     expect(mxn.liquidAssetsCents, 100000);
-    expect(
-      mxn.safeToSpendCents,
-      50000,
-    ); // 100000 - 20000 goals - 30000 card net
-    expect(mxn.buyingPowerCents, 90000); // safe 50000 + revolving 40000
+    // 100000 liquid - 10000 goal monthly (30000 over 3 months) - 2000 card net
+    expect(mxn.safeToSpendCents, 88000);
+    // liquid 100000 + revolving 40000 (limit 50000 - used 10000)
+    expect(mxn.buyingPowerCents, 140000);
   });
 }
 
@@ -55,8 +54,18 @@ class _FakeDashboardLocalStore extends DashboardLocalStore {
   }
 
   @override
-  Future<List<GoalTargetDTO>> getTotalTargetInGoals() async {
-    return const [GoalTargetDTO(currencyCode: 'MXN', totalTargetCents: 20000)];
+  Future<List<GoalModel>> getActiveGoals() async {
+    return [
+      GoalModel(
+        id: 'goal-1',
+        name: 'Fondo',
+        targetAmountCents: 30000,
+        currencyCode: 'MXN',
+        targetDate: '2026-08-01',
+        createdAt: DateTime.utc(2026, 2, 1),
+        updatedAt: DateTime.utc(2026, 2, 1),
+      ),
+    ];
   }
 
   @override

@@ -5,7 +5,7 @@ import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_account_c
 import 'package:pocket_pilot/src/features/dashboard/domain/nature_spend_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/tag_spend_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_movement_dto.dart';
-import 'package:pocket_pilot/src/features/dashboard/domain/goal_target_dto.dart';
+import 'package:pocket_pilot/src/features/goals/domain/goal.dart';
 
 class DashboardLocalStore {
   final DatabaseHelper _db;
@@ -215,19 +215,24 @@ class DashboardLocalStore {
     return rows.map(TagSpendDTO.fromMap).toList();
   }
 
-  /// Returns the sum of `target_amount_cents` for all active goals,
-  /// grouped by currency code.
-  Future<List<GoalTargetDTO>> getTotalTargetInGoals() async {
+  /// Returns all active (non-deleted) goals with the fields required to
+  /// compute the monthly required contribution per goal.
+  Future<List<GoalModel>> getActiveGoals() async {
     final db = await _db.database;
     final rows = await db.rawQuery('''
       SELECT
+        id,
+        name,
+        target_amount_cents,
         currency_code,
-        COALESCE(SUM(target_amount_cents), 0) AS total_target_cents
+        target_date,
+        created_at,
+        updated_at,
+        deleted_at
       FROM goals
       WHERE deleted_at IS NULL
-      GROUP BY currency_code
     ''');
-    return rows.map(GoalTargetDTO.fromMap).toList();
+    return rows.map(GoalModel.fromMap).toList();
   }
 
   Future<List<CreditCardAccountCycleDTO>> getCreditCardAccounts({

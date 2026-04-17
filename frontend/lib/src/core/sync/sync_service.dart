@@ -5,12 +5,14 @@ import 'package:pocket_pilot/src/core/sync/scheduled_generation_orchestrator.dar
 import 'package:pocket_pilot/src/core/sync/sync_handler.dart';
 import 'package:pocket_pilot/src/core/sync/sync_metadata_store.dart';
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
+import 'package:pocket_pilot/src/core/sync/sync_status_remote_service.dart';
 
 enum SyncStatus { idle, syncing, error }
 
 class SyncService implements SyncRunner {
   final SyncOutbox _outbox;
   final SyncMetadataStore _metadataStore;
+  final SyncStatusRemoteService _statusService;
   final Map<String, SyncHandler> _handlers;
 
   final ValueNotifier<SyncStatus> status = ValueNotifier(SyncStatus.idle);
@@ -18,12 +20,19 @@ class SyncService implements SyncRunner {
   bool _syncRequested = false;
   Future<void>? _activeSyncFuture;
 
+  /// Número de entidades cuyo pull fue saltado en el último ciclo porque el
+  /// cursor del servidor no era más reciente que el local. Expuesto para la
+  /// pantalla de Sync Status.
+  int lastCycleSkippedCount = 0;
+
   SyncService({
     required SyncOutbox outbox,
     required SyncMetadataStore metadataStore,
+    required SyncStatusRemoteService statusService,
     required List<SyncHandler> handlers,
   }) : _outbox = outbox,
        _metadataStore = metadataStore,
+       _statusService = statusService,
        _handlers = {for (final h in handlers) h.entityType: h};
 
   /// Ejecuta un ciclo completo de sync: Pull -> Push para todas las entidades.
@@ -51,10 +60,38 @@ class SyncService implements SyncRunner {
         ..sort((a, b) => a.syncOrder.compareTo(b.syncOrder));
       while (_syncRequested) {
         _syncRequested = false;
+
+        // Preflight: ask the server for per-entity cursors so we can skip
+        // pulls where nothing changed. If the call fails (network, 5xx),
+        // fall back to pulling every entity.
+        Map<String, DateTime>? serverCursors;
+        try {
+          serverCursors = await _statusService.getSyncStatus();
+        } catch (_) {
+          serverCursors = null;
+        }
+
+        int skipped = 0;
         for (final handler in sorted) {
-          await _pullEntity(handler);
+          final localCursor = await _metadataStore.getLastSyncedAt(
+            handler.entityType,
+          );
+          final serverCursor = serverCursors?[handler.entityType];
+
+          final shouldSkip =
+              serverCursors != null &&
+              localCursor != null &&
+              serverCursor != null &&
+              !serverCursor.isAfter(localCursor);
+
+          if (shouldSkip) {
+            skipped++;
+          } else {
+            await _pullEntity(handler);
+          }
           await _pushEntity(handler);
         }
+        lastCycleSkippedCount = skipped;
       }
     } catch (_) {
       hadError = true;

@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/AlanIsaacV/pocket-pilot/internal/sync"
 )
 
 // Account is the internal domain model.
@@ -28,11 +30,12 @@ type Account struct {
 }
 
 type Repository struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	cursor *sync.CursorStore
 }
 
-func NewRepository(pool *pgxpool.Pool) *Repository {
-	return &Repository{pool: pool}
+func NewRepository(pool *pgxpool.Pool, cursor *sync.CursorStore) *Repository {
+	return &Repository{pool: pool, cursor: cursor}
 }
 
 func (r *Repository) scan(row pgx.Row) (*Account, error) {
@@ -130,7 +133,13 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 //   - conflictResolved=false: the incoming version was accepted (insert or LWW update).
 //   - conflictResolved=true:  the server had a newer version; returned account is the server's.
 func (r *Repository) Upsert(ctx context.Context, a *Account) (*Account, bool, error) {
-	row := r.pool.QueryRow(ctx, `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback(ctx)
+
+	row := tx.QueryRow(ctx, `
 		INSERT INTO accounts (id, user_id, name, type, currency_code, credit_limit_cents, statement_day, payment_due_day, interest_rate_apr, term_months, created_at, updated_at, deleted_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		ON CONFLICT (id) DO UPDATE SET
@@ -157,15 +166,19 @@ func (r *Repository) Upsert(ctx context.Context, a *Account) (*Account, bool, er
 
 	result, err := r.scan(row)
 	if err == nil {
-		// Insert or update succeeded — client's version was accepted.
+		if err := r.cursor.Bump(ctx, tx, a.UserID, sync.EntityAccount, result.UpdatedAt); err != nil {
+			return nil, false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, false, err
+		}
 		return result, false, nil
 	}
 	if err != pgx.ErrNoRows {
 		return nil, false, err
 	}
 
-	// ErrNoRows means the WHERE updated_at < EXCLUDED.updated_at was false:
-	// the server has a newer version. Fetch and return it with conflict_resolved=true.
+	// LWW rejected the client's version — return the server's without bumping.
 	current, err := r.GetByID(ctx, a.ID, a.UserID)
 	if err != nil {
 		return nil, false, err
@@ -177,10 +190,24 @@ func (r *Repository) Upsert(ctx context.Context, a *Account) (*Account, bool, er
 // If the server's updated_at is newer than the requested deleted_at, the delete is silently
 // ignored (the server's version wins and the client will receive it on the next delta pull).
 func (r *Repository) SoftDelete(ctx context.Context, id, userID uuid.UUID, deletedAt time.Time) error {
-	_, err := r.pool.Exec(ctx, `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `
 		UPDATE accounts SET deleted_at = $3, updated_at = $3
 		WHERE id = $1 AND user_id = $2
 		  AND (deleted_at IS NULL OR updated_at < $3)
 	`, id, userID, deletedAt)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() > 0 {
+		if err := r.cursor.Bump(ctx, tx, userID, sync.EntityAccount, deletedAt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }

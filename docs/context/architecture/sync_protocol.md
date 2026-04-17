@@ -10,6 +10,17 @@ Pocket Pilot uses an offline-first strategy based on an Outbox pattern for write
 - **Response:** The server returns all records (including soft-deleted ones) modified after that time, capped by `page_size`, plus a `PageResponse.next_page_token` when more records remain.
 - **Pagination:** ALL list endpoints are paginated on the backend (default `page_size=20`, max `100`). Both full sync (`updated_since=nil`) and delta sync must loop through pages until `next_page_token` is empty — otherwise only the first page is persisted and the remaining records are silently lost. Sync handlers accumulate `SyncItem`s across pages and commit a single `last_synced_at` derived from the server's `synced_at` timestamp of the final response.
 
+### 1.1 Preflight Cursors (Skip-on-idle)
+- **Mechanism:** Before the per-entity pull loop, the client calls `SyncService.GetSyncStatus()` once per sync cycle. The server returns a map `{entity_type: cursor_at}` with the latest `updated_at` observed across the user's rows for each of the 9 sync entities (missing entities report the Unix epoch so the map is always complete).
+- **Skip rule:** For each handler, if `server_cursor <= local_last_synced_at` AND `local_last_synced_at != null`, the client skips the entity's pull entirely. A null local cursor (first sync) always forces a pull regardless of the preflight result.
+- **Cursor maintenance:** The cursor lives in PostgreSQL table `user_sync_cursors(user_id, entity_type, cursor_at)`. Every repository's `Upsert` and `SoftDelete` calls `sync.CursorStore.Bump(tx, userID, entityType, updatedAt)` inside the same transaction as the triggering write. The bump uses LWW semantics (`WHERE cursor_at < EXCLUDED.cursor_at`), so rejected LWW upserts do not move the cursor.
+- **Observability:** `SyncService.lastCycleSkippedCount` (frontend) holds `N/9` for the most recent cycle and is surfaced on the Sync Status screen.
+- **Fallback:** If `GetSyncStatus` fails for any reason (network, 5xx), the client logs and falls back to the previous behavior (pull all 9 entities). The optimization is purely additive — never blocks sync.
+- **Canonical entity list:** `backend/internal/sync.AllEntityTypes()` is the source of truth. Adding a new sync-participating entity requires:
+    1. Appending to `AllEntityTypes()`.
+    2. Calling `cursor.Bump(ctx, tx, userID, sync.EntityX, updatedAt)` inside that repo's `Upsert`/`SoftDelete`, transactionalizing them if they were not already.
+    3. Adding an integration test in `backend/internal/<repo>/cursor_integration_test.go` covering Upsert bump, SoftDelete bump, and LWW-rejection no-bump.
+
 ### 2. Sync Outbox (Push)
 - **Mechanism:** Every local write (insert/update/delete) is enqueued in a `sync_outbox` table in SQLite.
 - **Deduplication:** The outbox only keeps the latest operation per `(entity_type, entity_id)` to avoid redundant network calls.

@@ -7,14 +7,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/AlanIsaacV/pocket-pilot/internal/sync"
 )
 
 type Repository struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	cursor *sync.CursorStore
 }
 
-func NewRepository(pool *pgxpool.Pool) *Repository {
-	return &Repository{pool: pool}
+func NewRepository(pool *pgxpool.Pool, cursor *sync.CursorStore) *Repository {
+	return &Repository{pool: pool, cursor: cursor}
 }
 
 const scanColumns = `id, user_id, name, account_id, to_account_id, category_id, type, amount_cents, currency_code, tags, description, frequency, next_date, end_date, created_at, updated_at, deleted_at, is_auto_charge, is_active, nature`
@@ -87,7 +90,13 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 }
 
 func (r *Repository) Upsert(ctx context.Context, t *Template) (*Template, bool, error) {
-	row := r.pool.QueryRow(ctx, `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback(ctx)
+
+	row := tx.QueryRow(ctx, `
 		INSERT INTO transaction_templates (id, user_id, name, account_id, to_account_id, category_id, type, amount_cents, currency_code, tags, description, frequency, next_date, end_date, created_at, updated_at, is_auto_charge, is_active, nature)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 		ON CONFLICT (id) DO UPDATE SET
@@ -119,6 +128,12 @@ func (r *Repository) Upsert(ctx context.Context, t *Template) (*Template, bool, 
 
 	result, err := r.scan(row)
 	if err == nil {
+		if err := r.cursor.Bump(ctx, tx, t.UserID, sync.EntityTransactionTemplate, result.UpdatedAt); err != nil {
+			return nil, false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, false, err
+		}
 		return result, false, nil
 	}
 	if err != pgx.ErrNoRows {
@@ -133,10 +148,24 @@ func (r *Repository) Upsert(ctx context.Context, t *Template) (*Template, bool, 
 }
 
 func (r *Repository) SoftDelete(ctx context.Context, id, userID uuid.UUID, deletedAt time.Time) error {
-	_, err := r.pool.Exec(ctx, `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `
 		UPDATE transaction_templates SET deleted_at = $3, updated_at = $3
 		WHERE id = $1 AND user_id = $2
 		  AND (deleted_at IS NULL OR updated_at < $3)
 	`, id, userID, deletedAt)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() > 0 {
+		if err := r.cursor.Bump(ctx, tx, userID, sync.EntityTransactionTemplate, deletedAt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }

@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+// SyncService exposes cross-cutting sync coordination RPCs.
+service SyncService {
+  // Returns the server's latest cursor per entity type for the authenticated
+  // user. The client compares each cursor with its local last_synced_at and
+  // skips the per-entity delta pull when server_cursor <= local_last_synced_at.
+  rpc GetSyncStatus(GetSyncStatusRequest) returns (GetSyncStatusResponse);
+}
+
+message GetSyncStatusRequest {}
+
+message GetSyncStatusResponse {
+  // Map keyed by entity_type (matches the frontend SyncHandler.entityType
+  // string: "account", "transaction", "category", "goal", "tag", "budget",
+  // "transaction_template", "user_preference", "yield_config").
+  // Every known entity appears. Entities with no stored cursor report
+  // 1970-01-01T00:00:00Z so the client can safely compare without null checks.
+  map<string, google.protobuf.Timestamp> cursors = 1;
+
+  // Server wall-clock at the moment of the query. Informational only.
+  google.protobuf.Timestamp synced_at = 2;
+}

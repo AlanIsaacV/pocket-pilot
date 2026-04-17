@@ -15,6 +15,7 @@ class SyncStatusScreen extends StatefulWidget {
 class _SyncStatusScreenState extends State<SyncStatusScreen> {
   int _pendingCount = 0;
   DateTime? _lastSyncedAt;
+  int _skippedCount = 0;
 
   @override
   void initState() {
@@ -30,6 +31,7 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
     setState(() {
       _pendingCount = pending;
       _lastSyncedAt = lastSync;
+      _skippedCount = syncService.lastCycleSkippedCount;
     });
   }
 
@@ -141,6 +143,14 @@ class _SyncStatusScreenState extends State<SyncStatusScreen> {
                       )
                     : valueStyle,
               ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Entidades saltadas (último ciclo)', style: detailStyle),
+              Text('$_skippedCount/9', style: valueStyle),
             ],
           ),
         ],

@@ -27,6 +27,7 @@ import 'package:pocket_pilot/src/core/sync/sync_metadata_store.dart';
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
 import 'package:pocket_pilot/src/core/sync/scheduled_generation_orchestrator.dart';
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
+import 'package:pocket_pilot/src/core/sync/sync_status_remote_service.dart';
 import 'package:pocket_pilot/src/core/theme/theme_preference_controller.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_remote_service.dart';
@@ -180,9 +181,12 @@ Future<void> main() async {
     remote: BudgetRemoteService(),
   );
 
+  final syncStatusRemoteService = SyncStatusRemoteService();
+
   final syncService = SyncService(
     outbox: syncOutbox,
     metadataStore: syncMetadataStore,
+    statusService: syncStatusRemoteService,
     handlers: [
       accountSyncHandler,
       categorySyncHandler,

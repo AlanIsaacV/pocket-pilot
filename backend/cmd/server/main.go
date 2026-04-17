@@ -23,6 +23,7 @@ import (
 	"github.com/AlanIsaacV/pocket-pilot/internal/goal"
 	"github.com/AlanIsaacV/pocket-pilot/internal/jwks"
 	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
+	"github.com/AlanIsaacV/pocket-pilot/internal/sync"
 	"github.com/AlanIsaacV/pocket-pilot/internal/tag"
 	"github.com/AlanIsaacV/pocket-pilot/internal/transaction"
 	"github.com/AlanIsaacV/pocket-pilot/internal/transactiontemplate"
@@ -47,16 +48,22 @@ func main() {
 	defer pool.Close()
 	slog.Info("connected to PostgreSQL")
 
+	// Shared sync cursor store used by every repository below.
+	cursorStore := sync.NewCursorStore(pool)
+
 	// Wire up repositories and handlers
-	accountHandler := account.NewHandler(account.NewRepository(pool))
-	categoryHandler := category.NewHandler(category.NewRepository(pool))
-	transactionHandler := transaction.NewHandler(transaction.NewRepository(pool))
-	transactionTemplateHandler := transactiontemplate.NewHandler(transactiontemplate.NewRepository(pool))
-	yieldConfigHandler := yieldconfig.NewHandler(yieldconfig.NewRepository(pool))
-	goalHandler := goal.NewHandler(goal.NewRepository(pool))
-	budgetHandler := budget.NewHandler(budget.NewRepository(pool))
-	tagHandler := tag.NewHandler(tag.NewRepository(pool))
-	userPreferenceHandler := userpreference.NewHandler(userpreference.NewRepository(pool))
+	accountHandler := account.NewHandler(account.NewRepository(pool, cursorStore))
+	categoryHandler := category.NewHandler(category.NewRepository(pool, cursorStore))
+	transactionHandler := transaction.NewHandler(transaction.NewRepository(pool, cursorStore))
+	transactionTemplateHandler := transactiontemplate.NewHandler(transactiontemplate.NewRepository(pool, cursorStore))
+	yieldConfigHandler := yieldconfig.NewHandler(yieldconfig.NewRepository(pool, cursorStore))
+	goalHandler := goal.NewHandler(goal.NewRepository(pool, cursorStore))
+	budgetHandler := budget.NewHandler(budget.NewRepository(pool, cursorStore))
+	tagHandler := tag.NewHandler(tag.NewRepository(pool, cursorStore))
+	userPreferenceHandler := userpreference.NewHandler(userpreference.NewRepository(pool, cursorStore))
+
+	// SyncService handler (preflight GetSyncStatus).
+	syncHandler := sync.NewHandler(cursorStore)
 
 	// AI Assistant
 	geminiProvider := aiassistant.NewGeminiProvider(cfg.GeminiAPIKey)
@@ -89,6 +96,7 @@ func main() {
 	pb.RegisterUserPreferenceServiceServer(srv, userPreferenceHandler)
 	pb.RegisterAIAssistantServiceServer(srv, aiHandler)
 	pb.RegisterAuthServiceServer(srv, authHandler)
+	pb.RegisterSyncServiceServer(srv, syncHandler)
 
 	reflection.Register(srv)
 

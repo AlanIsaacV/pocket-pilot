@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/AlanIsaacV/pocket-pilot/internal/sync"
 )
 
 // Transaction mirrors the `transactions` table.
@@ -34,11 +36,12 @@ type Transaction struct {
 }
 
 type Repository struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	cursor *sync.CursorStore
 }
 
-func NewRepository(pool *pgxpool.Pool) *Repository {
-	return &Repository{pool: pool}
+func NewRepository(pool *pgxpool.Pool, cursor *sync.CursorStore) *Repository {
+	return &Repository{pool: pool, cursor: cursor}
 }
 
 const scanColumns = `id, user_id, account_id, category_id, linked_transaction_id, template_id, yield_id, type, amount_cents, installments_count, currency_code, status, tags, description, nature, date, created_at, updated_at, deleted_at`
@@ -140,7 +143,13 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 //   - conflictResolved=false: incoming version was accepted.
 //   - conflictResolved=true:  server had a newer version; returned transaction is the server's.
 func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, bool, error) {
-	row := r.pool.QueryRow(ctx, `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback(ctx)
+
+	row := tx.QueryRow(ctx, `
 		INSERT INTO transactions (id, user_id, account_id, category_id, linked_transaction_id, template_id, yield_id, type, amount_cents, installments_count, currency_code, status, tags, description, nature, date, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		ON CONFLICT (id) DO UPDATE SET
@@ -171,13 +180,19 @@ func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, 
 
 	result, err := r.scan(row)
 	if err == nil {
+		if err := r.cursor.Bump(ctx, tx, t.UserID, sync.EntityTransaction, result.UpdatedAt); err != nil {
+			return nil, false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, false, err
+		}
 		return result, false, nil
 	}
 	if err != pgx.ErrNoRows {
 		return nil, false, err
 	}
 
-	// ErrNoRows: server has a newer version. Return it with conflict_resolved=true.
+	// LWW rejected the client's version — return the server's without bumping.
 	current, err := r.GetByID(ctx, t.ID, t.UserID)
 	if err != nil {
 		return nil, false, err
@@ -218,6 +233,12 @@ func (r *Repository) SoftDelete(ctx context.Context, id, userID uuid.UUID, delet
 		if err != nil {
 			return err
 		}
+	}
+
+	// Bump cursor within the same tx. The CursorStore's LWW guard prevents
+	// regression if deletedAt happened to be older than the stored cursor.
+	if err := r.cursor.Bump(ctx, tx, userID, sync.EntityTransaction, deletedAt); err != nil {
+		return err
 	}
 
 	return tx.Commit(ctx)

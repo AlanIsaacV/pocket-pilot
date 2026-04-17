@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/AlanIsaacV/pocket-pilot/internal/sync"
 )
 
 // Category mirrors the `categories` table.
@@ -25,11 +27,12 @@ type Category struct {
 }
 
 type Repository struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	cursor *sync.CursorStore
 }
 
-func NewRepository(pool *pgxpool.Pool) *Repository {
-	return &Repository{pool: pool}
+func NewRepository(pool *pgxpool.Pool, cursor *sync.CursorStore) *Repository {
+	return &Repository{pool: pool, cursor: cursor}
 }
 
 const scanColumns = `id, user_id, name, icon, color, parent_id, type, default_nature, created_at, updated_at, deleted_at`
@@ -115,7 +118,13 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 //   - conflictResolved=false: incoming version was accepted.
 //   - conflictResolved=true:  server had a newer version; returned category is the server's.
 func (r *Repository) Upsert(ctx context.Context, c *Category) (*Category, bool, error) {
-	row := r.pool.QueryRow(ctx, `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback(ctx)
+
+	row := tx.QueryRow(ctx, `
 		INSERT INTO categories (id, user_id, name, icon, color, parent_id, type, default_nature, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (id) DO UPDATE SET
@@ -134,13 +143,19 @@ func (r *Repository) Upsert(ctx context.Context, c *Category) (*Category, bool, 
 
 	result, err := r.scan(row)
 	if err == nil {
+		if err := r.cursor.Bump(ctx, tx, c.UserID, sync.EntityCategory, result.UpdatedAt); err != nil {
+			return nil, false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, false, err
+		}
 		return result, false, nil
 	}
 	if err != pgx.ErrNoRows {
 		return nil, false, err
 	}
 
-	// ErrNoRows: server has a newer version. Return it with conflict_resolved=true.
+	// LWW rejected the client's version — return the server's without bumping.
 	current, err := r.GetByID(ctx, c.ID, c.UserID)
 	if err != nil {
 		return nil, false, err
@@ -150,10 +165,24 @@ func (r *Repository) Upsert(ctx context.Context, c *Category) (*Category, bool, 
 
 // SoftDelete sets deleted_at on a category, applying LWW by comparing timestamps.
 func (r *Repository) SoftDelete(ctx context.Context, id, userID uuid.UUID, deletedAt time.Time) error {
-	_, err := r.pool.Exec(ctx, `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `
 		UPDATE categories SET deleted_at = $3, updated_at = $3
 		WHERE id = $1 AND user_id = $2
 		  AND (deleted_at IS NULL OR updated_at < $3)
 	`, id, userID, deletedAt)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() > 0 {
+		if err := r.cursor.Bump(ctx, tx, userID, sync.EntityCategory, deletedAt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }

@@ -7,14 +7,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/AlanIsaacV/pocket-pilot/internal/sync"
 )
 
 type Repository struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	cursor *sync.CursorStore
 }
 
-func NewRepository(pool *pgxpool.Pool) *Repository {
-	return &Repository{pool: pool}
+func NewRepository(pool *pgxpool.Pool, cursor *sync.CursorStore) *Repository {
+	return &Repository{pool: pool, cursor: cursor}
 }
 
 const scanColumns = `id, user_id, category_id, limit_amount_cents, currency_code, period, created_at, updated_at, deleted_at`
@@ -97,7 +100,13 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 }
 
 func (r *Repository) Upsert(ctx context.Context, b *Budget) (*Budget, bool, error) {
-	row := r.pool.QueryRow(
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback(ctx)
+
+	row := tx.QueryRow(
 		ctx,
 		`
 		INSERT INTO budgets (
@@ -134,6 +143,12 @@ func (r *Repository) Upsert(ctx context.Context, b *Budget) (*Budget, bool, erro
 
 	result, err := r.scan(row)
 	if err == nil {
+		if err := r.cursor.Bump(ctx, tx, b.UserID, sync.EntityBudget, result.UpdatedAt); err != nil {
+			return nil, false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, false, err
+		}
 		return result, false, nil
 	}
 	if err != pgx.ErrNoRows {
@@ -149,7 +164,13 @@ func (r *Repository) Upsert(ctx context.Context, b *Budget) (*Budget, bool, erro
 }
 
 func (r *Repository) SoftDelete(ctx context.Context, id, userID uuid.UUID, deletedAt time.Time) error {
-	_, err := r.pool.Exec(
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(
 		ctx,
 		`UPDATE budgets SET deleted_at = $3, updated_at = $3
 		 WHERE id = $1 AND user_id = $2
@@ -158,5 +179,13 @@ func (r *Repository) SoftDelete(ctx context.Context, id, userID uuid.UUID, delet
 		userID,
 		deletedAt,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() > 0 {
+		if err := r.cursor.Bump(ctx, tx, userID, sync.EntityBudget, deletedAt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }

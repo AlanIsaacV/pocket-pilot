@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/AlanIsaacV/pocket-pilot/internal/sync"
 )
 
 type UserPreference struct {
@@ -19,11 +21,12 @@ type UserPreference struct {
 }
 
 type Repository struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	cursor *sync.CursorStore
 }
 
-func NewRepository(pool *pgxpool.Pool) *Repository {
-	return &Repository{pool: pool}
+func NewRepository(pool *pgxpool.Pool, cursor *sync.CursorStore) *Repository {
+	return &Repository{pool: pool, cursor: cursor}
 }
 
 const scanColumns = `user_id, pref_key, pref_value, created_at, updated_at, deleted_at`
@@ -94,7 +97,13 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 }
 
 func (r *Repository) Upsert(ctx context.Context, p *UserPreference) (*UserPreference, bool, error) {
-	row := r.pool.QueryRow(ctx, `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback(ctx)
+
+	row := tx.QueryRow(ctx, `
 		INSERT INTO user_preferences (user_id, pref_key, pref_value, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (user_id, pref_key) DO UPDATE SET
@@ -108,6 +117,12 @@ func (r *Repository) Upsert(ctx context.Context, p *UserPreference) (*UserPrefer
 
 	result, err := r.scan(row)
 	if err == nil {
+		if err := r.cursor.Bump(ctx, tx, result.UserID, sync.EntityUserPreference, result.UpdatedAt); err != nil {
+			return nil, false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, false, err
+		}
 		return result, false, nil
 	}
 	if err != pgx.ErrNoRows {
@@ -122,10 +137,24 @@ func (r *Repository) Upsert(ctx context.Context, p *UserPreference) (*UserPrefer
 }
 
 func (r *Repository) SoftDelete(ctx context.Context, userID uuid.UUID, prefKey string, deletedAt time.Time) error {
-	_, err := r.pool.Exec(ctx, `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `
 		UPDATE user_preferences SET deleted_at = $3, updated_at = $3
 		WHERE user_id = $1 AND pref_key = $2
 		  AND (deleted_at IS NULL OR updated_at < $3)
 	`, userID, prefKey, deletedAt)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() > 0 {
+		if err := r.cursor.Bump(ctx, tx, userID, sync.EntityUserPreference, deletedAt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }

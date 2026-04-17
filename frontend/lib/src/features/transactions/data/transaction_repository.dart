@@ -58,6 +58,31 @@ class TransactionRepository {
     return TransactionModel.fromMap(row);
   }
 
+  /// Confirma una transacción pendiente: cambia status a 'cleared' y
+  /// preserva todos los demás campos (incluida la fecha). Idempotente:
+  /// no hace nada si la transacción no existe o ya está cleared.
+  Future<void> confirmTransaction(String id) async {
+    final current = await getTransactionById(id);
+    if (current == null || current.status == 'cleared') return;
+
+    await updateTransaction(
+      id: current.id,
+      accountId: current.accountId,
+      categoryId: current.categoryId,
+      templateId: current.templateId,
+      amountMinor: current.amount,
+      installmentsCount: current.installmentsCount,
+      currencyCode: current.currencyCode,
+      description: current.description,
+      nature: current.nature,
+      date: current.date,
+      type: current.type,
+      status: 'cleared',
+      tags: current.tags,
+      createdAt: current.createdAt,
+    );
+  }
+
   // ----------------------------------------------------------
   // WRITE — income/expense
   // ----------------------------------------------------------

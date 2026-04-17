@@ -157,6 +157,24 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
       return;
     }
 
+    // En modo edición, si alguna de las cuentas origen/destino está archivada
+    // inyectarla para permitir guardar cambios sin forzar al usuario a
+    // restaurarla o cambiar de cuenta.
+    if (_isEditMode) {
+      final originalIds = <String>{
+        widget.transferOut!.accountId,
+        widget.transferIn!.accountId,
+      };
+      for (final id in originalIds) {
+        if (accounts.any((a) => a.id == id)) continue;
+        final archived = await accountStore.getByIdIncludingArchived(id);
+        if (archived != null && archived.type != 'contact') {
+          accounts.add(archived);
+        }
+      }
+      if (!mounted) return;
+    }
+
     var allowedCurrencies = List<String>.from(currencySnapshot.allowedCodes);
     AccountModel? fromAccount;
     AccountModel? toAccount;

@@ -6,8 +6,8 @@
 2. **Net Worth card** — `DashboardMetrics.netWorthCents` (sum of all accounts).
 3. **Metrics grid** — Three cards:
    - Liquidez real: `liquidAssetsCents` (bank + cash only)
-   - Liquidez libre: `safeToSpendCents` (liquid - goals - card payments)
-   - Poder de compra: `buyingPowerCents` (safe-to-spend + available revolving credit)
+   - Liquidez libre: `safeToSpendCents` = `liquid - goalMonthly - cardPayment`. `goalMonthly` is the **monthly required contribution** across all active goals, computed via `GoalMath.totalMonthlyRequiredCents(goals, now)` — **not** the total target. The full target is a long-term savings objective, not a current-month outflow.
+   - Poder de compra: `buyingPowerCents` = `liquid + revolving`. Represents gross purchase capacity: cash/bank balances plus remaining credit-card capacity (`creditLimit + balance`, where credit-card balances are negative). **Does not** subtract goals or card payments — those already reduce `safeToSpend` and shouldn't double-count here.
 4. **Tarjetas de credito** — Per-card estimated monthly payment. Only shown when credit cards exist.
 5. **Cuentas** — All accounts with balance. Tappable → navigates to `/accounts/:accountId/edit`.
 6. **Gasto del mes** — Spend grouped by category. Excludes `categoryId == null` transactions.
@@ -33,6 +33,10 @@ DashboardLocalStore (SQL queries)
 | `CategorySpendDTO` | `getMonthlySpendByCategory()` | categoryId, categoryName, categoryColor, currencyCode, spentCents |
 | `NatureSpendDTO` | `getMonthlySpendByNature()` | nature, currencyCode, spentCents |
 | `TagSpendDTO` | `getMonthlySpendByTag()` | tagName, currencyCode, spentCents |
+
+## Goals Aggregation for Dashboard
+
+`DashboardLocalStore.getActiveGoals()` returns `List<GoalModel>` (not an aggregate). `DashboardRepository.calculateAllMetrics` groups goals by currency and calls `GoalMath.totalMonthlyRequiredCents(goalsForCurrency, now: now)` per currency. This keeps the monthly-cuota math in one place (`GoalModel.monthlyRequiredCentsAt`) and lets the dashboard reuse it without duplicating ceil-division logic.
 
 ## Credit Card Payment Calculation
 

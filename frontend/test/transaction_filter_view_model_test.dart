@@ -36,10 +36,12 @@ void main() {
       expect(vm.periodGranularity, PeriodGranularity.year);
     });
 
-    test('navigatePeriod cannot go forward past 0', () {
+    test('navigatePeriod can go forward into future periods', () {
       vm.setActivePageIndex(1);
-      vm.navigatePeriod(1); // try to go forward from 0
-      expect(vm.periodOffset, 0);
+      vm.navigatePeriod(1);
+      expect(vm.periodOffset, 1);
+      vm.navigatePeriod(1);
+      expect(vm.periodOffset, 2);
     });
 
     test('navigatePeriod can go back', () {

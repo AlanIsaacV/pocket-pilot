@@ -227,11 +227,14 @@ class _TransactionsListTabState extends State<_TransactionsListTab> {
 
     final categories = await categoryStore.getCategories();
     final accounts = await accountStore.getAccounts();
+    final archivedAccounts = await accountStore.getArchivedAccounts();
 
     if (!mounted) return;
     setState(() {
       _categoryMap = {for (final c in categories) c.id: c};
-      _accountMap = {for (final a in accounts) a.id: a};
+      _accountMap = {
+        for (final a in [...accounts, ...archivedAccounts]) a.id: a,
+      };
       _lookupsLoaded = true;
     });
   }
@@ -374,6 +377,9 @@ class _TransactionList extends StatelessWidget {
                 onTap: () {
                   _handleTransactionTap(context, t);
                 },
+                onConfirm: t.status == 'pending'
+                    ? () => _handleConfirmTap(context, t)
+                    : null,
               ),
             );
           }
@@ -382,6 +388,29 @@ class _TransactionList extends StatelessWidget {
         return const SizedBox.shrink();
       },
     );
+  }
+
+  Future<void> _handleConfirmTap(
+    BuildContext context,
+    TransactionModel transaction,
+  ) async {
+    try {
+      await vm.confirmTransaction(
+        transaction.id,
+        linkedTransactionId: transaction.linkedTransactionId,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Transacción confirmada')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo confirmar: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _handleTransactionTap(
@@ -435,34 +464,42 @@ class _TransactionList extends StatelessWidget {
     return AccountLocalStore(db: db).getById(id);
   }
 
-  void _openTransferEdit(BuildContext context, TransactionModel t) {
-    final linked = t.linkedTransactionId != null
-        ? vm.findLinked(t.linkedTransactionId!)
-        : null;
+  Future<void> _openTransferEdit(
+    BuildContext context,
+    TransactionModel t,
+  ) async {
+    TransactionModel? linked;
+    if (t.linkedTransactionId != null) {
+      // La pierna complementaria puede estar fuera del listado filtrado;
+      // primero se intenta en memoria y, si no aparece, se busca en DB.
+      linked =
+          vm.findLinked(t.linkedTransactionId!) ??
+          await vm.getTransactionById(t.linkedTransactionId!);
+    }
+    if (!context.mounted) return;
 
-    // Determine which is out and which is in.
-    final TransactionModel? outLeg;
-    final TransactionModel? inLeg;
-    if (t.isTransferOut) {
-      outLeg = t;
-      inLeg = linked;
-    } else {
-      outLeg = linked;
-      inLeg = t;
+    final outLeg = t.isTransferOut ? t : linked;
+    final inLeg = t.isTransferOut ? linked : t;
+
+    if (outLeg == null || inLeg == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se encontró la otra pierna de la transferencia'),
+        ),
+      );
+      return;
     }
 
-    if (outLeg != null && inLeg != null) {
-      context
-          .push(
-            '/transactions/${t.id}/edit-transfer',
-            extra: {'out': outLeg, 'in': inLeg},
-          )
-          .then((result) {
-            if (result == true && context.mounted) {
-              vm.loadOnAppear();
-            }
-          });
-    }
+    context
+        .push(
+          '/transactions/${t.id}/edit-transfer',
+          extra: {'out': outLeg, 'in': inLeg},
+        )
+        .then((result) {
+          if (result == true && context.mounted) {
+            vm.loadOnAppear();
+          }
+        });
   }
 }
 
@@ -524,12 +561,14 @@ class _TransactionTile extends StatelessWidget {
   final CategoryModel? category;
   final AccountModel? account;
   final VoidCallback onTap;
+  final VoidCallback? onConfirm;
 
   const _TransactionTile({
     required this.transaction,
     required this.onTap,
     this.category,
     this.account,
+    this.onConfirm,
   });
 
   @override
@@ -710,6 +749,57 @@ class _TransactionTile extends StatelessWidget {
                                 }).toList(),
                               ),
                             ],
+                          ],
+                        ),
+                      ],
+                      if (transaction.status == 'pending') ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: cs.tertiaryContainer,
+                                borderRadius: AppTheme.radiusFull,
+                              ),
+                              child: Text(
+                                'Pendiente',
+                                style: GoogleFonts.ibmPlexSans(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: cs.onTertiaryContainer,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            if (onConfirm != null)
+                              TextButton.icon(
+                                onPressed: onConfirm,
+                                icon: const Icon(
+                                  Icons.check_circle_outline,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  'Confirmar',
+                                  style: GoogleFonts.ibmPlexSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: cs.primary,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 0,
+                                  ),
+                                  minimumSize: const Size(0, 28),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
                           ],
                         ),
                       ],

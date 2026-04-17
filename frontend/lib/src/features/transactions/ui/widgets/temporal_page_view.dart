@@ -155,9 +155,7 @@ class _PeriodPage extends StatelessWidget {
           iconSize: 22,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          onPressed: vm.isAtCurrentPeriod
-              ? null
-              : () => vm.navigatePeriod(1),
+          onPressed: () => vm.navigatePeriod(1),
         ),
       ],
     );
@@ -229,11 +227,12 @@ class _CustomPage extends StatelessWidget {
   }
 
   Future<void> _pickDate(BuildContext context, {required bool isFrom}) async {
+    final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: isFrom ? vm.customFrom : vm.customTo,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      lastDate: DateTime(now.year + 5, now.month, now.day),
     );
     if (picked != null) {
       if (isFrom) {

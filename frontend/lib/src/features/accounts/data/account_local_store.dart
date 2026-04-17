@@ -48,6 +48,19 @@ class AccountLocalStore {
     return AccountModel.fromMap(rows.first);
   }
 
+  /// Retorna una cuenta por id sin importar si está archivada.
+  Future<AccountModel?> getByIdIncludingArchived(String id) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'accounts',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return AccountModel.fromMap(rows.first);
+  }
+
   /// Retorna todas las cuentas archivadas, ordenadas por fecha de archivado descendente.
   Future<List<AccountModel>> getArchivedAccounts() async {
     final db = await _db.database;

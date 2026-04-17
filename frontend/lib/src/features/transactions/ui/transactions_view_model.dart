@@ -72,6 +72,19 @@ class TransactionsViewModel extends ChangeNotifier {
     await _loadLocalThenMaybeSync();
   }
 
+  /// Confirma una transacción pending. Si tiene linked (transferencia),
+  /// confirma ambas piernas para mantener consistencia.
+  Future<void> confirmTransaction(
+    String id, {
+    String? linkedTransactionId,
+  }) async {
+    await _repository.confirmTransaction(id);
+    if (linkedTransactionId != null) {
+      await _repository.confirmTransaction(linkedTransactionId);
+    }
+    await _loadLocal();
+  }
+
   Future<bool> isInitialBalanceTransaction({
     required TransactionModel transaction,
     required String accountType,
@@ -98,6 +111,10 @@ class TransactionsViewModel extends ChangeNotifier {
       return null;
     }
   }
+
+  /// Busca la transacción por id directamente en DB (sin filtros del listado).
+  Future<TransactionModel?> getTransactionById(String id) =>
+      _repository.getTransactionById(id);
 
   // ----------------------------------------------------------
   // Implementación interna

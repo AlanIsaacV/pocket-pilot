@@ -68,9 +68,7 @@ class TransactionFilterViewModel extends ChangeNotifier {
   }
 
   void navigatePeriod(int delta) {
-    final next = _periodOffset + delta;
-    if (next > 0) return; // cannot go past current period
-    _periodOffset = next;
+    _periodOffset += delta;
     notifyListeners();
   }
 
@@ -179,7 +177,13 @@ class TransactionFilterViewModel extends ChangeNotifier {
         duration = const Duration(days: 365);
     }
     final from = now.subtract(duration);
-    return (TransactionFilter.fmt(from), TransactionFilter.fmt(now));
+    // El rango default (d30) extiende su tope 30 días al futuro para que
+    // transacciones futuras (manuales o pending generadas por templates)
+    // sean visibles sin cambiar de filtro.
+    final to = _quickSelection == QuickRange.d30
+        ? now.add(const Duration(days: 30))
+        : now;
+    return (TransactionFilter.fmt(from), TransactionFilter.fmt(to));
   }
 
   (String, String) _resolvePeriod() {

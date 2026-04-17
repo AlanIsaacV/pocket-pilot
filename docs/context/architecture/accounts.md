@@ -45,9 +45,18 @@ There is **no permanent deletion** for accounts. The existing `deleted_at` colum
 
 ### Frontend
 
-- `AccountLocalStore` has `getAccounts()` (active, `deleted_at IS NULL`) and `getArchivedAccounts()` (archived, `deleted_at IS NOT NULL`).
+- `AccountLocalStore` has `getAccounts()` (active, `deleted_at IS NULL`), `getArchivedAccounts()` (archived, `deleted_at IS NOT NULL`), `getById(id)` (active only), and `getByIdIncludingArchived(id)` (either state; used by lookup code that must surface archived accounts).
 - `AccountRepository.restoreAccount()` sets `deleted_at = null` locally, re-reads the model, and enqueues as `operation: 'upsert'` (following the category restore pattern).
 - `_buildProto` in `AccountRemoteService` explicitly sets `deleted_at` on the proto when non-null.
+
+### Accessibility of archived accounts in dependent features
+
+Historical transactions keep referencing archived accounts — UI must still resolve those references:
+
+- **Transactions list** (`transactions_screen.dart:_loadLookups`): the `_accountMap` merges `getAccounts() + getArchivedAccounts()` so every `t.accountId` resolves to a name, even for archived accounts.
+- **Transaction edit form** (`transaction_form_screen.dart:_loadData`): in edit mode, if the original `accountId` is not among active accounts, it is injected via `getByIdIncludingArchived(id)`. This lets the user tweak amount/date without being forced to change accounts or restore.
+- **Transfer edit form** (`transfer_form_screen.dart:_loadData`): same pattern, applied to both `transferOut.accountId` and `transferIn.accountId`.
+- **New-transaction picker** does NOT inject archived accounts — they only surface for the specific transaction being edited.
 
 ### UI
 

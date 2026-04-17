@@ -119,6 +119,22 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       return;
     }
 
+    // En modo edición, si la cuenta original está archivada inyectarla para
+    // que el usuario pueda guardar cambios sin obligarlo a cambiar de cuenta
+    // o restaurarla.
+    if (_isEditMode) {
+      final originalId = widget.transaction!.accountId;
+      final hasOriginal = accounts.any((a) => a.id == originalId);
+      if (!hasOriginal) {
+        final archived = await accountStore.getByIdIncludingArchived(
+          originalId,
+        );
+        if (archived != null && archived.type != 'contact') {
+          accounts.add(archived);
+        }
+      }
+    }
+
     var allowedCurrencies = List<String>.from(currencySnapshot.allowedCodes);
     var selectedCurrencyCode = currencySnapshot.defaultCode;
     AccountModel? selectedAccount;

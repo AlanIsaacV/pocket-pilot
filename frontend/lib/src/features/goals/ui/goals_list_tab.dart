@@ -73,6 +73,7 @@ class GoalsListTab extends StatelessWidget {
                       },
                       child: _GoalCard(
                         goal: goal,
+                        liquidityAssignedCents: vm.liquidityForGoal(goal.id),
                         onTap: () => _onGoalTap(context, goal),
                       ),
                     );
@@ -126,22 +127,43 @@ class GoalsListTab extends StatelessWidget {
 
 class _GoalCard extends StatelessWidget {
   final GoalModel goal;
+  final int liquidityAssignedCents;
   final VoidCallback onTap;
 
-  const _GoalCard({required this.goal, required this.onTap});
+  const _GoalCard({
+    required this.goal,
+    required this.liquidityAssignedCents,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final progress = goal.progressPercentage.clamp(0, 100).toDouble();
+    final now = DateTime.now();
+    final progress = goal
+        .progressPercentageAt(now, liquidityAssignedCents: liquidityAssignedCents)
+        .clamp(0, 100)
+        .toDouble();
     final progressFraction = progress / 100;
     final target = goal.targetAmountCents / 100;
-    final monthly = goal.monthlyRequiredCents / 100;
-    final months = goal.monthsRemaining;
-    final isOverdue = goal.isOverdue;
+    final monthly =
+        goal.monthlyRequiredCentsAt(
+              now,
+              liquidityAssignedCents: liquidityAssignedCents,
+            ) /
+            100;
+    final months = goal.monthsRemainingAt(now);
+    final isCompleted = goal.targetAmountCents > 0 &&
+        liquidityAssignedCents >= goal.targetAmountCents;
+    final isOverdue = goal.isOverdueAt(
+      now,
+      liquidityAssignedCents: liquidityAssignedCents,
+    );
 
-    final (statusLabel, statusColor) = isOverdue
-        ? ('Atrasada', Theme.of(context).colorScheme.error)
-        : ('En curso', Theme.of(context).colorScheme.tertiary);
+    final (statusLabel, statusColor) = isCompleted
+        ? ('Completada', Theme.of(context).colorScheme.primary)
+        : isOverdue
+            ? ('Atrasada', Theme.of(context).colorScheme.error)
+            : ('En curso', Theme.of(context).colorScheme.tertiary);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),

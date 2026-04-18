@@ -37,43 +37,39 @@ Service: `GoalService` with `ListGoals`, `UpsertGoal`, `DeleteGoal` RPCs.
 
 ## Computed Properties (GoalModel)
 
-All computed properties live in `frontend/lib/src/features/goals/domain/goal.dart`.
+All computed properties live in `frontend/lib/src/features/goals/domain/goal.dart`. They accept an optional `liquidityAssignedCents` (defaults to `0`, which preserves the "no liquidity known" behavior for callers that don't wire it yet).
 
-| Property | Current Behavior | Future (with liquidity) |
-|----------|-----------------|------------------------|
-| `progressPercentage` | Time-based: `monthsElapsed / totalMonths * 100` | `liquidezAcumulada / targetAmountCents * 100` |
-| `monthlyRequiredCents` | `ceil(targetAmountCents / monthsRemaining)` | `ceil((targetAmountCents - liquidezAsignada) / monthsRemaining)` |
-| `isOverdue` | `targetDate < now` (month comparison) | `targetDate < now AND liquidez < targetAmountCents` |
-| `monthsRemaining` | Calendar diff from now to targetDate (min 1) | No change |
+| Property | Behavior |
+|----------|----------|
+| `progressPercentageAt(now, {liquidityAssignedCents})` | `liquidityAssignedCents / targetAmountCents * 100` (0 when target is 0). |
+| `monthlyRequiredCentsAt(now, {liquidityAssignedCents})` | `ceil(max(0, targetAmountCents - liquidityAssignedCents) / monthsRemaining)`. |
+| `isOverdueAt(now, {liquidityAssignedCents})` | `targetDate < now` AND `liquidityAssignedCents < targetAmountCents`. |
+| `monthsRemainingAt(now)` | Calendar diff from now to targetDate (min 1). |
 
-## Liquidity Concept (Not Yet Implemented)
+The no-arg getters (`progressPercentage`, `monthlyRequiredCents`, `isOverdue`) pass `liquidityAssignedCents = 0` and therefore report "worst case / unfunded" figures. `GoalsListTab` and `GoalViewModel` always pass real liquidity; other call sites (dashboard) deliberately don't.
 
-**Total liquidity** = sum of available balances across all user accounts. This is the "liquid cash" the user has at any point in time.
+## Liquidity Model
 
-### Why liquidity instead of manual savings?
+**Total liquidity per currency** = sum of `bank` + `cash` account balances (cleared, non-deleted transactions) grouped by `currency_code`. Computed by `GoalLocalStore.getLiquidByCurrency()`. The SQL predicate mirrors `DashboardLocalStore.getBalancesPerAccount` so goal progress stays aligned with `DashboardMetrics.liquidAssetsCents`.
 
-In practice, users don't park money in a single account per goal. They have multiple accounts with mixed purposes. Tracking "which peso belongs to which goal" is manual overhead that doesn't reflect reality. Instead:
+### FIFO allocation across multiple goals
 
-- The system calculates the **total monthly quota** across all goals (`GoalMath.totalMonthlyRequiredCents`)
-- If total liquidity >= accumulated monthly quotas, goals are on track
-- If liquidity falls short, the user should adjust: extend deadlines, reduce targets, or increase income
+When several goals share a currency, the total pool is distributed **FIFO by `targetDate` ascending** (tiebreaker: `createdAt` ascending for stability). Each goal reserves up to its `targetAmountCents`; the remainder passes to the next goal. Deleted goals are skipped. Goals whose currency has no entry in the liquidity map receive 0.
 
-### Integration points when liquidity is available
+Rationale: the soonest deadline gets funded first, matching typical financial urgency. The allocation is deterministic, fully client-side, and requires no persistence or "manual assignment" UI.
 
-Search for `TODO(liquidity)` in the codebase. Key files:
+Implemented in `GoalMath.allocateLiquidity(goals, liquidByCurrency) → Map<goalId, liquidityAssignedCents>`. `GoalViewModel._reloadLocal` caches the result so `GoalsListTab` can look it up with `vm.liquidityForGoal(goal.id)` in O(1).
 
-1. **`frontend/lib/src/features/goals/domain/goal.dart`**
-   - `progressPercentageAt()` — switch from time-based to liquidity-based
-   - `monthlyRequiredCentsAt()` — subtract liquidity from remaining amount
-   - `isOverdueAt()` — don't mark overdue if liquidity covers the target
+### Dashboard integration (intentionally unchanged)
 
-2. **`frontend/lib/src/features/goals/ui/goals_list_tab.dart`**
-   - Progress bar currently shows time progress; update to show liquidity coverage
-   - Add "Completada" badge when liquidity >= target
+`DashboardRepository.calculateAllMetrics` still calls `GoalMath.totalMonthlyRequiredCents(goalsForCurrency, now: now)` **without** passing `liquidByCurrency`, so `goalMonthly` reflects the unfunded case. This is deliberate: `safeToSpend = liquid - goalMonthly - cardPayment` already treats `liquid` as an additive, and reducing `goalMonthly` by accumulated liquidity would double-count the same pesos (inflating safeToSpend). If the product later introduces explicit per-goal "assignment" or separate savings accounts, revisit this.
 
-3. **Liquidity provider** — needs to be created:
-   - Calculate sum of all account balances (requires `AccountsViewModel` or a new `LiquidityService`)
-   - Inject into `GoalViewModel` or pass as parameter to computed properties
+### Completion state in UI
+
+`GoalsListTab._GoalCard` selects one of three statuses:
+- **Completada** (primary green) — when `liquidityAssignedCents >= targetAmountCents`.
+- **Atrasada** (error red) — when `isOverdueAt(...)` returns true (i.e., past date and not covered).
+- **En curso** (tertiary) — otherwise.
 
 ## File Map
 
@@ -84,9 +80,9 @@ Search for `TODO(liquidity)` in the codebase. Key files:
 - `backend/internal/goal/validation.go` — Business rules
 
 ### Frontend (Dart)
-- `frontend/lib/src/features/goals/domain/goal.dart` — GoalModel + GoalMath
-- `frontend/lib/src/features/goals/data/goal_local_store.dart` — SQLite DAO
-- `frontend/lib/src/features/goals/data/goal_repository.dart` — Local-first + outbox
+- `frontend/lib/src/features/goals/domain/goal.dart` — GoalModel + GoalMath (`allocateLiquidity`, liquidity-aware `totalMonthlyRequiredCents`)
+- `frontend/lib/src/features/goals/data/goal_local_store.dart` — SQLite DAO + `getLiquidByCurrency()`
+- `frontend/lib/src/features/goals/data/goal_repository.dart` — Local-first + outbox + liquidity pass-through
 - `frontend/lib/src/features/goals/data/goal_remote_service.dart` — gRPC client
 - `frontend/lib/src/features/goals/data/goal_sync_handler.dart` — Delta sync handler
 - `frontend/lib/src/features/goals/ui/goal_view_model.dart` — UI state (ChangeNotifier)

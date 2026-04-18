@@ -21,10 +21,12 @@ class GoalViewModel extends ChangeNotifier {
   // ----------------------------------------------------------
 
   List<GoalModel> goals = [];
+  Map<String, int> liquidByCurrency = {};
   bool isLoading = false;
   bool isSyncing = false;
   String? errorMessage;
 
+  Map<String, int> _liquidityByGoalId = const {};
   DateTime? _lastSyncAt;
 
   GoalViewModel({
@@ -37,11 +39,20 @@ class GoalViewModel extends ChangeNotifier {
   // Getters computados
   // ----------------------------------------------------------
 
-  int get totalMonthlyRequiredCents =>
-      GoalMath.totalMonthlyRequiredCents(goals);
+  int get totalMonthlyRequiredCents => GoalMath.totalMonthlyRequiredCents(
+    goals,
+    liquidByCurrency: liquidByCurrency,
+  );
+
+  int liquidityForGoal(String goalId) => _liquidityByGoalId[goalId] ?? 0;
 
   List<GoalModel> get overdueGoals {
-    return goals.where((goal) => goal.isOverdue).toList();
+    return goals.where((goal) {
+      return goal.isOverdueAt(
+        DateTime.now(),
+        liquidityAssignedCents: liquidityForGoal(goal.id),
+      );
+    }).toList();
   }
 
   // ----------------------------------------------------------
@@ -69,7 +80,13 @@ class GoalViewModel extends ChangeNotifier {
   // ----------------------------------------------------------
 
   Future<void> _reloadLocal() async {
-    goals = await _repository.getGoals();
+    final results = await Future.wait([
+      _repository.getGoals(),
+      _repository.getLiquidByCurrency(),
+    ]);
+    goals = results[0] as List<GoalModel>;
+    liquidByCurrency = results[1] as Map<String, int>;
+    _liquidityByGoalId = GoalMath.allocateLiquidity(goals, liquidByCurrency);
     notifyListeners();
   }
 
@@ -94,7 +111,7 @@ class GoalViewModel extends ChangeNotifier {
 
     try {
       await _syncService.sync();
-      goals = await _repository.getGoals();
+      await _reloadLocal();
       _lastSyncAt = DateTime.now();
       errorMessage = null;
     } catch (e) {

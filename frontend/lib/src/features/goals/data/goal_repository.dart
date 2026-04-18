@@ -17,6 +17,9 @@ class GoalRepository {
     return rows.map((row) => GoalModel.fromMap(row)).toList();
   }
 
+  Future<Map<String, int>> getLiquidByCurrency() =>
+      _local.getLiquidByCurrency();
+
   Future<void> upsertGoal(GoalModel goal) async {
     final normalized = goal.normalized();
     await _local.upsertRow(normalized.toMap());

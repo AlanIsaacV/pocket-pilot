@@ -130,12 +130,12 @@ class GoalModel {
     return elapsed > total ? total : elapsed;
   }
 
-  // TODO(liquidity): reemplazar por liquidezAcumulada / targetAmountCents * 100
-  double progressPercentageAt(DateTime nowLocal) {
-    final total = _totalMonths();
-    if (total <= 0) return 0;
-    final elapsed = monthsElapsedAt(nowLocal);
-    return (elapsed / total) * 100;
+  double progressPercentageAt(
+    DateTime nowLocal, {
+    int liquidityAssignedCents = 0,
+  }) {
+    if (targetAmountCents <= 0) return 0;
+    return (liquidityAssignedCents / targetAmountCents) * 100;
   }
 
   double get progressPercentage => progressPercentageAt(DateTime.now());
@@ -157,9 +157,11 @@ class GoalModel {
 
   int get monthsRemaining => monthsRemainingAt(DateTime.now());
 
-  // TODO(liquidity): remaining = targetAmountCents - liquidezAsignada
-  int monthlyRequiredCentsAt(DateTime nowLocal) {
-    final remaining = targetAmountCents;
+  int monthlyRequiredCentsAt(
+    DateTime nowLocal, {
+    int liquidityAssignedCents = 0,
+  }) {
+    final remaining = targetAmountCents - liquidityAssignedCents;
     if (remaining <= 0) {
       return 0;
     }
@@ -170,8 +172,11 @@ class GoalModel {
 
   int get monthlyRequiredCents => monthlyRequiredCentsAt(DateTime.now());
 
-  // TODO(liquidity): no marcar overdue si liquidez ya cubre el target
-  bool isOverdueAt(DateTime nowLocal) {
+  bool isOverdueAt(
+    DateTime nowLocal, {
+    int liquidityAssignedCents = 0,
+  }) {
+    if (liquidityAssignedCents >= targetAmountCents) return false;
     final nowMonthStart = DateTime(nowLocal.year, nowLocal.month, 1);
     final targetLocal = DateTime.parse(_dateOnly(targetDate));
     final targetMonthStart = DateTime(targetLocal.year, targetLocal.month, 1);
@@ -192,13 +197,65 @@ class GoalModel {
 }
 
 class GoalMath {
+  /// Reparte la liquidez por moneda entre las metas activas usando FIFO por
+  /// `targetDate` ascendente (desempate estable por `createdAt`).
+  /// Devuelve `Map<goalId, liquidityAssignedCents>`. Las metas en una moneda
+  /// sin entrada en [liquidByCurrency] reciben 0.
+  static Map<String, int> allocateLiquidity(
+    Iterable<GoalModel> goals,
+    Map<String, int> liquidByCurrency,
+  ) {
+    final result = <String, int>{};
+    final grouped = <String, List<GoalModel>>{};
+    for (final goal in goals) {
+      if (goal.deletedAt != null) continue;
+      grouped.putIfAbsent(goal.currencyCode, () => []).add(goal);
+    }
+
+    grouped.forEach((currency, currencyGoals) {
+      currencyGoals.sort((a, b) {
+        final byDate = a.targetDate.compareTo(b.targetDate);
+        if (byDate != 0) return byDate;
+        return a.createdAt.compareTo(b.createdAt);
+      });
+
+      var pool = liquidByCurrency[currency] ?? 0;
+      if (pool < 0) pool = 0;
+
+      for (final goal in currencyGoals) {
+        if (pool <= 0 || goal.targetAmountCents <= 0) {
+          result[goal.id] = 0;
+          continue;
+        }
+        final take = pool >= goal.targetAmountCents
+            ? goal.targetAmountCents
+            : pool;
+        result[goal.id] = take;
+        pool -= take;
+      }
+    });
+
+    return result;
+  }
+
   static int totalMonthlyRequiredCents(
     Iterable<GoalModel> goals, {
     DateTime? now,
+    Map<String, int> liquidByCurrency = const {},
   }) {
     final current = now ?? DateTime.now();
-    return goals.where((goal) => goal.deletedAt == null).fold(0, (sum, goal) {
-      return sum + goal.monthlyRequiredCentsAt(current);
+    final active = goals.where((goal) => goal.deletedAt == null).toList();
+    final allocation = liquidByCurrency.isEmpty
+        ? const <String, int>{}
+        : allocateLiquidity(active, liquidByCurrency);
+
+    return active.fold(0, (sum, goal) {
+      final liquidity = allocation[goal.id] ?? 0;
+      return sum +
+          goal.monthlyRequiredCentsAt(
+            current,
+            liquidityAssignedCents: liquidity,
+          );
     });
   }
 }

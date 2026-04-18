@@ -17,11 +17,13 @@ import 'package:pocket_pilot/src/features/statistics/ui/widgets/time_window_chip
 class CategoryHistoryScreen extends StatefulWidget {
   final String categoryId;
   final CategorySeriesDTO? initialSummary;
+  final String? initialCurrencyCode;
 
   const CategoryHistoryScreen({
     super.key,
     required this.categoryId,
     this.initialSummary,
+    this.initialCurrencyCode,
   });
 
   @override
@@ -43,8 +45,9 @@ class _CategoryHistoryScreenState extends State<CategoryHistoryScreen> {
 
   Future<void> _load() async {
     final repo = context.read<StatisticsRepository>();
-    final filter = context.read<DashboardFilterViewModel>();
-    final currency = filter.currencyCode;
+    final currency = widget.initialCurrencyCode ??
+        widget.initialSummary?.currencyCode ??
+        context.read<DashboardFilterViewModel>().currencyCode;
     if (currency == null) {
       setState(() {
         _loading = false;

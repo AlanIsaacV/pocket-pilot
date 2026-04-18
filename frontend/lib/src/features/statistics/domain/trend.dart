@@ -11,18 +11,19 @@ const double kTrendFlatThresholdRatio = 0.05;
 
 enum Trend { up, down, flat }
 
-/// Computes a trend from two halves of a window.
+/// Computes a trend comparing the current month against the window
+/// average. Semantics match `StatDeltaRow._deltaColor` exactly so the
+/// list row arrow never disagrees with the detail ±N% badge.
 ///
-/// - Returns `Trend.flat` if either half is zero (insufficient signal)
-///   or if the relative difference is below [kTrendFlatThresholdRatio].
-/// - Uses the first-half total as the denominator when non-zero.
+/// - Returns `Trend.flat` if `avgCents` is zero (no denominator) or
+///   if the rounded percent delta is below [kTrendFlatThresholdRatio].
 Trend computeTrend({
-  required int firstHalfCents,
-  required int secondHalfCents,
+  required int currentCents,
+  required int avgCents,
 }) {
-  if (firstHalfCents == 0 || secondHalfCents == 0) return Trend.flat;
-  final diff = secondHalfCents - firstHalfCents;
-  final ratio = diff.abs() / firstHalfCents.abs();
+  if (avgCents == 0) return Trend.flat;
+  final pct = ((currentCents - avgCents) / avgCents * 100).round();
+  final ratio = pct.abs() / 100;
   if (ratio < kTrendFlatThresholdRatio) return Trend.flat;
-  return diff > 0 ? Trend.up : Trend.down;
+  return pct > 0 ? Trend.up : Trend.down;
 }

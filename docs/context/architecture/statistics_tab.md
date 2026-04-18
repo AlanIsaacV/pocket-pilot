@@ -19,7 +19,7 @@ The outer AppBar (title + `NotificationBell` + `_FilterButton`) stays the same a
 | Path | Screen | Notes |
 |------|--------|-------|
 | `/dashboard` | `DashboardScreen` | Defaults to the Resumen tab. |
-| `/dashboard/statistics/category/:categoryId` | `CategoryHistoryScreen` | Push-navigated. Accepts `CategorySeriesDTO` as `extra` to paint the header while data loads. |
+| `/dashboard/statistics/category/:categoryId?currency=MXN` | `CategoryHistoryScreen` | Push-navigated. Accepts `CategorySeriesDTO` as `extra` to paint the header while data loads. The `currency` query param is forwarded from the parent dashboard filter (same pattern as `/accounts/budgets/new`) so the detail survives the route's isolated `DashboardRouteScope`. `CategoryHistoryScreen._load()` resolves currency as `initialCurrencyCode ?? initialSummary.currencyCode ?? filterVM.currencyCode`. |
 
 ## Feature Structure (`features/statistics/`)
 
@@ -91,7 +91,7 @@ All dates are `'YYYY-MM-DD'` strings to compare lexicographically against the SQ
 Embeds four aggregates in one query to avoid N+1 round-trips:
 - `total_cents` over the full window.
 - `current_month_cents` (filtered by `strftime('%Y-%m', t.date) = :currentYm`).
-- `first_half_cents` (date `< windowMid`) and `second_half_cents` (date `>= windowMid`) — feed `computeTrend`.
+- `first_half_cents` (date `< windowMid`) and `second_half_cents` (date `>= windowMid`) — vestigial; not consumed after trend semantics switched to current-vs-avg, but kept for future "window half trend" use.
 
 `LEFT JOIN transactions` so categories with no activity are still visible to the `HAVING ABS(total_cents) > 0` filter. `ORDER BY ABS(total_cents) DESC`. Deleted categories excluded (`c.deleted_at IS NULL`) — deferred to surface later.
 
@@ -111,11 +111,11 @@ Cross-feature read via new `BudgetLocalStore.findByCategory(categoryId)` (return
 
 ## Trend Semantics
 
-`computeTrend(firstHalfCents, secondHalfCents)`:
-- `flat` if either half is zero OR the relative delta is below `kTrendFlatThresholdRatio = 0.05`.
-- Otherwise `up` (second half larger) or `down`.
+`computeTrend(currentCents, avgCents)`:
+- `flat` if `avgCents == 0` OR the rounded percent delta is below `kTrendFlatThresholdRatio = 0.05`.
+- Otherwise `up` (current > avg) or `down`.
 
-The same constant is reused in `StatDeltaRow` for neutral-delta coloring so the list-row arrow and detail delta color never disagree. Delta coloring flips by `kind`: for expense categories, up = worse (red); for income, up = better (primary).
+Compares the current month against the window average — the **same** metric `StatDeltaRow._deltaColor` uses in the detail screen — so the list-row arrow and the detail `±N%` badge never disagree. Delta coloring flips by `kind`: for expense categories, up = worse (red); for income, up = better (primary).
 
 ## UI — Statistics Tab (List)
 

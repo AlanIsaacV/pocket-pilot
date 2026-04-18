@@ -90,7 +90,8 @@ class StatisticsTab extends StatelessWidget {
 
   void _openDetail(BuildContext context, CategorySeriesDTO item) {
     context.push(
-      '/dashboard/statistics/category/${item.categoryId}',
+      '/dashboard/statistics/category/${item.categoryId}'
+      '?currency=${Uri.encodeQueryComponent(item.currencyCode)}',
       extra: item,
     );
   }

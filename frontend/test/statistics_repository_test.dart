@@ -19,9 +19,7 @@ void main() {
               'icon': 'restaurant',
               'kind': 'expense',
               'total_cents': 60000,         // 6 months * 10000
-              'current_month_cents': 10000,
-              'first_half_cents': 30000,
-              'second_half_cents': 30000,
+              'current_month_cents': 10000, // equal to avg → flat
             },
           ],
         ),
@@ -58,8 +56,6 @@ void main() {
               // Income subtracts in SQL, so totals come back negative.
               'total_cents': -120000,
               'current_month_cents': -20000,
-              'first_half_cents': -60000,
-              'second_half_cents': -60000,
             },
           ],
         ),
@@ -81,7 +77,7 @@ void main() {
       expect(list[0].kind, 'income');
     });
 
-    test('trend up when second half > first half by > threshold', () async {
+    test('trend up when current month > window avg by > threshold', () async {
       final repo = StatisticsRepository(
         local: _FakeLocalStore(
           categorySeries: const [
@@ -91,10 +87,8 @@ void main() {
               'color': '#A0A0A0',
               'icon': 'movie',
               'kind': 'expense',
-              'total_cents': 100,
-              'current_month_cents': 0,
-              'first_half_cents': 40,
-              'second_half_cents': 60, // +50% over first half
+              'total_cents': 60000,          // 6m * 10000 avg
+              'current_month_cents': 15000,  // +50% over avg
             },
           ],
         ),
@@ -111,6 +105,36 @@ void main() {
       );
 
       expect(list[0].trend, Trend.up);
+    });
+
+    test('trend down when current month < window avg by > threshold', () async {
+      final repo = StatisticsRepository(
+        local: _FakeLocalStore(
+          categorySeries: const [
+            {
+              'category_id': 'c4',
+              'name': 'Ocio',
+              'color': '#A0A0A0',
+              'icon': 'movie',
+              'kind': 'expense',
+              'total_cents': 60000,         // avg 10000
+              'current_month_cents': 5000,  // -50% vs avg
+            },
+          ],
+        ),
+        budgetLocal: _FakeBudgetLocalStore(),
+      );
+
+      final list = await repo.getSeriesList(
+        currencyCode: 'MXN',
+        windowStart: '2025-11-01',
+        windowEnd: '2026-05-01',
+        windowMid: '2026-02-01',
+        currentYm: '2026-04',
+        months: 6,
+      );
+
+      expect(list[0].trend, Trend.down);
     });
   });
 
@@ -131,8 +155,6 @@ void main() {
               'kind': 'expense',
               'total_cents': 12000,
               'current_month_cents': 0,
-              'first_half_cents': 0,
-              'second_half_cents': 12000,
             },
           ],
         ),
@@ -170,8 +192,6 @@ void main() {
               'kind': 'expense',
               'total_cents': 1,
               'current_month_cents': 0,
-              'first_half_cents': 0,
-              'second_half_cents': 1,
             },
           ],
         ),
@@ -211,8 +231,6 @@ void main() {
               'kind': 'expense',
               'total_cents': 1,
               'current_month_cents': 0,
-              'first_half_cents': 0,
-              'second_half_cents': 1,
             },
           ],
         ),

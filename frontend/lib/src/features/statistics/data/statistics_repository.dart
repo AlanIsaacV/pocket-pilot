@@ -107,15 +107,9 @@ class StatisticsRepository {
     String currencyCode,
   ) {
     final kind = r['kind'] as String;
-    final totalSigned = _asInt(r['total_cents']);
-    final currentSigned = _asInt(r['current_month_cents']);
-    final firstHalfSigned = _asInt(r['first_half_cents']);
-    final secondHalfSigned = _asInt(r['second_half_cents']);
-
-    final total = _signFlip(totalSigned, kind);
-    final current = _signFlip(currentSigned, kind);
-    final first = _signFlip(firstHalfSigned, kind);
-    final second = _signFlip(secondHalfSigned, kind);
+    final total = _signFlip(_asInt(r['total_cents']), kind);
+    final current = _signFlip(_asInt(r['current_month_cents']), kind);
+    final avg = months > 0 ? total ~/ months : 0;
 
     return CategorySeriesDTO(
       categoryId: r['category_id'] as String,
@@ -125,12 +119,9 @@ class StatisticsRepository {
       kind: kind,
       currencyCode: currencyCode,
       totalCents: total,
-      avgMonthlyCents: months > 0 ? total ~/ months : 0,
+      avgMonthlyCents: avg,
       currentMonthCents: current,
-      trend: computeTrend(
-        firstHalfCents: first,
-        secondHalfCents: second,
-      ),
+      trend: computeTrend(currentCents: current, avgCents: avg),
     );
   }
 

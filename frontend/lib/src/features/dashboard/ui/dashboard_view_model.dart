@@ -156,6 +156,11 @@ class DashboardViewModel extends ChangeNotifier {
       monthlySpendByNature = results[4] as List<NatureSpendDTO>;
       monthlySpendByTag = results[5] as List<TagSpendDTO>;
       errorMessage = null;
+
+      if (_filterVM.currencyCode == null) {
+        final seed = _firstCurrency;
+        if (seed != null) _filterVM.setCurrencyCode(seed);
+      }
     } catch (e) {
       errorMessage = e.toString();
     } finally {

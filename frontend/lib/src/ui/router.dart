@@ -105,6 +105,7 @@ GoRouter buildRouter(AuthProvider authProvider) {
                   child: CategoryHistoryScreen(
                     categoryId: state.pathParameters['categoryId']!,
                     initialSummary: state.extra as CategorySeriesDTO?,
+                    initialCurrencyCode: state.uri.queryParameters['currency'],
                   ),
                 ),
               ),

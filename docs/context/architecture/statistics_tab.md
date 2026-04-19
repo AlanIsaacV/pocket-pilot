@@ -1,25 +1,46 @@
-# Statistics Tab — Historical Category Analytics
+# Statistics Tab — Hub for Historical Analytics
 
-Read-only feature that lets the user inspect per-category spending/income over a configurable window (3/6/12 months), drill into any category for a monthly bar chart, and seed a new budget from the observed average. Lives as the second tab of `DashboardScreen` (alongside `Resumen`).
+The **Estadísticas** tab is a **hub** (index) for read-only analytical views. Each entry links to a dedicated full-screen visualization. The hub shares a single window filter (3/6/12 months) across all entries via `StatisticsFilterViewModel`. Currency comes from `DashboardFilterViewModel` (AppBar selector, already shared with the Resumen tab).
 
-Spec: `docs/superpowers/specs/2026-04-17-statistics-tab-design.md`. Plan: `docs/superpowers/plans/2026-04-17-statistics-tab.md`.
+Current views:
+- **Categorías** (`/dashboard/statistics/categories`) — per-category spending/income aggregates. Drill into a category for a monthly bar chart + budget CTA.
+- **Flujo** (`/dashboard/statistics/cashflow`) — cashflow in/out/net for the window with waterfall chart; toggle between Categoría and Naturaleza breakdowns. See `docs/context/architecture/cashflow_tab.md`.
+
+Spec for original Categorías feature: `docs/superpowers/specs/2026-04-17-statistics-tab-design.md`.
 
 ## Integration Point
 
 `DashboardScreen` hosts a `TabBar` with two tabs:
-- **Resumen** → `DashboardSummaryTab` (extracted from the old body).
-- **Estadísticas** → `StatisticsTab`.
+- **Resumen** → `DashboardSummaryTab`.
+- **Estadísticas** → `StatisticsTab` (the hub).
 
-The outer AppBar (title + `NotificationBell` + `_FilterButton`) stays the same across both tabs. `DashboardFilterViewModel.currencyCode` is shared and drives both tabs.
+The outer AppBar (title + `NotificationBell` + `_FilterButton`) stays the same across both tabs. `DashboardFilterViewModel.currencyCode` is shared.
 
-`DashboardRouteScope` now provides `StatisticsRepository` + `StatisticsViewModel` in addition to the existing dashboard VMs.
+`DashboardRouteScope` provides:
+- `DashboardFilterViewModel` (currency)
+- `StatisticsFilterViewModel` (window 3/6/12 — **NEW**, shared with sub-routes)
+- `StatisticsRepository` + `StatisticsViewModel`
+- plus the existing dashboard VMs.
 
 ## Routes
 
-| Path | Screen | Notes |
-|------|--------|-------|
-| `/dashboard` | `DashboardScreen` | Defaults to the Resumen tab. |
-| `/dashboard/statistics/category/:categoryId?currency=MXN` | `CategoryHistoryScreen` | Push-navigated. Accepts `CategorySeriesDTO` as `extra` to paint the header while data loads. The `currency` query param is forwarded from the parent dashboard filter (same pattern as `/accounts/budgets/new`) so the detail survives the route's isolated `DashboardRouteScope`. `CategoryHistoryScreen._load()` resolves currency as `initialCurrencyCode ?? initialSummary.currencyCode ?? filterVM.currencyCode`. |
+| Path | Screen / Scope | Notes |
+|------|---------------|-------|
+| `/dashboard` | `DashboardScreen` | Two sub-tabs: Resumen, Estadísticas (hub). |
+| `/dashboard/statistics/categories?window=6&currency=MXN` | `CategoriesTab` inside `StatisticsCategoriesRouteScope` | Push-navigated from the hub. Window + currency threaded via query params so the scope's fresh VMs initialize to the user's current selection. Tapping a row opens the category detail screen below. |
+| `/dashboard/statistics/cashflow?window=6&currency=MXN` | `CashflowTab` inside `CashflowRouteScope` | Push-navigated from the hub. Same query-param threading pattern. |
+| `/dashboard/statistics/category/:categoryId?currency=MXN` | `CategoryHistoryScreen` inside `DashboardRouteScope` | Reached from `CategoriesTab`. Accepts `CategorySeriesDTO` as `extra` to paint the header while data loads. Resolves currency as `initialCurrencyCode ?? initialSummary.currencyCode ?? filterVM.currencyCode`. |
+
+**Query-param threading rationale.** Each GoRoute sub-route builds a fresh provider subtree, so filter VMs do not automatically persist across navigations. Rather than elevating providers to `ShellRoute` level (which would change currency semantics across unrelated tabs), the hub passes `?window=` and `?currency=` when pushing, and each sub-scope seeds its local filter VMs from them. Same pattern as the pre-existing `?currency=` threading on category-detail.
+
+## Filter State Split
+
+| VM | Scope | State |
+|----|-------|-------|
+| `DashboardFilterViewModel` | `DashboardRouteScope` (+ seeded copies in sub-scopes) | `currencyCode`, `dateRange`, `accountIds` (currency is the one used by Statistics sub-views). |
+| `StatisticsFilterViewModel` | `DashboardRouteScope` (+ seeded copies in sub-scopes) | `window: 3 | 6 | 12`. Previously owned by `StatisticsViewModel`; elevated so the hub and every sub-view observe the same knob. |
+
+`StatisticsViewModel` and `CashflowViewModel` both listen to `DashboardFilterViewModel` (currency) **and** `StatisticsFilterViewModel` (window) and refresh on either change. They no longer own a `months` setter — chips write directly to `StatisticsFilterViewModel.setWindow`.
 
 ## Feature Structure (`features/statistics/`)
 
@@ -30,16 +51,19 @@ features/statistics/
 │   └── statistics_repository.dart    # Orchestrator: sign-flip + trend + zero-fill + budget
 ├── domain/
 │   ├── trend.dart                    # enum Trend + kTrendFlatThresholdRatio (0.05) + computeTrend
-│   ├── window_math.dart              # StatisticsWindow.fromNow (pure, testable)
-│   ├── category_series_dto.dart      # per-category aggregate
-│   ├── monthly_point_dto.dart        # {yearMonth, amountCents}
-│   └── category_history_dto.dart     # {summary, points, budget?}
+│   ├── window_math.dart              # StatisticsWindow.fromNow (pure, testable) — reused by cashflow
+│   ├── category_series_dto.dart
+│   ├── monthly_point_dto.dart
+│   └── category_history_dto.dart
 └── ui/
-    ├── statistics_view_model.dart    # ChangeNotifier, reactive to DashboardFilterViewModel
-    ├── statistics_tab.dart           # List body (Gastos + Ingresos sections)
-    ├── category_history_screen.dart  # Detail screen (push)
+    ├── statistics_filter_view_model.dart  # NEW — shared window state (3/6/12)
+    ├── statistics_view_model.dart         # ChangeNotifier, reactive to Dashboard + Stats filters
+    ├── statistics_tab.dart                # The HUB (hub ListView + chips)
+    ├── categories_tab.dart                # The old Statistics body (Gastos + Ingresos sections)
+    ├── categories_route_scope.dart        # StatisticsCategoriesRouteScope
+    ├── category_history_screen.dart       # Detail screen (push)
     └── widgets/
-        ├── time_window_chips.dart    # SegmentedButton 3m/6m/12m
+        ├── time_window_chips.dart    # SegmentedButton 3m/6m/12m (reused by hub, Categorías, Flujo)
         ├── category_list_row.dart
         ├── stat_delta_row.dart
         └── category_monthly_bar_chart.dart  # fl_chart BarChart
@@ -117,9 +141,18 @@ Cross-feature read via new `BudgetLocalStore.findByCategory(categoryId)` (return
 
 Compares the current month against the window average — the **same** metric `StatDeltaRow._deltaColor` uses in the detail screen — so the list-row arrow and the detail `±N%` badge never disagree. Delta coloring flips by `kind`: for expense categories, up = worse (red); for income, up = better (primary).
 
-## UI — Statistics Tab (List)
+## UI — Statistics Hub
 
-Order: `TimeWindowChips` → `Gastos` section (expense rows, sorted by total desc) → `Ingresos` section (income rows; omitted if empty). Loading shows a spinner; empty state shows "Aún no hay suficiente historial" + CTA to `/transactions`; error state shows `Reintentar`. `RefreshIndicator` re-runs Query 1.
+The hub body is a simple vertical list:
+1. `TimeWindowChips` centered at the top (bound to `StatisticsFilterViewModel`).
+2. Navigation entries (`_HubEntry` cards): Categorías, Flujo, plus a "Próximamente" hint. Each card: leading tinted icon + title + subtitle + trailing chevron.
+3. Tapping an entry builds a URL with the current window + currency and calls `context.push`.
+
+The hub does not render data itself — it only navigates to full-screen views.
+
+## UI — Categorías Tab (full-screen)
+
+Same content as the pre-hub Statistics tab: `Scaffold` with its own AppBar titled "Categorías", a `TimeWindowChips` at the top, then `Gastos` + `Ingresos` sections of `CategoryListRow`s sorted by total desc. Loading shows a spinner; empty state shows "Aún no hay suficiente historial" + CTA to `/transactions`; error state shows `Reintentar`. `RefreshIndicator` re-runs Query 1.
 
 Row (`CategoryListRow`): category icon (colored) + name + current-month amount (right), with a second line `prom. últimos Nm: $X` and a trend chip. Tap pushes `/dashboard/statistics/category/:categoryId` with `CategorySeriesDTO` as `extra`.
 
@@ -167,8 +200,9 @@ Both strictly additive (no migration, no sync impact):
 
 Each is a standalone design cycle:
 1. Historical metrics series (net worth, liquidity, buying power).
-2. Cash flow (income vs expenses, per account and global).
+2. ~~Cash flow (income vs expenses, per account and global).~~ **Done — see `cashflow_tab.md`.**
 3. Arbitrary period comparison (A vs B).
 4. Forecasting.
 5. Surface deleted categories with historical data.
 6. MSI proration for statistics.
+7. Custom date ranges for the shared window (beyond 3/6/12m).

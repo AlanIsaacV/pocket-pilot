@@ -7,13 +7,14 @@ import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_mod
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/window_math.dart';
+import 'package:pocket_pilot/src/features/statistics/ui/statistics_filter_view_model.dart';
 
 class StatisticsViewModel extends ChangeNotifier {
   final StatisticsRepository _repository;
   final DashboardFilterViewModel _filterVM;
+  final StatisticsFilterViewModel _statsFilterVM;
   final DateTime Function() _now;
 
-  int months = 6; // default window
   List<CategorySeriesDTO> series = const [];
   bool isLoading = false;
   String? errorMessage;
@@ -23,19 +24,17 @@ class StatisticsViewModel extends ChangeNotifier {
   StatisticsViewModel({
     required StatisticsRepository repository,
     required DashboardFilterViewModel filterViewModel,
+    required StatisticsFilterViewModel statsFilterViewModel,
     DateTime Function()? now,
   })  : _repository = repository,
         _filterVM = filterViewModel,
+        _statsFilterVM = statsFilterViewModel,
         _now = now ?? DateTime.now {
     _filterVM.addListener(_onFilterChanged);
+    _statsFilterVM.addListener(_onFilterChanged);
   }
 
-  void setWindow(int nextMonths) {
-    if (nextMonths == months) return;
-    assert(nextMonths == 3 || nextMonths == 6 || nextMonths == 12);
-    months = nextMonths;
-    unawaited(refresh());
-  }
+  int get months => _statsFilterVM.window;
 
   void loadOnAppear() {
     unawaited(refresh());
@@ -78,6 +77,7 @@ class StatisticsViewModel extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _filterVM.removeListener(_onFilterChanged);
+    _statsFilterVM.removeListener(_onFilterChanged);
     super.dispose();
   }
 

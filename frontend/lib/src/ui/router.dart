@@ -59,8 +59,12 @@ import 'package:pocket_pilot/src/features/user_preferences/ui/user_preferences_r
 import 'package:pocket_pilot/src/features/yield_configs/domain/yield_config.dart';
 import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_form_route_scope.dart';
 import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_form_screen.dart';
+import 'package:pocket_pilot/src/features/cashflow/ui/cashflow_route_scope.dart';
+import 'package:pocket_pilot/src/features/cashflow/ui/cashflow_tab.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_route_scope.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.dart';
+import 'package:pocket_pilot/src/features/statistics/ui/categories_route_scope.dart';
+import 'package:pocket_pilot/src/features/statistics/ui/categories_tab.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/category_history_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/home/home_screen.dart';
@@ -99,6 +103,30 @@ GoRouter buildRouter(AuthProvider authProvider) {
             builder: (context, state) =>
                 const DashboardRouteScope(child: DashboardScreen()),
             routes: [
+              GoRoute(
+                path: 'statistics/categories',
+                builder: (context, state) {
+                  final q = state.uri.queryParameters;
+                  final window = int.tryParse(q['window'] ?? '') ?? 6;
+                  return StatisticsCategoriesRouteScope(
+                    initialWindow: window,
+                    initialCurrencyCode: q['currency'],
+                    child: const CategoriesTab(),
+                  );
+                },
+              ),
+              GoRoute(
+                path: 'statistics/cashflow',
+                builder: (context, state) {
+                  final q = state.uri.queryParameters;
+                  final window = int.tryParse(q['window'] ?? '') ?? 6;
+                  return CashflowRouteScope(
+                    initialWindow: window,
+                    initialCurrencyCode: q['currency'],
+                    child: const CashflowTab(),
+                  );
+                },
+              ),
               GoRoute(
                 path: 'statistics/category/:categoryId',
                 builder: (context, state) => DashboardRouteScope(

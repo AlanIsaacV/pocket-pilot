@@ -7,14 +7,17 @@ import 'package:pocket_pilot/src/features/statistics/data/statistics_local_store
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/trend.dart';
+import 'package:pocket_pilot/src/features/statistics/ui/statistics_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/statistics_view_model.dart';
 
 void main() {
   test('initial load with no currency emits empty list', () async {
     final filter = DashboardFilterViewModel();
+    final statsFilter = StatisticsFilterViewModel();
     final vm = StatisticsViewModel(
       repository: _FakeRepo(rowsByCurrency: const {}),
       filterViewModel: filter,
+      statsFilterViewModel: statsFilter,
       now: () => DateTime.utc(2026, 4, 17),
     );
 
@@ -27,6 +30,7 @@ void main() {
 
   test('window change triggers reload', () async {
     final filter = DashboardFilterViewModel()..setCurrencyCode('MXN');
+    final statsFilter = StatisticsFilterViewModel();
     final repo = _FakeRepo(
       rowsByCurrency: {
         'MXN': 1,
@@ -35,12 +39,13 @@ void main() {
     final vm = StatisticsViewModel(
       repository: repo,
       filterViewModel: filter,
+      statsFilterViewModel: statsFilter,
       now: () => DateTime.utc(2026, 4, 17),
     );
     await vm.refresh();
     final priorCalls = repo.callsByMonths[12] ?? 0;
 
-    vm.setWindow(12);
+    statsFilter.setWindow(12);
     // Allow the unawaited refresh to complete.
     await Future<void>.delayed(Duration.zero);
     await Future<void>.delayed(Duration.zero);
@@ -51,10 +56,12 @@ void main() {
 
   test('currency change triggers reload', () async {
     final filter = DashboardFilterViewModel()..setCurrencyCode('MXN');
+    final statsFilter = StatisticsFilterViewModel();
     final repo = _FakeRepo(rowsByCurrency: const {'MXN': 1, 'USD': 1});
     final vm = StatisticsViewModel(
       repository: repo,
       filterViewModel: filter,
+      statsFilterViewModel: statsFilter,
       now: () => DateTime.utc(2026, 4, 17),
     );
     await vm.refresh();
@@ -69,9 +76,11 @@ void main() {
 
   test('repository failure surfaces errorMessage', () async {
     final filter = DashboardFilterViewModel()..setCurrencyCode('MXN');
+    final statsFilter = StatisticsFilterViewModel();
     final vm = StatisticsViewModel(
       repository: _ThrowingRepo(),
       filterViewModel: filter,
+      statsFilterViewModel: statsFilter,
       now: () => DateTime.utc(2026, 4, 17),
     );
 

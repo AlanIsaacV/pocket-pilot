@@ -9,6 +9,7 @@ import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_mod
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_view_model.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_local_store.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
+import 'package:pocket_pilot/src/features/statistics/ui/statistics_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/statistics_view_model.dart';
 
 class DashboardRouteScope extends StatelessWidget {
@@ -21,6 +22,9 @@ class DashboardRouteScope extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => DashboardFilterViewModel()),
+        ChangeNotifierProvider(
+          create: (_) => StatisticsFilterViewModel(),
+        ),
         Provider<StatisticsRepository>(
           create: (ctx) {
             final db = ctx.read<DatabaseHelper>();
@@ -46,9 +50,11 @@ class DashboardRouteScope extends StatelessWidget {
           create: (ctx) {
             final repo = ctx.read<StatisticsRepository>();
             final filterVM = ctx.read<DashboardFilterViewModel>();
+            final statsFilterVM = ctx.read<StatisticsFilterViewModel>();
             return StatisticsViewModel(
               repository: repo,
               filterViewModel: filterVM,
+              statsFilterViewModel: statsFilterVM,
             )..loadOnAppear();
           },
         ),

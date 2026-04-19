@@ -6,13 +6,10 @@ import 'package:flutter/foundation.dart';
 import 'package:pocket_pilot/src/features/cashflow/data/cashflow_repository.dart';
 import 'package:pocket_pilot/src/features/cashflow/domain/cashflow_snapshot.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
-import 'package:pocket_pilot/src/features/statistics/ui/statistics_filter_view_model.dart';
 
 class CashflowViewModel extends ChangeNotifier {
   final CashflowRepository _repository;
   final DashboardFilterViewModel _filterVM;
-  final StatisticsFilterViewModel _statsFilterVM;
-  final DateTime Function() _now;
 
   BreakdownMode _mode = BreakdownMode.category;
   CashflowSnapshot? snapshot;
@@ -24,14 +21,9 @@ class CashflowViewModel extends ChangeNotifier {
   CashflowViewModel({
     required CashflowRepository repository,
     required DashboardFilterViewModel filterViewModel,
-    required StatisticsFilterViewModel statsFilterViewModel,
-    DateTime Function()? now,
   })  : _repository = repository,
-        _filterVM = filterViewModel,
-        _statsFilterVM = statsFilterViewModel,
-        _now = now ?? DateTime.now {
+        _filterVM = filterViewModel {
     _filterVM.addListener(_onFilterChanged);
-    _statsFilterVM.addListener(_onFilterChanged);
   }
 
   BreakdownMode get mode => _mode;
@@ -60,10 +52,15 @@ class CashflowViewModel extends ChangeNotifier {
     _safeNotify();
 
     try {
+      final (from, to) = _filterVM.resolvedDateRange;
+      final accountIds = _filterVM.accountIds.isNotEmpty
+          ? _filterVM.accountIds
+          : null;
       final next = await _repository.getSnapshot(
         currencyCode: currency,
-        months: _statsFilterVM.window,
-        now: _now(),
+        from: from,
+        to: to,
+        accountIds: accountIds,
       );
       snapshot = next;
       errorMessage = null;
@@ -80,7 +77,6 @@ class CashflowViewModel extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _filterVM.removeListener(_onFilterChanged);
-    _statsFilterVM.removeListener(_onFilterChanged);
     super.dispose();
   }
 

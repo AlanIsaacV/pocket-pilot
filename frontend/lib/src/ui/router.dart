@@ -98,44 +98,37 @@ GoRouter buildRouter(AuthProvider authProvider) {
       ShellRoute(
         builder: (context, state, child) => HomeScreen(child: child),
         routes: [
-          GoRoute(
-            path: '/dashboard',
-            builder: (context, state) =>
-                const DashboardRouteScope(child: DashboardScreen()),
+          ShellRoute(
+            builder: (context, state, child) =>
+                DashboardRouteScope(child: child),
             routes: [
               GoRoute(
-                path: 'statistics/categories',
-                builder: (context, state) {
-                  final q = state.uri.queryParameters;
-                  final window = int.tryParse(q['window'] ?? '') ?? 6;
-                  return StatisticsCategoriesRouteScope(
-                    initialWindow: window,
-                    initialCurrencyCode: q['currency'],
-                    child: const CategoriesTab(),
-                  );
-                },
-              ),
-              GoRoute(
-                path: 'statistics/cashflow',
-                builder: (context, state) {
-                  final q = state.uri.queryParameters;
-                  final window = int.tryParse(q['window'] ?? '') ?? 6;
-                  return CashflowRouteScope(
-                    initialWindow: window,
-                    initialCurrencyCode: q['currency'],
-                    child: const CashflowTab(),
-                  );
-                },
-              ),
-              GoRoute(
-                path: 'statistics/category/:categoryId',
-                builder: (context, state) => DashboardRouteScope(
-                  child: CategoryHistoryScreen(
-                    categoryId: state.pathParameters['categoryId']!,
-                    initialSummary: state.extra as CategorySeriesDTO?,
-                    initialCurrencyCode: state.uri.queryParameters['currency'],
+                path: '/dashboard',
+                builder: (context, state) => const DashboardScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'statistics/categories',
+                    builder: (context, state) =>
+                        const StatisticsCategoriesRouteScope(
+                      child: CategoriesTab(),
+                    ),
                   ),
-                ),
+                  GoRoute(
+                    path: 'statistics/cashflow',
+                    builder: (context, state) => const CashflowRouteScope(
+                      child: CashflowTab(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'statistics/category/:categoryId',
+                    builder: (context, state) => CategoryHistoryScreen(
+                      categoryId: state.pathParameters['categoryId']!,
+                      initialSummary: state.extra as CategorySeriesDTO?,
+                      initialCurrencyCode:
+                          state.uri.queryParameters['currency'],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

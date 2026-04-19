@@ -25,8 +25,16 @@ class CashflowLocalStore {
     required String currencyCode,
     required String windowStart,
     required String windowEnd,
+    Set<String>? accountIds,
   }) async {
     final db = await _db.database;
+    final accountsClause = StringBuffer();
+    final accountsArgs = <Object?>[];
+    if (accountIds != null && accountIds.isNotEmpty) {
+      final placeholders = List.filled(accountIds.length, '?').join(',');
+      accountsClause.write(' AND t.account_id IN ($placeholders)');
+      accountsArgs.addAll(accountIds);
+    }
     return db.rawQuery(
       '''
       SELECT
@@ -43,12 +51,13 @@ class CashflowLocalStore {
         AND t.date         <  ?
         AND t.deleted_at   IS NULL
         AND t.type         IN ('expense', 'income')
+        ${accountsClause.toString()}
       WHERE c.deleted_at IS NULL
       GROUP BY c.id
       HAVING total_cents > 0
       ORDER BY total_cents DESC
       ''',
-      [currencyCode, windowStart, windowEnd],
+      [currencyCode, windowStart, windowEnd, ...accountsArgs],
     );
   }
 
@@ -59,8 +68,16 @@ class CashflowLocalStore {
     required String currencyCode,
     required String windowStart,
     required String windowEnd,
+    Set<String>? accountIds,
   }) async {
     final db = await _db.database;
+    final accountsClause = StringBuffer();
+    final accountsArgs = <Object?>[];
+    if (accountIds != null && accountIds.isNotEmpty) {
+      final placeholders = List.filled(accountIds.length, '?').join(',');
+      accountsClause.write(' AND t.account_id IN ($placeholders)');
+      accountsArgs.addAll(accountIds);
+    }
     return db.rawQuery(
       '''
       SELECT
@@ -75,11 +92,12 @@ class CashflowLocalStore {
         AND t.type         IN ('expense', 'income')
         AND t.nature       IS NOT NULL
         AND t.nature       <> ''
+        ${accountsClause.toString()}
       GROUP BY t.nature, t.type
       HAVING total_cents > 0
       ORDER BY total_cents DESC
       ''',
-      [currencyCode, windowStart, windowEnd],
+      [currencyCode, windowStart, windowEnd, ...accountsArgs],
     );
   }
 
@@ -94,8 +112,16 @@ class CashflowLocalStore {
     required String currencyCode,
     required String windowStart,
     required String windowEnd,
+    Set<String>? accountIds,
   }) async {
     final db = await _db.database;
+    final accountsClause = StringBuffer();
+    final accountsArgs = <Object?>[];
+    if (accountIds != null && accountIds.isNotEmpty) {
+      final placeholders = List.filled(accountIds.length, '?').join(',');
+      accountsClause.write(' AND t.account_id IN ($placeholders)');
+      accountsArgs.addAll(accountIds);
+    }
     final rows = await db.rawQuery(
       '''
       SELECT
@@ -107,9 +133,10 @@ class CashflowLocalStore {
         AND t.date         <  ?
         AND t.deleted_at   IS NULL
         AND t.type         IN ('expense', 'income', 'transfer_in', 'transfer_out')
+        ${accountsClause.toString()}
       GROUP BY t.type
       ''',
-      [currencyCode, windowStart, windowEnd],
+      [currencyCode, windowStart, windowEnd, ...accountsArgs],
     );
     final totals = <String, int>{
       'income': 0,

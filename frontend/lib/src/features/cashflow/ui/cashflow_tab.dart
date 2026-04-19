@@ -1,8 +1,8 @@
 // features/cashflow/ui/cashflow_tab.dart
 //
-// Full-screen Cashflow visualization. Mounted at /dashboard/statistics/cashflow
-// behind CashflowRouteScope. Shows three summary cards, a toggle between
-// Category and Nature breakdown, a waterfall chart, and a detail list.
+// Vista full-screen de Cashflow. Lee el window (meses) desde
+// DashboardFilterViewModel.monthsWindow, compartido con el resto de
+// Dashboard/Stats.
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -14,8 +14,7 @@ import 'package:pocket_pilot/src/features/cashflow/domain/cashflow_snapshot.dart
 import 'package:pocket_pilot/src/features/cashflow/ui/cashflow_view_model.dart';
 import 'package:pocket_pilot/src/features/cashflow/ui/widgets/cashflow_summary_cards.dart';
 import 'package:pocket_pilot/src/features/cashflow/ui/widgets/cashflow_waterfall_chart.dart';
-import 'package:pocket_pilot/src/features/statistics/ui/statistics_filter_view_model.dart';
-import 'package:pocket_pilot/src/features/statistics/ui/widgets/time_window_chips.dart';
+import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
 
 class CashflowTab extends StatelessWidget {
   const CashflowTab({super.key});
@@ -34,68 +33,65 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statsFilter = context.watch<StatisticsFilterViewModel>();
+    return Stack(
+      children: [
+        Consumer<CashflowViewModel>(
+          builder: (context, vm, _) {
+            if (vm.isLoading && vm.snapshot == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (vm.errorMessage != null) {
+              return _ErrorState(
+                  message: vm.errorMessage!, onRetry: vm.refresh);
+            }
+            final snap = vm.snapshot;
+            if (snap == null) {
+              return _EmptyCurrency();
+            }
 
-    return Consumer<CashflowViewModel>(
-      builder: (context, vm, _) {
-        if (vm.isLoading && vm.snapshot == null) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (vm.errorMessage != null) {
-          return _ErrorState(message: vm.errorMessage!, onRetry: vm.refresh);
-        }
-        final snap = vm.snapshot;
-        if (snap == null) {
-          return _EmptyCurrency();
-        }
-
-        return RefreshIndicator(
-          onRefresh: vm.refresh,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 96),
-            children: [
-              Center(
-                child: TimeWindowChips(
-                  selectedMonths: statsFilter.window,
-                  onChanged: statsFilter.setWindow,
-                ),
+            return RefreshIndicator(
+              onRefresh: vm.refresh,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 160),
+                children: [
+                  CashflowSummaryCards(
+                    currencyCode: snap.currencyCode,
+                    totalInCents: snap.totalInCents,
+                    totalOutCents: snap.totalOutCents,
+                    netCents: snap.netCents,
+                  ),
+                  const SizedBox(height: 20),
+                  _ModeToggle(
+                    mode: vm.mode,
+                    onChanged: vm.setMode,
+                  ),
+                  const SizedBox(height: 16),
+                  if (snap.isEmpty)
+                    _EmptyPeriod()
+                  else ...[
+                    CashflowWaterfallChart(
+                      entries: snap.entriesFor(vm.mode),
+                      mode: vm.mode,
+                      totalInCents: snap.totalInCents,
+                      totalOutCents: snap.totalOutCents,
+                      netCents: snap.netCents,
+                    ),
+                    const SizedBox(height: 20),
+                    _BreakdownList(
+                      entries: snap.entriesFor(vm.mode),
+                      mode: vm.mode,
+                      currencyCode: snap.currencyCode,
+                      totalInCents: snap.totalInCents,
+                      totalOutCents: snap.totalOutCents,
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 16),
-              CashflowSummaryCards(
-                currencyCode: snap.currencyCode,
-                totalInCents: snap.totalInCents,
-                totalOutCents: snap.totalOutCents,
-                netCents: snap.netCents,
-              ),
-              const SizedBox(height: 20),
-              _ModeToggle(
-                mode: vm.mode,
-                onChanged: vm.setMode,
-              ),
-              const SizedBox(height: 16),
-              if (snap.isEmpty)
-                _EmptyPeriod()
-              else ...[
-                CashflowWaterfallChart(
-                  entries: snap.entriesFor(vm.mode),
-                  mode: vm.mode,
-                  totalInCents: snap.totalInCents,
-                  totalOutCents: snap.totalOutCents,
-                  netCents: snap.netCents,
-                ),
-                const SizedBox(height: 20),
-                _BreakdownList(
-                  entries: snap.entriesFor(vm.mode),
-                  mode: vm.mode,
-                  currencyCode: snap.currencyCode,
-                  totalInCents: snap.totalInCents,
-                  totalOutCents: snap.totalOutCents,
-                ),
-              ],
-            ],
-          ),
-        );
-      },
+            );
+          },
+        ),
+        const DashboardFilterSheet(),
+      ],
     );
   }
 }

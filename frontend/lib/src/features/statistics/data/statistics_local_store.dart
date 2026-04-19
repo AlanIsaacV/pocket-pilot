@@ -24,8 +24,16 @@ class StatisticsLocalStore {
     required String windowEnd,
     required String windowMid,
     required String currentYm,
+    Set<String>? accountIds,
   }) async {
     final db = await _db.database;
+    final accountsClause = StringBuffer();
+    final accountsArgs = <Object?>[];
+    if (accountIds != null && accountIds.isNotEmpty) {
+      final placeholders = List.filled(accountIds.length, '?').join(',');
+      accountsClause.write(' AND t.account_id IN ($placeholders)');
+      accountsArgs.addAll(accountIds);
+    }
     return db.rawQuery(
       '''
       SELECT
@@ -57,12 +65,21 @@ class StatisticsLocalStore {
         AND t.date         <  ?
         AND t.deleted_at   IS NULL
         AND t.type         IN ('expense', 'income')
+        ${accountsClause.toString()}
       WHERE c.deleted_at IS NULL
       GROUP BY c.id
       HAVING ABS(total_cents) > 0
       ORDER BY ABS(total_cents) DESC
       ''',
-      [currentYm, windowMid, windowMid, currencyCode, windowStart, windowEnd],
+      [
+        currentYm,
+        windowMid,
+        windowMid,
+        currencyCode,
+        windowStart,
+        windowEnd,
+        ...accountsArgs,
+      ],
     );
   }
 
@@ -73,8 +90,16 @@ class StatisticsLocalStore {
     required String currencyCode,
     required String windowStart,
     required String windowEnd,
+    Set<String>? accountIds,
   }) async {
     final db = await _db.database;
+    final accountsClause = StringBuffer();
+    final accountsArgs = <Object?>[];
+    if (accountIds != null && accountIds.isNotEmpty) {
+      final placeholders = List.filled(accountIds.length, '?').join(',');
+      accountsClause.write(' AND t.account_id IN ($placeholders)');
+      accountsArgs.addAll(accountIds);
+    }
     return db.rawQuery(
       '''
       SELECT
@@ -89,10 +114,17 @@ class StatisticsLocalStore {
         AND t.date         <  ?
         AND t.deleted_at   IS NULL
         AND t.type         IN ('expense', 'income')
+        ${accountsClause.toString()}
       GROUP BY ym
       ORDER BY ym
       ''',
-      [categoryId, currencyCode, windowStart, windowEnd],
+      [
+        categoryId,
+        currencyCode,
+        windowStart,
+        windowEnd,
+        ...accountsArgs,
+      ],
     );
   }
 }

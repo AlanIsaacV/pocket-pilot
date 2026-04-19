@@ -20,36 +20,30 @@ import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_payment_d
 import 'package:pocket_pilot/src/features/dashboard/domain/dashboard_metrics.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/nature_spend_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/tag_spend_dto.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_view_model.dart';
+import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
 
 class DashboardSummaryTab extends StatelessWidget {
   const DashboardSummaryTab({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<DashboardViewModel, DashboardFilterViewModel>(
-      builder: (context, vm, filterVM, _) {
-        if (vm.isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return Stack(
+      children: [
+        Consumer<DashboardViewModel>(
+          builder: (context, vm, _) {
+            if (vm.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        final metrics = vm.activeMetrics;
+            final metrics = vm.activeMetrics;
 
-        return RefreshIndicator(
-          onRefresh: vm.refresh,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
-            children: [
-              if (vm.availableCurrencies.length > 1) ...[
-                _CurrencyTabs(
-                  currencies: vm.availableCurrencies,
-                  selected: vm.selectedCurrency,
-                  onSelected: (cc) => filterVM.setCurrencyCode(cc),
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (metrics != null) ...[
+            return RefreshIndicator(
+              onRefresh: vm.refresh,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 160),
+                children: [
+                  if (metrics != null) ...[
                 _NetWorthCard(metrics: metrics),
                 const SizedBox(height: 12),
                 _MetricsGrid(metrics: metrics),
@@ -113,49 +107,14 @@ class DashboardSummaryTab extends StatelessWidget {
                   label: 'Sin etiquetas este mes',
                 )
               else
-                _TagSpendBreakdown(items: vm.filteredMonthlySpendByTag),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ============================================================
-// Currency tabs
-// ============================================================
-
-class _CurrencyTabs extends StatelessWidget {
-  final List<String> currencies;
-  final String? selected;
-  final ValueChanged<String> onSelected;
-
-  const _CurrencyTabs({
-    required this.currencies,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 36,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: currencies.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final cc = currencies[index];
-          final isSelected = cc == selected;
-          return ChoiceChip(
-            label: Text(cc),
-            selected: isSelected,
-            onSelected: (_) => onSelected(cc),
-            visualDensity: VisualDensity.compact,
-          );
-        },
-      ),
+                    _TagSpendBreakdown(items: vm.filteredMonthlySpendByTag),
+                ],
+              ),
+            );
+          },
+        ),
+        const DashboardFilterSheet(),
+      ],
     );
   }
 }

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
-import 'package:pocket_pilot/src/features/dashboard/domain/account_balance_dto.dart';
+import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
+import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_view_model.dart';
+import 'package:pocket_pilot/src/features/dashboard/ui/widgets/temporal_page_view.dart';
 
 class DashboardFilterSheet extends StatelessWidget {
   const DashboardFilterSheet({super.key});
@@ -13,257 +15,174 @@ class DashboardFilterSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final filterVM = context.watch<DashboardFilterViewModel>();
-    final dashVM = context.watch<DashboardViewModel>();
 
-    // Derive available currencies and accounts from loaded data
-    final currencies = dashVM.availableCurrencies;
-    final accounts = dashVM.accountBalances;
-
-    // Deduplicate accounts (balance query may have duplicates per currency,
-    // but in practice account_id is unique per row since grouped by id+currency)
-    final uniqueAccounts = <String, AccountBalanceDTO>{};
-    for (final a in accounts) {
-      uniqueAccounts.putIfAbsent(a.accountId, () => a);
-    }
-    final accountList = uniqueAccounts.values.toList()
-      ..sort((a, b) => a.accountName.compareTo(b.accountName));
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: cs.onSurfaceVariant.withValues(alpha: 0.3),
-                  borderRadius: AppTheme.radiusFull,
-                ),
-              ),
+    return DraggableScrollableSheet(
+      initialChildSize: 0.12,
+      minChildSize: 0.12,
+      maxChildSize: 0.55,
+      snap: true,
+      snapSizes: const [0.12, 0.55],
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: cs.surfaceContainer,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(16),
             ),
-            const SizedBox(height: 16),
-
-            // Header row
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Filtros',
-                    style: GoogleFonts.ibmPlexSans(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                ),
-                if (filterVM.hasFilters)
-                  TextButton(
-                    onPressed: filterVM.clearAll,
-                    child: const Text('Limpiar'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // --- Date range ---
-            Text(
-              'Rango de fechas',
-              style: GoogleFonts.ibmPlexSans(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _DateButton(
-                    label: 'Desde',
-                    value: filterVM.dateFrom,
-                    onTap: () => _pickDate(
-                      context,
-                      initial: DateTime.tryParse(filterVM.dateFrom),
-                      onPicked: (d) {
-                        filterVM.setDateRange(
-                          DashboardFilterViewModel.fmt(d),
-                          filterVM.dateTo,
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _DateButton(
-                    label: 'Hasta',
-                    value: filterVM.dateTo,
-                    onTap: () => _pickDate(
-                      context,
-                      initial: DateTime.tryParse(filterVM.dateTo),
-                      onPicked: (d) {
-                        filterVM.setDateRange(
-                          filterVM.dateFrom,
-                          DashboardFilterViewModel.fmt(d),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // --- Currency ---
-            if (currencies.length > 1) ...[
-              const SizedBox(height: 20),
-              Text(
-                'Moneda',
-                style: GoogleFonts.ibmPlexSans(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: currencies.map((cc) {
-                  final selected = filterVM.currencyCode == cc;
-                  return ChoiceChip(
-                    label: Text(cc),
-                    selected: selected,
-                    onSelected: (_) {
-                      filterVM.setCurrencyCode(selected ? null : cc);
-                    },
-                  );
-                }).toList(),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 8,
+                offset: const Offset(0, -2),
               ),
             ],
-
-            // --- Accounts ---
-            if (accountList.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Text(
-                'Cuentas',
-                style: GoogleFonts.ibmPlexSans(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurfaceVariant,
+          ),
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest,
+                    borderRadius: AppTheme.radiusFull,
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: accountList.map((a) {
-                  final selected = filterVM.accountIds.contains(a.accountId);
-                  return FilterChip(
-                    label: Text(a.accountName),
-                    selected: selected,
-                    onSelected: (_) => filterVM.toggleAccountId(a.accountId),
-                  );
-                }).toList(),
-              ),
+              const TemporalPageView(),
+              const _ScopeFilters(),
             ],
-
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
-  }
-
-  Future<void> _pickDate(
-    BuildContext context, {
-    DateTime? initial,
-    required ValueChanged<DateTime> onPicked,
-  }) async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial ?? now,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(now.year + 1, 12, 31),
-    );
-    if (picked != null) onPicked(picked);
   }
 }
 
-class _DateButton extends StatelessWidget {
-  final String label;
-  final String value;
-  final VoidCallback onTap;
+class _ScopeFilters extends StatefulWidget {
+  const _ScopeFilters();
 
-  const _DateButton({
-    required this.label,
-    required this.value,
-    required this.onTap,
-  });
+  @override
+  State<_ScopeFilters> createState() => _ScopeFiltersState();
+}
+
+class _ScopeFiltersState extends State<_ScopeFilters> {
+  List<AccountModel> _accounts = const [];
+  List<String> _currencies = const [];
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAccounts();
+  }
+
+  Future<void> _loadAccounts() async {
+    try {
+      final db = context.read<DatabaseHelper>();
+      final store = AccountLocalStore(db: db);
+      final accounts = (await store.getAccounts())
+          .where((a) => a.type != 'contact')
+          .toList()
+        ..sort((a, b) => a.name.compareTo(b.name));
+      final currencies = accounts.map((a) => a.currencyCode).toSet().toList()
+        ..sort();
+      if (!mounted) return;
+      setState(() {
+        _accounts = accounts;
+        _currencies = currencies;
+        _loaded = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loaded = true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHigh,
-          borderRadius: AppTheme.radiusSmall,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: GoogleFonts.ibmPlexSans(
-                      fontSize: 11,
-                      color: cs.onSurfaceVariant,
-                    ),
+    final filterVM = context.watch<DashboardFilterViewModel>();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Filtros',
+                  style: GoogleFonts.ibmPlexSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _formatDisplayDate(value),
-                    style: GoogleFonts.ibmPlexSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                ],
+                ),
+              ),
+              if (filterVM.hasFilters)
+                TextButton(
+                  onPressed: filterVM.clearAll,
+                  child: const Text('Limpiar'),
+                ),
+            ],
+          ),
+          if (_loaded && _currencies.length > 1) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Moneda',
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurfaceVariant,
               ),
             ),
-            Icon(
-              Icons.calendar_today_outlined,
-              size: 16,
-              color: cs.onSurfaceVariant,
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: _currencies.map((cc) {
+                final selected = filterVM.currencyCode == cc;
+                return ChoiceChip(
+                  label: Text(cc),
+                  selected: selected,
+                  onSelected: (_) {
+                    filterVM.setCurrencyCode(selected ? null : cc);
+                  },
+                );
+              }).toList(),
             ),
           ],
-        ),
+          if (_loaded && _accounts.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Cuentas',
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: _accounts.map((a) {
+                final selected = filterVM.accountIds.contains(a.id);
+                return FilterChip(
+                  label: Text(a.name),
+                  selected: selected,
+                  onSelected: (_) => filterVM.toggleAccountId(a.id),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
       ),
     );
-  }
-
-  String _formatDisplayDate(String isoDate) {
-    try {
-      final d = DateTime.parse(isoDate);
-      const months = [
-        'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-        'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
-      ];
-      return '${d.day} ${months[d.month - 1]} ${d.year}';
-    } catch (_) {
-      return isoDate;
-    }
   }
 }

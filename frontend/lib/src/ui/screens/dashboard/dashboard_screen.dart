@@ -9,11 +9,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_view_model.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/statistics_tab.dart';
 import 'package:pocket_pilot/src/ui/screens/dashboard/dashboard_summary_tab.dart';
 import 'package:pocket_pilot/src/ui/widgets/notification_bell.dart';
@@ -23,8 +19,6 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filterVM = context.watch<DashboardFilterViewModel>();
-
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -41,10 +35,9 @@ class DashboardScreen extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          actions: [
-            const NotificationBell(),
-            _FilterButton(hasFilters: filterVM.hasFilters),
-            const SizedBox(width: 8),
+          actions: const [
+            NotificationBell(),
+            SizedBox(width: 8),
           ],
           bottom: const TabBar(
             tabs: [
@@ -60,63 +53,6 @@ class DashboardScreen extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _FilterButton extends StatelessWidget {
-  final bool hasFilters;
-
-  const _FilterButton({required this.hasFilters});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Stack(
-      children: [
-        IconButton(
-          icon: Icon(
-            Icons.tune_outlined,
-            color: hasFilters ? cs.primary : cs.onSurfaceVariant,
-          ),
-          onPressed: () {
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              builder: (_) {
-                return MultiProvider(
-                  providers: [
-                    ChangeNotifierProvider.value(
-                      value: context.read<DashboardFilterViewModel>(),
-                    ),
-                    ChangeNotifierProvider.value(
-                      value: context.read<DashboardViewModel>(),
-                    ),
-                  ],
-                  child: const DashboardFilterSheet(),
-                );
-              },
-            );
-          },
-        ),
-        if (hasFilters)
-          Positioned(
-            top: 8,
-            right: 8,
-            child: Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: cs.primary,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-      ],
     );
   }
 }

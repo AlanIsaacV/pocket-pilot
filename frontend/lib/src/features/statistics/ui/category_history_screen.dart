@@ -7,12 +7,12 @@ import 'package:provider/provider.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/budgets/domain/budget_status.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
+import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/category_history_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/widgets/category_monthly_bar_chart.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/widgets/stat_delta_row.dart';
-import 'package:pocket_pilot/src/features/statistics/ui/widgets/time_window_chips.dart';
 
 class CategoryHistoryScreen extends StatefulWidget {
   final String categoryId;
@@ -31,11 +31,16 @@ class CategoryHistoryScreen extends StatefulWidget {
 }
 
 class _CategoryHistoryScreenState extends State<CategoryHistoryScreen> {
-  int _months = 6;
   int? _selectedBarIndex;
   CategoryHistoryDTO? _history;
   bool _loading = true;
   String? _error;
+
+  DashboardFilterViewModel? _filterVM;
+  String? _lastFrom;
+  String? _lastTo;
+  String? _lastCurrency;
+  Set<String> _lastAccountIds = const {};
 
   @override
   void initState() {
@@ -43,11 +48,57 @@ class _CategoryHistoryScreenState extends State<CategoryHistoryScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final vm = context.read<DashboardFilterViewModel>();
+    if (!identical(vm, _filterVM)) {
+      _filterVM?.removeListener(_onFilterChanged);
+      _filterVM = vm;
+      _filterVM!.addListener(_onFilterChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    _filterVM?.removeListener(_onFilterChanged);
+    super.dispose();
+  }
+
+  void _onFilterChanged() {
+    final vm = _filterVM!;
+    final (from, to) = vm.resolvedDateRange;
+    final currency = vm.currencyCode;
+    final accountIds = vm.accountIds;
+    if (from == _lastFrom &&
+        to == _lastTo &&
+        currency == _lastCurrency &&
+        _setEquals(accountIds, _lastAccountIds)) {
+      return;
+    }
+    _load();
+  }
+
+  static bool _setEquals(Set<String> a, Set<String> b) {
+    if (a.length != b.length) {
+      return false;
+    }
+    for (final item in a) {
+      if (!b.contains(item)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   Future<void> _load() async {
     final repo = context.read<StatisticsRepository>();
+    final vm = context.read<DashboardFilterViewModel>();
+    final (from, to) = vm.resolvedDateRange;
+    final accountIds = vm.accountIds.isNotEmpty ? vm.accountIds : null;
     final currency = widget.initialCurrencyCode ??
         widget.initialSummary?.currencyCode ??
-        context.read<DashboardFilterViewModel>().currencyCode;
+        vm.currencyCode;
     if (currency == null) {
       setState(() {
         _loading = false;
@@ -63,14 +114,19 @@ class _CategoryHistoryScreenState extends State<CategoryHistoryScreen> {
       final data = await repo.getHistory(
         categoryId: widget.categoryId,
         currencyCode: currency,
-        months: _months,
-        now: DateTime.now(),
+        from: from,
+        to: to,
+        accountIds: accountIds,
       );
       if (!mounted) return;
       setState(() {
         _history = data;
         _selectedBarIndex = data.points.length - 1;
         _loading = false;
+        _lastFrom = from;
+        _lastTo = to;
+        _lastCurrency = currency;
+        _lastAccountIds = Set.of(vm.accountIds);
       });
     } catch (e) {
       if (!mounted) return;
@@ -99,36 +155,32 @@ class _CategoryHistoryScreenState extends State<CategoryHistoryScreen> {
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _Error(message: _error!, onRetry: _load)
-              : _Body(
-                  history: _history!,
-                  months: _months,
-                  selectedBarIndex: _selectedBarIndex,
-                  onWindowChanged: (m) {
-                    setState(() => _months = m);
-                    _load();
-                  },
-                  onBarTap: (i) => setState(() => _selectedBarIndex = i),
-                ),
+      body: Stack(
+        children: [
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+                  ? _Error(message: _error!, onRetry: _load)
+                  : _Body(
+                      history: _history!,
+                      selectedBarIndex: _selectedBarIndex,
+                      onBarTap: (i) => setState(() => _selectedBarIndex = i),
+                    ),
+          const DashboardFilterSheet(),
+        ],
+      ),
     );
   }
 }
 
 class _Body extends StatelessWidget {
   final CategoryHistoryDTO history;
-  final int months;
   final int? selectedBarIndex;
-  final ValueChanged<int> onWindowChanged;
   final ValueChanged<int> onBarTap;
 
   const _Body({
     required this.history,
-    required this.months,
     required this.selectedBarIndex,
-    required this.onWindowChanged,
     required this.onBarTap,
   });
 
@@ -143,15 +195,8 @@ class _Body extends StatelessWidget {
         : history.points.last.yearMonth;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 96),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 160),
       children: [
-        Center(
-          child: TimeWindowChips(
-            selectedMonths: months,
-            onChanged: onWindowChanged,
-          ),
-        ),
-        const SizedBox(height: 16),
         StatDeltaRow(
           currency: s.currencyCode,
           avgCents: s.avgMonthlyCents,

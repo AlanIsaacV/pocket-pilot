@@ -164,8 +164,8 @@ void main() {
       final history = await repo.getHistory(
         categoryId: 'c1',
         currencyCode: 'MXN',
-        months: 3,
-        now: DateTime.utc(2026, 3, 15),
+        from: '2026-01-01',
+        to: '2026-03-15',
       );
 
       expect(history.points.map((p) => p.yearMonth).toList(), [
@@ -212,8 +212,8 @@ void main() {
       final history = await repo.getHistory(
         categoryId: 'c1',
         currencyCode: 'MXN',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-01',
       );
 
       expect(history.budget, isNull);
@@ -240,8 +240,8 @@ void main() {
       final history = await repo.getHistory(
         categoryId: 'c1',
         currencyCode: 'MXN',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-01',
       );
 
       expect(history.budget, isNull);
@@ -267,6 +267,7 @@ class _FakeLocalStore extends StatisticsLocalStore {
     required String windowEnd,
     required String windowMid,
     required String currentYm,
+    Set<String>? accountIds,
   }) async =>
       categorySeries;
 
@@ -276,6 +277,7 @@ class _FakeLocalStore extends StatisticsLocalStore {
     required String currencyCode,
     required String windowStart,
     required String windowEnd,
+    Set<String>? accountIds,
   }) async =>
       monthlySeries;
 }

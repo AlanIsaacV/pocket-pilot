@@ -1,35 +1,86 @@
 import 'package:flutter/foundation.dart';
 
+// ----------------------------------------------------------
+// Enums
+// ----------------------------------------------------------
+
+enum QuickRange { d7, d30, m6, y1 }
+
+enum PeriodGranularity { week, month, year }
+
+// ----------------------------------------------------------
+// ViewModel
+// ----------------------------------------------------------
+
 class DashboardFilterViewModel extends ChangeNotifier {
-  String _dateFrom;
-  String _dateTo;
+  // Temporal state
+  int _activePageIndex = 0;
+  QuickRange _quickSelection = QuickRange.m6;
+  PeriodGranularity _periodGranularity = PeriodGranularity.month;
+  int _periodOffset = 0;
+  DateTime _customFrom = DateTime.now().subtract(const Duration(days: 30));
+  DateTime _customTo = DateTime.now();
+
+  // Scope filters
   String? _currencyCode;
   Set<String> _accountIds = {};
 
-  DashboardFilterViewModel()
-      : _dateFrom = _defaultDateFrom(),
-        _dateTo = _defaultDateTo();
+  // --- Temporal getters ---
+  int get activePageIndex => _activePageIndex;
+  QuickRange get quickSelection => _quickSelection;
+  PeriodGranularity get periodGranularity => _periodGranularity;
+  int get periodOffset => _periodOffset;
+  DateTime get customFrom => _customFrom;
+  DateTime get customTo => _customTo;
 
-  // --- Getters ---
-
-  String get dateFrom => _dateFrom;
-  String get dateTo => _dateTo;
+  // --- Scope getters ---
   String? get currencyCode => _currencyCode;
   Set<String> get accountIds => _accountIds;
+
+  // --- Derived date range ---
+  (String, String) get resolvedDateRange => _resolveDateRange();
+  String get dateFrom => resolvedDateRange.$1;
+  String get dateTo => resolvedDateRange.$2;
 
   bool get hasFilters =>
       _currencyCode != null ||
       _accountIds.isNotEmpty ||
-      _dateFrom != _defaultDateFrom() ||
-      _dateTo != _defaultDateTo();
+      _activePageIndex != 0 ||
+      _quickSelection != QuickRange.m6;
 
-  // --- Setters ---
+  // --- Temporal setters ---
 
-  void setDateRange(String from, String to) {
-    _dateFrom = from;
-    _dateTo = to;
+  void setActivePageIndex(int index) {
+    _activePageIndex = index;
     notifyListeners();
   }
+
+  void setQuickSelection(QuickRange range) {
+    _quickSelection = range;
+    _activePageIndex = 0;
+    notifyListeners();
+  }
+
+  void setPeriodGranularity(PeriodGranularity g) {
+    _periodGranularity = g;
+    _periodOffset = 0;
+    _activePageIndex = 1;
+    notifyListeners();
+  }
+
+  void navigatePeriod(int delta) {
+    _periodOffset += delta;
+    notifyListeners();
+  }
+
+  void setCustomRange(DateTime from, DateTime to) {
+    _customFrom = from;
+    _customTo = to;
+    _activePageIndex = 2;
+    notifyListeners();
+  }
+
+  // --- Scope setters ---
 
   void setCurrencyCode(String? code) {
     _currencyCode = code;
@@ -46,27 +97,112 @@ class DashboardFilterViewModel extends ChangeNotifier {
   }
 
   void clearAll() {
-    _dateFrom = _defaultDateFrom();
-    _dateTo = _defaultDateTo();
+    _activePageIndex = 0;
+    _quickSelection = QuickRange.m6;
+    _periodGranularity = PeriodGranularity.month;
+    _periodOffset = 0;
+    _customFrom = DateTime.now().subtract(const Duration(days: 30));
+    _customTo = DateTime.now();
     _currencyCode = null;
     _accountIds = {};
     notifyListeners();
   }
 
-  // --- Defaults ---
+  // --- Date resolution ---
 
-  static String _defaultDateFrom() {
-    final now = DateTime.now();
-    return '${now.year}-${now.month.toString().padLeft(2, '0')}-01';
+  (String, String) _resolveDateRange() {
+    switch (_activePageIndex) {
+      case 0:
+        return _resolveQuick();
+      case 1:
+        return _resolvePeriod();
+      case 2:
+        return (fmt(_customFrom), fmt(_customTo));
+      default:
+        return _resolveQuick();
+    }
   }
 
-  static String _defaultDateTo() {
+  (String, String) _resolveQuick() {
     final now = DateTime.now();
-    final lastDay = DateTime(now.year, now.month + 1, 0).day;
-    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${lastDay.toString().padLeft(2, '0')}';
+    final Duration duration;
+    switch (_quickSelection) {
+      case QuickRange.d7:
+        duration = const Duration(days: 7);
+      case QuickRange.d30:
+        duration = const Duration(days: 30);
+      case QuickRange.m6:
+        duration = const Duration(days: 182);
+      case QuickRange.y1:
+        duration = const Duration(days: 365);
+    }
+    final from = now.subtract(duration);
+    return (fmt(from), fmt(now));
   }
+
+  (String, String) _resolvePeriod() {
+    final now = DateTime.now();
+    switch (_periodGranularity) {
+      case PeriodGranularity.week:
+        final currentMonday = now.subtract(Duration(days: now.weekday - 1));
+        final targetMonday =
+            currentMonday.add(Duration(days: 7 * _periodOffset));
+        final targetSunday = targetMonday.add(const Duration(days: 6));
+        return (fmt(targetMonday), fmt(targetSunday));
+      case PeriodGranularity.month:
+        final targetMonth = DateTime(now.year, now.month + _periodOffset, 1);
+        final lastDay = DateTime(targetMonth.year, targetMonth.month + 1, 0);
+        return (fmt(targetMonth), fmt(lastDay));
+      case PeriodGranularity.year:
+        final targetYear = DateTime(now.year + _periodOffset, 1, 1);
+        final lastDay = DateTime(targetYear.year, 12, 31);
+        return (fmt(targetYear), fmt(lastDay));
+    }
+  }
+
+  // --- Period label for display ---
+
+  String get periodLabel {
+    if (_periodOffset == 0) return _periodGranularityLabel;
+    final now = DateTime.now();
+    switch (_periodGranularity) {
+      case PeriodGranularity.week:
+        final currentMonday = now.subtract(Duration(days: now.weekday - 1));
+        final targetMonday =
+            currentMonday.add(Duration(days: 7 * _periodOffset));
+        return '${targetMonday.day}/${targetMonday.month}';
+      case PeriodGranularity.month:
+        final target = DateTime(now.year, now.month + _periodOffset, 1);
+        return _monthName(target.month);
+      case PeriodGranularity.year:
+        return '${now.year + _periodOffset}';
+    }
+  }
+
+  String get _periodGranularityLabel {
+    switch (_periodGranularity) {
+      case PeriodGranularity.week:
+        return 'Semana';
+      case PeriodGranularity.month:
+        return 'Mes';
+      case PeriodGranularity.year:
+        return 'Año';
+    }
+  }
+
+  bool get isAtCurrentPeriod => _periodOffset == 0;
+
+  // --- Static helpers ---
 
   static String fmt(DateTime d) {
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  static String _monthName(int month) {
+    const names = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+    ];
+    return names[month - 1];
   }
 }

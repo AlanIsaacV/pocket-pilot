@@ -7,15 +7,13 @@ import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_mod
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/window_math.dart';
-import 'package:pocket_pilot/src/features/statistics/ui/statistics_filter_view_model.dart';
 
 class StatisticsViewModel extends ChangeNotifier {
   final StatisticsRepository _repository;
   final DashboardFilterViewModel _filterVM;
-  final StatisticsFilterViewModel _statsFilterVM;
-  final DateTime Function() _now;
 
   List<CategorySeriesDTO> series = const [];
+  int months = 0;
   bool isLoading = false;
   String? errorMessage;
 
@@ -24,17 +22,10 @@ class StatisticsViewModel extends ChangeNotifier {
   StatisticsViewModel({
     required StatisticsRepository repository,
     required DashboardFilterViewModel filterViewModel,
-    required StatisticsFilterViewModel statsFilterViewModel,
-    DateTime Function()? now,
   })  : _repository = repository,
-        _filterVM = filterViewModel,
-        _statsFilterVM = statsFilterViewModel,
-        _now = now ?? DateTime.now {
+        _filterVM = filterViewModel {
     _filterVM.addListener(_onFilterChanged);
-    _statsFilterVM.addListener(_onFilterChanged);
   }
-
-  int get months => _statsFilterVM.window;
 
   void loadOnAppear() {
     unawaited(refresh());
@@ -54,14 +45,20 @@ class StatisticsViewModel extends ChangeNotifier {
     _safeNotify();
 
     try {
-      final window = StatisticsWindow.fromNow(months: months, now: _now());
+      final (from, to) = _filterVM.resolvedDateRange;
+      final window = StatisticsWindow.fromRange(from: from, to: to);
+      months = window.months;
+      final accountIds = _filterVM.accountIds.isNotEmpty
+          ? _filterVM.accountIds
+          : null;
       series = await _repository.getSeriesList(
         currencyCode: currency,
         windowStart: window.windowStart,
         windowEnd: window.windowEnd,
         windowMid: window.windowMid,
         currentYm: window.currentYm,
-        months: months,
+        months: window.months,
+        accountIds: accountIds,
       );
       errorMessage = null;
     } catch (e) {
@@ -77,7 +74,6 @@ class StatisticsViewModel extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _filterVM.removeListener(_onFilterChanged);
-    _statsFilterVM.removeListener(_onFilterChanged);
     super.dispose();
   }
 

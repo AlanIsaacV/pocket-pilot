@@ -19,16 +19,18 @@ class CashflowRepository {
 
   Future<CashflowSnapshot> getSnapshot({
     required String currencyCode,
-    required int months,
-    required DateTime now,
+    required String from,
+    required String to,
     int topN = defaultTopN,
+    Set<String>? accountIds,
   }) async {
-    final window = StatisticsWindow.fromNow(months: months, now: now);
+    final window = StatisticsWindow.fromRange(from: from, to: to);
 
     final totals = await _local.getTotals(
       currencyCode: currencyCode,
       windowStart: window.windowStart,
       windowEnd: window.windowEnd,
+      accountIds: accountIds,
     );
     final income = totals['income'] ?? 0;
     final expense = totals['expense'] ?? 0;
@@ -42,16 +44,18 @@ class CashflowRepository {
       currencyCode: currencyCode,
       windowStart: window.windowStart,
       windowEnd: window.windowEnd,
+      accountIds: accountIds,
     );
     final natRows = await _local.getNatureTotals(
       currencyCode: currencyCode,
       windowStart: window.windowStart,
       windowEnd: window.windowEnd,
+      accountIds: accountIds,
     );
 
     return CashflowSnapshot(
       currencyCode: currencyCode,
-      windowMonths: months,
+      windowMonths: window.months,
       totalInCents: totalIn,
       totalOutCents: totalOut,
       netCents: totalIn - totalOut,

@@ -16,8 +16,8 @@ void main() {
 
       final snap = await repo.getSnapshot(
         currencyCode: 'MXN',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-30',
       );
 
       expect(snap.totalInCents, 50000);
@@ -32,8 +32,8 @@ void main() {
 
       final snap = await repo.getSnapshot(
         currencyCode: 'MXN',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-30',
       );
 
       expect(snap.isEmpty, true);
@@ -61,8 +61,8 @@ void main() {
 
       final snap = await repo.getSnapshot(
         currencyCode: 'MXN',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-30',
         topN: 3,
       );
 
@@ -116,8 +116,8 @@ void main() {
 
       final snap = await repo.getSnapshot(
         currencyCode: 'MXN',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-30',
       );
 
       final income = snap.byCategory.where((e) => e.kind == 'income').toList();
@@ -144,8 +144,8 @@ void main() {
 
       final snap = await repo.getSnapshot(
         currencyCode: 'MXN',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-30',
       );
 
       expect(snap.byNature, hasLength(3));
@@ -189,8 +189,8 @@ void main() {
 
       final snap = await repo.getSnapshot(
         currencyCode: 'USD',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-30',
       );
 
       expect(snap.totalInCents, 70000);
@@ -212,8 +212,8 @@ void main() {
 
       final snap = await repo.getSnapshot(
         currencyCode: 'USD',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-30',
       );
 
       final inflow =
@@ -244,8 +244,8 @@ void main() {
 
       final snap = await repo.getSnapshot(
         currencyCode: 'USD',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-30',
       );
 
       expect(
@@ -272,8 +272,8 @@ void main() {
 
       final snap = await repo.getSnapshot(
         currencyCode: 'USD',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-30',
       );
 
       expect(
@@ -300,8 +300,8 @@ void main() {
 
       final snap = await repo.getSnapshot(
         currencyCode: 'MXN',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-30',
       );
 
       expect(snap.totalInCents, 1000);
@@ -323,8 +323,8 @@ void main() {
 
       final snap = await repo.getSnapshot(
         currencyCode: 'MXN',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-30',
       );
 
       expect(snap.netCents, -50);
@@ -360,8 +360,8 @@ void main() {
 
       final snap = await repo.getSnapshot(
         currencyCode: 'USD',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-30',
       );
 
       final incomeSum = snap.byCategory
@@ -383,8 +383,8 @@ void main() {
       );
       final snap = await repoWithTransfer.getSnapshot(
         currencyCode: 'USD',
-        months: 3,
-        now: DateTime.utc(2026, 4, 1),
+        from: '2026-02-01',
+        to: '2026-04-30',
       );
       expect(snap.isEmpty, false);
     });
@@ -407,6 +407,7 @@ class _FakeLocal extends CashflowLocalStore {
     required String currencyCode,
     required String windowStart,
     required String windowEnd,
+    Set<String>? accountIds,
   }) async =>
       totals;
 
@@ -415,6 +416,7 @@ class _FakeLocal extends CashflowLocalStore {
     required String currencyCode,
     required String windowStart,
     required String windowEnd,
+    Set<String>? accountIds,
   }) async =>
       categoryRows;
 
@@ -423,6 +425,7 @@ class _FakeLocal extends CashflowLocalStore {
     required String currencyCode,
     required String windowStart,
     required String windowEnd,
+    Set<String>? accountIds,
   }) async =>
       natureRows;
 }

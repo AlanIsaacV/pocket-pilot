@@ -1,21 +1,18 @@
 // features/statistics/ui/categories_tab.dart
 //
-// Full-screen view of per-category expense/income aggregates. Previously
-// the body of StatisticsTab; now mounted at /dashboard/statistics/categories
-// behind its own RouteScope. Reads window from the scope's
-// StatisticsFilterViewModel (seeded from the `?window=` query param when
-// pushed from the hub).
+// Vista full-screen con los agregados de gastos/ingresos por categoría.
+// Lee el window (meses) desde DashboardFilterViewModel (monthsWindow),
+// compartido con el Dashboard y el resto de Stats.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.dart';
-import 'package:pocket_pilot/src/features/statistics/ui/statistics_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/statistics_view_model.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/widgets/category_list_row.dart';
-import 'package:pocket_pilot/src/features/statistics/ui/widgets/time_window_chips.dart';
 
 class CategoriesTab extends StatelessWidget {
   const CategoriesTab({super.key});
@@ -35,75 +32,75 @@ class _Body extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final statsFilter = context.watch<StatisticsFilterViewModel>();
 
-    return Consumer<StatisticsViewModel>(
-      builder: (context, vm, _) {
-        if (vm.isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (vm.errorMessage != null) {
-          return _ErrorState(message: vm.errorMessage!, onRetry: vm.refresh);
-        }
+    return Stack(
+      children: [
+        Consumer<StatisticsViewModel>(
+          builder: (context, vm, _) {
+            if (vm.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (vm.errorMessage != null) {
+              return _ErrorState(
+                  message: vm.errorMessage!, onRetry: vm.refresh);
+            }
 
-        final expense = vm.series.where((s) => s.kind == 'expense').toList();
-        final income = vm.series.where((s) => s.kind == 'income').toList();
+            final months = vm.months;
+            final expense =
+                vm.series.where((s) => s.kind == 'expense').toList();
+            final income = vm.series.where((s) => s.kind == 'income').toList();
 
-        return RefreshIndicator(
-          onRefresh: vm.refresh,
-          child: CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    Center(
-                      child: TimeWindowChips(
-                        selectedMonths: statsFilter.window,
-                        onChanged: statsFilter.setWindow,
-                      ),
+            return RefreshIndicator(
+              onRefresh: vm.refresh,
+              child: CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 160),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        if (vm.series.isEmpty)
+                          _EmptyState(cs: cs)
+                        else ...[
+                          if (expense.isNotEmpty) ...[
+                            const _SectionHeader(title: 'Gastos'),
+                            const SizedBox(height: 12),
+                            ...expense.map(
+                              (s) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: CategoryListRow(
+                                  item: s,
+                                  windowMonths: months,
+                                  onTap: () => _openDetail(context, s),
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (income.isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            const _SectionHeader(title: 'Ingresos'),
+                            const SizedBox(height: 12),
+                            ...income.map(
+                              (s) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: CategoryListRow(
+                                  item: s,
+                                  windowMonths: months,
+                                  onTap: () => _openDetail(context, s),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ]),
                     ),
-                    const SizedBox(height: 20),
-                    if (vm.series.isEmpty)
-                      _EmptyState(cs: cs)
-                    else ...[
-                      if (expense.isNotEmpty) ...[
-                        const _SectionHeader(title: 'Gastos'),
-                        const SizedBox(height: 12),
-                        ...expense.map(
-                          (s) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: CategoryListRow(
-                              item: s,
-                              windowMonths: statsFilter.window,
-                              onTap: () => _openDetail(context, s),
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (income.isNotEmpty) ...[
-                        const SizedBox(height: 20),
-                        const _SectionHeader(title: 'Ingresos'),
-                        const SizedBox(height: 12),
-                        ...income.map(
-                          (s) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: CategoryListRow(
-                              item: s,
-                              windowMonths: statsFilter.window,
-                              onTap: () => _openDetail(context, s),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ]),
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        );
-      },
+            );
+          },
+        ),
+        const DashboardFilterSheet(),
+      ],
     );
   }
 

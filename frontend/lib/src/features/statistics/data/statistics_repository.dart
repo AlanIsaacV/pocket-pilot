@@ -35,6 +35,7 @@ class StatisticsRepository {
     required String windowMid,
     required String currentYm,
     required int months,
+    Set<String>? accountIds,
   }) async {
     final rows = await _local.getCategorySeries(
       currencyCode: currencyCode,
@@ -42,6 +43,7 @@ class StatisticsRepository {
       windowEnd: windowEnd,
       windowMid: windowMid,
       currentYm: currentYm,
+      accountIds: accountIds,
     );
     return rows.map((r) => _toSeries(r, months, currencyCode)).toList();
   }
@@ -49,10 +51,11 @@ class StatisticsRepository {
   Future<CategoryHistoryDTO> getHistory({
     required String categoryId,
     required String currencyCode,
-    required int months,
-    required DateTime now,
+    required String from,
+    required String to,
+    Set<String>? accountIds,
   }) async {
-    final window = StatisticsWindow.fromNow(months: months, now: now);
+    final window = StatisticsWindow.fromRange(from: from, to: to);
 
     final seriesRows = await _local.getCategorySeries(
       currencyCode: currencyCode,
@@ -60,6 +63,7 @@ class StatisticsRepository {
       windowEnd: window.windowEnd,
       windowMid: window.windowMid,
       currentYm: window.currentYm,
+      accountIds: accountIds,
     );
     final summaryRow = seriesRows.firstWhere(
       (r) => r['category_id'] == categoryId,
@@ -69,13 +73,14 @@ class StatisticsRepository {
     // screen can still render (e.g. user arrived via deep link).
     final summary = summaryRow.isEmpty
         ? _emptySeries(categoryId, currencyCode)
-        : _toSeries(summaryRow, months, currencyCode);
+        : _toSeries(summaryRow, window.months, currencyCode);
 
     final pointRows = await _local.getMonthlySeries(
       categoryId: categoryId,
       currencyCode: currencyCode,
       windowStart: window.windowStart,
       windowEnd: window.windowEnd,
+      accountIds: accountIds,
     );
     final byYm = <String, int>{
       for (final r in pointRows)

@@ -1,8 +1,9 @@
 // features/statistics/ui/categories_route_scope.dart
 //
-// Providers for the Categorías full-screen view under the Statistics hub.
-// Named StatisticsCategoriesRouteScope to avoid collision with the
-// existing CategoriesRouteScope under features/categories.
+// Providers para la vista full-screen Categorías dentro del hub de Stats.
+// Hereda DashboardFilterViewModel del DashboardRouteScope padre (el shell
+// mantiene ese scope vivo al navegar a subrutas), por lo que el estado del
+// filtro se preserva.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -12,38 +13,20 @@ import 'package:pocket_pilot/src/features/budgets/data/budget_local_store.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_local_store.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
-import 'package:pocket_pilot/src/features/statistics/ui/statistics_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/statistics_view_model.dart';
 
 class StatisticsCategoriesRouteScope extends StatelessWidget {
   final Widget child;
-  final int initialWindow;
-  final String? initialCurrencyCode;
 
   const StatisticsCategoriesRouteScope({
     super.key,
     required this.child,
-    this.initialWindow = 6,
-    this.initialCurrencyCode,
   });
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (_) {
-            final vm = DashboardFilterViewModel();
-            if (initialCurrencyCode != null) {
-              vm.setCurrencyCode(initialCurrencyCode);
-            }
-            return vm;
-          },
-        ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              StatisticsFilterViewModel(initialWindow: initialWindow),
-        ),
         Provider<StatisticsRepository>(
           create: (ctx) {
             final db = ctx.read<DatabaseHelper>();
@@ -57,7 +40,6 @@ class StatisticsCategoriesRouteScope extends StatelessWidget {
           create: (ctx) => StatisticsViewModel(
             repository: ctx.read<StatisticsRepository>(),
             filterViewModel: ctx.read<DashboardFilterViewModel>(),
-            statsFilterViewModel: ctx.read<StatisticsFilterViewModel>(),
           )..loadOnAppear(),
         ),
       ],

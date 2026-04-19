@@ -1,20 +1,16 @@
 // features/statistics/ui/statistics_tab.dart
 //
-// The Statistics dashboard tab is now a HUB: a small menu of available
-// visualizations. Each entry navigates to its own screen with scroll
-// vertical and filters seeded from here. The shared window lives in
-// StatisticsFilterViewModel (see dashboard_route_scope.dart). Moneda is
-// already shared via DashboardFilterViewModel on the AppBar.
+// Hub de visualizaciones de estadísticas. Cada entrada navega a su pantalla.
+// Comparte el DashboardFilterViewModel con el resto del Dashboard a través
+// del DashboardRouteScope, por lo que el filtro temporal/moneda/cuentas
+// persiste al navegar entre pestañas y subpantallas.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
-import 'package:pocket_pilot/src/features/statistics/ui/statistics_filter_view_model.dart';
-import 'package:pocket_pilot/src/features/statistics/ui/widgets/time_window_chips.dart';
+import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
 
 class StatisticsTab extends StatelessWidget {
   const StatisticsTab({super.key});
@@ -22,54 +18,39 @@ class StatisticsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final statsFilter = context.watch<StatisticsFilterViewModel>();
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 96),
+    return Stack(
       children: [
-        Center(
-          child: TimeWindowChips(
-            selectedMonths: statsFilter.window,
-            onChanged: statsFilter.setWindow,
-          ),
+        ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 160),
+          children: [
+            _HubEntry(
+              icon: Icons.donut_small_outlined,
+              title: 'Categorías',
+              subtitle: 'Gastos e ingresos por categoría',
+              onTap: () => context.push('/dashboard/statistics/categories'),
+            ),
+            const SizedBox(height: 10),
+            _HubEntry(
+              icon: Icons.swap_vert,
+              title: 'Flujo',
+              subtitle: 'Ingresos vs gastos y neto del periodo',
+              onTap: () => context.push('/dashboard/statistics/cashflow'),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Próximamente se agregarán más visualizaciones aquí.',
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 12,
+                color: cs.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
-        const SizedBox(height: 20),
-        _HubEntry(
-          icon: Icons.donut_small_outlined,
-          title: 'Categorías',
-          subtitle: 'Gastos e ingresos por categoría',
-          onTap: () => _open(context, 'categories'),
-        ),
-        const SizedBox(height: 10),
-        _HubEntry(
-          icon: Icons.swap_vert,
-          title: 'Flujo',
-          subtitle: 'Ingresos vs gastos y neto del periodo',
-          onTap: () => _open(context, 'cashflow'),
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'Próximamente se agregarán más visualizaciones aquí.',
-          style: GoogleFonts.ibmPlexSans(
-            fontSize: 12,
-            color: cs.onSurfaceVariant,
-          ),
-          textAlign: TextAlign.center,
-        ),
+        const DashboardFilterSheet(),
       ],
     );
-  }
-
-  void _open(BuildContext context, String view) {
-    final window = context.read<StatisticsFilterViewModel>().window;
-    final currency = context.read<DashboardFilterViewModel>().currencyCode;
-    final params = <String, String>{'window': '$window'};
-    if (currency != null) params['currency'] = currency;
-    final qs = params.entries
-        .map((e) =>
-            '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}')
-        .join('&');
-    context.push('/dashboard/statistics/$view?$qs');
   }
 }
 

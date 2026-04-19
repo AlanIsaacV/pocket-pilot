@@ -1,16 +1,16 @@
 // features/statistics/domain/window_math.dart
 //
-// Pure time-window bounds for the Statistics tab. All dates are
-// 'YYYY-MM-DD' strings so they compare lexicographically against the
-// SQLite `date` column (same contract as `TransactionFilter`).
+// Pure time-window bounds for the Statistics / Cashflow screens.
+// Built from a user-selected date range (YYYY-MM-DD strings matching
+// the SQLite `date` column's lexicographic contract).
 
 class StatisticsWindow {
-  final int months;        // 3, 6, or 12
-  final String windowStart; // inclusive, first day of oldest month
-  final String windowEnd;   // exclusive, first day of month AFTER current
-  final String windowMid;   // boundary between first/second trend halves
-  final String currentYm;   // 'YYYY-MM' of `now`
-  final List<String> monthsInWindow; // N contiguous 'YYYY-MM' strings
+  final int months;        // count of distinct calendar months touched
+  final String windowStart; // inclusive lower bound
+  final String windowEnd;   // exclusive upper bound (to + 1 day)
+  final String windowMid;   // midpoint date (trend split)
+  final String currentYm;   // 'YYYY-MM' of the last month in the range
+  final List<String> monthsInWindow; // contiguous 'YYYY-MM' list
 
   const StatisticsWindow._({
     required this.months,
@@ -21,36 +21,54 @@ class StatisticsWindow {
     required this.monthsInWindow,
   });
 
-  factory StatisticsWindow.fromNow({
-    required int months,
-    required DateTime now,
+  /// Build a window from an explicit YYYY-MM-DD range (inclusive on both
+  /// ends). The SQL upper bound is computed as `to + 1 day` so `t.date <
+  /// windowEnd` includes transactions dated exactly on `to`.
+  factory StatisticsWindow.fromRange({
+    required String from,
+    required String to,
   }) {
-    assert(months == 3 || months == 6 || months == 12);
-    final y = now.year;
-    final m = now.month;
+    final fromD = _parseYmd(from);
+    final toD = _parseYmd(to);
+    assert(!toD.isBefore(fromD), 'to must be >= from');
 
-    // First day of current month.
-    final startOfCurrent = DateTime.utc(y, m, 1);
-    // First day of next month (exclusive upper bound).
-    final startOfNext = DateTime.utc(y, m + 1, 1);
-    // First day of the oldest month in the window.
-    final startOfOldest = DateTime.utc(y, m - (months - 1), 1);
-    // Mid boundary: start of month at offset N~/2 from oldest.
-    final startOfMid = DateTime.utc(y, m - (months - 1) + (months ~/ 2), 1);
+    // Exclusive upper bound: day after `to`.
+    final endD = toD.add(const Duration(days: 1));
 
+    // monthsInWindow: every YM from from's month to to's month.
     final list = <String>[];
-    for (var i = 0; i < months; i++) {
-      final d = DateTime.utc(y, m - (months - 1) + i, 1);
-      list.add(_fmtYm(d));
+    var y = fromD.year;
+    var m = fromD.month;
+    while (y < toD.year || (y == toD.year && m <= toD.month)) {
+      list.add(_fmtYm(DateTime.utc(y, m, 1)));
+      m++;
+      if (m > 12) {
+        m = 1;
+        y++;
+      }
     }
+    final months = list.length;
+
+    // windowMid: halfway through the span (day-accurate, for trend split).
+    final midDays = toD.difference(fromD).inDays ~/ 2;
+    final midD = fromD.add(Duration(days: midDays));
 
     return StatisticsWindow._(
       months: months,
-      windowStart: _fmtDate(startOfOldest),
-      windowEnd: _fmtDate(startOfNext),
-      windowMid: _fmtDate(startOfMid),
-      currentYm: _fmtYm(startOfCurrent),
+      windowStart: _fmtDate(fromD),
+      windowEnd: _fmtDate(endD),
+      windowMid: _fmtDate(midD),
+      currentYm: _fmtYm(toD),
       monthsInWindow: List.unmodifiable(list),
+    );
+  }
+
+  static DateTime _parseYmd(String s) {
+    final parts = s.split('-');
+    return DateTime.utc(
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+      int.parse(parts[2]),
     );
   }
 

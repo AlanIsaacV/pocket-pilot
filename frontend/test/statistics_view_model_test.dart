@@ -7,18 +7,14 @@ import 'package:pocket_pilot/src/features/statistics/data/statistics_local_store
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/trend.dart';
-import 'package:pocket_pilot/src/features/statistics/ui/statistics_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/statistics_view_model.dart';
 
 void main() {
   test('initial load with no currency emits empty list', () async {
     final filter = DashboardFilterViewModel();
-    final statsFilter = StatisticsFilterViewModel();
     final vm = StatisticsViewModel(
       repository: _FakeRepo(rowsByCurrency: const {}),
       filterViewModel: filter,
-      statsFilterViewModel: statsFilter,
-      now: () => DateTime.utc(2026, 4, 17),
     );
 
     await vm.refresh();
@@ -28,9 +24,8 @@ void main() {
     expect(vm.errorMessage, isNull);
   });
 
-  test('window change triggers reload', () async {
+  test('temporal change (Quick 1Y) triggers reload with ~12 months', () async {
     final filter = DashboardFilterViewModel()..setCurrencyCode('MXN');
-    final statsFilter = StatisticsFilterViewModel();
     final repo = _FakeRepo(
       rowsByCurrency: {
         'MXN': 1,
@@ -39,30 +34,25 @@ void main() {
     final vm = StatisticsViewModel(
       repository: repo,
       filterViewModel: filter,
-      statsFilterViewModel: statsFilter,
-      now: () => DateTime.utc(2026, 4, 17),
     );
     await vm.refresh();
-    final priorCalls = repo.callsByMonths[12] ?? 0;
+    final priorCallCount = repo.calls;
 
-    statsFilter.setWindow(12);
-    // Allow the unawaited refresh to complete.
+    filter.setQuickSelection(QuickRange.y1);
     await Future<void>.delayed(Duration.zero);
     await Future<void>.delayed(Duration.zero);
 
-    expect(vm.months, 12);
-    expect(repo.callsByMonths[12], priorCalls + 1);
+    // 365 days back can span 12 or 13 calendar months depending on `now`.
+    expect(vm.months, inInclusiveRange(12, 13));
+    expect(repo.calls, priorCallCount + 1);
   });
 
   test('currency change triggers reload', () async {
     final filter = DashboardFilterViewModel()..setCurrencyCode('MXN');
-    final statsFilter = StatisticsFilterViewModel();
     final repo = _FakeRepo(rowsByCurrency: const {'MXN': 1, 'USD': 1});
     final vm = StatisticsViewModel(
       repository: repo,
       filterViewModel: filter,
-      statsFilterViewModel: statsFilter,
-      now: () => DateTime.utc(2026, 4, 17),
     );
     await vm.refresh();
     expect(repo.lastCurrency, 'MXN');
@@ -76,12 +66,9 @@ void main() {
 
   test('repository failure surfaces errorMessage', () async {
     final filter = DashboardFilterViewModel()..setCurrencyCode('MXN');
-    final statsFilter = StatisticsFilterViewModel();
     final vm = StatisticsViewModel(
       repository: _ThrowingRepo(),
       filterViewModel: filter,
-      statsFilterViewModel: statsFilter,
-      now: () => DateTime.utc(2026, 4, 17),
     );
 
     await vm.refresh();
@@ -93,7 +80,7 @@ void main() {
 
 class _FakeRepo extends StatisticsRepository {
   final Map<String, int> rowsByCurrency;
-  final Map<int, int> callsByMonths = {};
+  int calls = 0;
   String? lastCurrency;
 
   _FakeRepo({required this.rowsByCurrency})
@@ -110,9 +97,10 @@ class _FakeRepo extends StatisticsRepository {
     required String windowMid,
     required String currentYm,
     required int months,
+    Set<String>? accountIds,
   }) async {
     lastCurrency = currencyCode;
-    callsByMonths[months] = (callsByMonths[months] ?? 0) + 1;
+    calls++;
     final count = rowsByCurrency[currencyCode] ?? 0;
     return List.generate(
       count,
@@ -143,6 +131,7 @@ class _ThrowingRepo extends _FakeRepo {
     required String windowMid,
     required String currentYm,
     required int months,
+    Set<String>? accountIds,
   }) async {
     throw StateError('db down');
   }

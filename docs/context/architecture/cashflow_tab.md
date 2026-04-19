@@ -1,6 +1,6 @@
 # Cashflow Tab — Income vs. Expense Waterfall
 
-Read-only view accessible from the Estadísticas hub at `/dashboard/statistics/cashflow`. Shows total inflows, total outflows, net for the current window, and a waterfall chart decomposing those totals by **Category** or by **Nature** (toggle). Transfers are excluded.
+Read-only view accessible from the Estadísticas hub at `/dashboard/statistics/cashflow`. Shows total inflows, total outflows, net for the current window, and a waterfall chart decomposing those totals by **Category** or by **Nature** (toggle). Transfers count as inflow (`transfer_in`) and outflow (`transfer_out`) in the row's own currency and appear as a synthetic "Transferencias" bucket in the breakdown.
 
 Entry point: `StatisticsTab` (hub) → "Flujo" row. See `statistics_tab.md` for hub navigation and shared filter contract.
 
@@ -38,19 +38,18 @@ CashflowLocalStore (SQL)
 All three queries share:
 - `currency_code = :currencyCode`
 - `date BETWEEN :windowStart AND :windowEnd` (same `StatisticsWindow.fromNow` math used by Statistics).
-- `type IN ('expense', 'income')` — transfers excluded.
 - `deleted_at IS NULL` on both `transactions` and `categories` (where joined).
 
 `amount_cents` in `transactions` stores the **absolute magnitude** (positive); the sign is inferred from `type`. SUMs are therefore always positive.
 
-### `getTotals` — grand totals per type
-Returns `{'income': sum, 'expense': sum}` in a single grouped query. The repository uses these values as the authoritative Entra/Sale/Neto numbers, so card totals do not drift when "Otros" folds entries.
+### `getTotals` — grand totals per raw type
+Widens `type IN ('expense', 'income', 'transfer_in', 'transfer_out')` and returns a map with those four keys (missing keys default to 0). The repository then combines `income + transfer_in → totalIn` and `expense + transfer_out → totalOut`. This makes per-currency cashflow faithful to what hit the balance: same-currency transfers cancel, cross-currency transfers show up in each currency's view, and fees/spread land in `net` as a real delta.
 
 ### `getCategoryTotals`
-One row per category with activity. `kind` column aliases `categories.type` (same convention as Statistics). Ordered by `total_cents DESC`.
+Keeps `type IN ('expense', 'income')` — transfers have no category and are surfaced as a synthetic entry by the repository (see below). One row per category with activity. `kind` column aliases `categories.type`. Ordered by `total_cents DESC`.
 
 ### `getNatureTotals`
-Grouped by `(nature, type)`. Skips rows where `nature` is NULL/empty (legacy data without classification) so the chart isn't polluted with an "Sin definir" wedge — those rows **still contribute to grand totals** via `getTotals`.
+Keeps `type IN ('expense', 'income')`. Grouped by `(nature, type)`. Skips rows where `nature` is NULL/empty (legacy data without classification) so the chart isn't polluted with an "Sin definir" wedge — those rows **still contribute to grand totals** via `getTotals`.
 
 ## Repository Logic
 
@@ -61,6 +60,10 @@ Grouped by `(nature, type)`. Skips rows where `nature` is NULL/empty (legacy dat
 - Same for expense.
 
 "Otros" is only appended if the tail is non-empty. Nature mode has no fold — the 7 financial natures are already few enough.
+
+### Synthetic "Transferencias" entry
+
+When `transfer_in > 0` or `transfer_out > 0` for the current currency/window, the repository appends a synthetic `CashflowBreakdownEntry` labeled `"Transferencias"` to both `byCategory` and `byNature`, one per non-zero kind. The entry carries `isTransfer: true` so the UI can differentiate it visually if needed. This preserves the invariant that `sum(byCategory per kind) == totalInCents / totalOutCents`, avoiding drift between cards and the breakdown list.
 
 ### Sign and display
 
@@ -106,7 +109,7 @@ Seeding currency and window via query params matches the pre-existing `/dashboar
 
 ## Testing
 
-- `test/cashflow_repository_test.dart` — 6 cases: totals passthrough, empty snapshot, top-N fold, separate income/expense buckets, nature 1:1 mapping, `entriesFor` selector.
+- `test/cashflow_repository_test.dart` — covers totals passthrough, empty snapshot, top-N fold, separate income/expense buckets, nature 1:1 mapping, `entriesFor` selector, plus transfer cases: totals include transfers, synthetic "Transferencias" entry per kind, same-currency cancellation, fee/spread net delta, and breakdown-sums-equal-totals invariant.
 - Window math and sign conventions covered by the Statistics test suite (`statistics_window_math_test.dart`, `statistics_repository_test.dart`).
 - SQL is validated manually against real data when smoke-testing the UI; no DB-level test per project convention.
 

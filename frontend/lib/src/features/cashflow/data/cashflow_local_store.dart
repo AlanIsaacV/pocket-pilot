@@ -1,8 +1,13 @@
 // features/cashflow/data/cashflow_local_store.dart
 //
 // Read-only SQL for aggregate cashflow totals across a time window.
-// Follows the same conventions as StatisticsLocalStore:
-//   - Transfers excluded (only type IN ('expense','income'))
+// Conventions:
+//   - Grand totals include transfers: transfer_in as inflow, transfer_out
+//     as outflow, in the row's own currency. Same-currency transfers
+//     naturally net to zero; fees/spread show up as real net impact.
+//   - Category/nature breakdowns still only count type IN ('expense','income');
+//     transfers appear as a synthetic "Transferencias" entry built in the
+//     repository so the sum of the breakdown equals the grand total.
 //   - Soft-deleted rows excluded (t.deleted_at IS NULL, c.deleted_at IS NULL)
 //   - amount_cents stored as absolute magnitude; sign inferred from type
 //   - Dates compared as 'YYYY-MM-DD' strings (lexicographic)
@@ -78,8 +83,13 @@ class CashflowLocalStore {
     );
   }
 
-  /// Grand totals (in vs out) so UI cards match the breakdown without
-  /// recomputing client-side — avoids drift if "Otros" fold shifts.
+  /// Grand totals per raw transaction type. Includes transfers so the
+  /// per-currency cashflow reflects what actually happened to the balance
+  /// (USD→MXN transfers show as outflow in USD and inflow in MXN; fees in
+  /// same-currency transfers show up as a real net delta).
+  ///
+  /// Returns a map with up to four keys: 'income', 'expense',
+  /// 'transfer_in', 'transfer_out'. Missing keys default to 0.
   Future<Map<String, int>> getTotals({
     required String currencyCode,
     required String windowStart,
@@ -96,20 +106,24 @@ class CashflowLocalStore {
         AND t.date         >= ?
         AND t.date         <  ?
         AND t.deleted_at   IS NULL
-        AND t.type         IN ('expense', 'income')
+        AND t.type         IN ('expense', 'income', 'transfer_in', 'transfer_out')
       GROUP BY t.type
       ''',
       [currencyCode, windowStart, windowEnd],
     );
-    var income = 0;
-    var expense = 0;
+    final totals = <String, int>{
+      'income': 0,
+      'expense': 0,
+      'transfer_in': 0,
+      'transfer_out': 0,
+    };
     for (final r in rows) {
       final kind = r['kind'] as String;
-      final total = _asInt(r['total_cents']);
-      if (kind == 'income') income = total;
-      if (kind == 'expense') expense = total;
+      if (totals.containsKey(kind)) {
+        totals[kind] = _asInt(r['total_cents']);
+      }
     }
-    return {'income': income, 'expense': expense};
+    return totals;
   }
 
   static int _asInt(Object? raw) {

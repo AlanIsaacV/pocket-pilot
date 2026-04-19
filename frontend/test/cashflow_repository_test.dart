@@ -174,6 +174,220 @@ void main() {
       expect(snap.entriesFor(BreakdownMode.category), [entry]);
       expect(snap.entriesFor(BreakdownMode.nature), isEmpty);
     });
+
+    test('transfers contribute to totals and net', () async {
+      final repo = CashflowRepository(
+        local: _FakeLocal(
+          totals: const {
+            'income': 50000,
+            'expense': 30000,
+            'transfer_in': 20000,
+            'transfer_out': 15000,
+          },
+        ),
+      );
+
+      final snap = await repo.getSnapshot(
+        currencyCode: 'USD',
+        months: 3,
+        now: DateTime.utc(2026, 4, 1),
+      );
+
+      expect(snap.totalInCents, 70000);
+      expect(snap.totalOutCents, 45000);
+      expect(snap.netCents, 25000);
+    });
+
+    test('synthetic Transferencias entry appears per kind in byCategory', () async {
+      final repo = CashflowRepository(
+        local: _FakeLocal(
+          totals: const {
+            'income': 0,
+            'expense': 0,
+            'transfer_in': 1500,
+            'transfer_out': 2500,
+          },
+        ),
+      );
+
+      final snap = await repo.getSnapshot(
+        currencyCode: 'USD',
+        months: 3,
+        now: DateTime.utc(2026, 4, 1),
+      );
+
+      final inflow =
+          snap.byCategory.where((e) => e.kind == 'income').toList();
+      final outflow =
+          snap.byCategory.where((e) => e.kind == 'expense').toList();
+
+      expect(inflow, hasLength(1));
+      expect(inflow.single.label, 'Transferencias');
+      expect(inflow.single.amountCents, 1500);
+      expect(inflow.single.isTransfer, true);
+
+      expect(outflow, hasLength(1));
+      expect(outflow.single.label, 'Transferencias');
+      expect(outflow.single.amountCents, 2500);
+      expect(outflow.single.isTransfer, true);
+    });
+
+    test('Transferencias entry appears in byNature when transfers exist', () async {
+      final repo = CashflowRepository(
+        local: _FakeLocal(
+          totals: const {'transfer_in': 1000, 'transfer_out': 0},
+          natureRows: const [
+            {'nature': 'required', 'kind': 'expense', 'total_cents': 500},
+          ],
+        ),
+      );
+
+      final snap = await repo.getSnapshot(
+        currencyCode: 'USD',
+        months: 3,
+        now: DateTime.utc(2026, 4, 1),
+      );
+
+      expect(
+        snap.byNature.map((e) => e.label).toList(),
+        ['required', 'Transferencias'],
+      );
+      final transfer = snap.byNature.last;
+      expect(transfer.kind, 'income');
+      expect(transfer.amountCents, 1000);
+      expect(transfer.isTransfer, true);
+    });
+
+    test('synthetic entry omitted when transfer total for that kind is zero', () async {
+      final repo = CashflowRepository(
+        local: _FakeLocal(
+          totals: const {
+            'income': 0,
+            'expense': 0,
+            'transfer_in': 1000,
+            'transfer_out': 0,
+          },
+        ),
+      );
+
+      final snap = await repo.getSnapshot(
+        currencyCode: 'USD',
+        months: 3,
+        now: DateTime.utc(2026, 4, 1),
+      );
+
+      expect(
+        snap.byCategory.where((e) => e.kind == 'expense'),
+        isEmpty,
+      );
+      expect(
+        snap.byCategory.where((e) => e.kind == 'income').length,
+        1,
+      );
+    });
+
+    test('same-currency transfer cancels (net stays zero)', () async {
+      final repo = CashflowRepository(
+        local: _FakeLocal(
+          totals: const {
+            'income': 0,
+            'expense': 0,
+            'transfer_in': 1000,
+            'transfer_out': 1000,
+          },
+        ),
+      );
+
+      final snap = await repo.getSnapshot(
+        currencyCode: 'MXN',
+        months: 3,
+        now: DateTime.utc(2026, 4, 1),
+      );
+
+      expect(snap.totalInCents, 1000);
+      expect(snap.totalOutCents, 1000);
+      expect(snap.netCents, 0);
+    });
+
+    test('transfer fee/spread shows as real net delta', () async {
+      final repo = CashflowRepository(
+        local: _FakeLocal(
+          totals: const {
+            'income': 0,
+            'expense': 0,
+            'transfer_in': 950,
+            'transfer_out': 1000,
+          },
+        ),
+      );
+
+      final snap = await repo.getSnapshot(
+        currencyCode: 'MXN',
+        months: 3,
+        now: DateTime.utc(2026, 4, 1),
+      );
+
+      expect(snap.netCents, -50);
+    });
+
+    test('category breakdown sums equal grand totals per kind', () async {
+      final repo = CashflowRepository(
+        local: _FakeLocal(
+          totals: const {
+            'income': 12000,
+            'expense': 8000,
+            'transfer_in': 3000,
+            'transfer_out': 2000,
+          },
+          categoryRows: const [
+            {
+              'category_id': 'i1',
+              'name': 'Salario',
+              'color': null,
+              'kind': 'income',
+              'total_cents': 12000,
+            },
+            {
+              'category_id': 'e1',
+              'name': 'Comida',
+              'color': null,
+              'kind': 'expense',
+              'total_cents': 8000,
+            },
+          ],
+        ),
+      );
+
+      final snap = await repo.getSnapshot(
+        currencyCode: 'USD',
+        months: 3,
+        now: DateTime.utc(2026, 4, 1),
+      );
+
+      final incomeSum = snap.byCategory
+          .where((e) => e.kind == 'income')
+          .fold<int>(0, (a, e) => a + e.amountCents);
+      final expenseSum = snap.byCategory
+          .where((e) => e.kind == 'expense')
+          .fold<int>(0, (a, e) => a + e.amountCents);
+
+      expect(incomeSum, snap.totalInCents);
+      expect(expenseSum, snap.totalOutCents);
+    });
+
+    test('isEmpty considers transfers', () async {
+      final repoWithTransfer = CashflowRepository(
+        local: _FakeLocal(
+          totals: const {'transfer_in': 100},
+        ),
+      );
+      final snap = await repoWithTransfer.getSnapshot(
+        currencyCode: 'USD',
+        months: 3,
+        now: DateTime.utc(2026, 4, 1),
+      );
+      expect(snap.isEmpty, false);
+    });
   });
 }
 

@@ -30,8 +30,13 @@ class CashflowRepository {
       windowStart: window.windowStart,
       windowEnd: window.windowEnd,
     );
-    final totalIn = totals['income'] ?? 0;
-    final totalOut = totals['expense'] ?? 0;
+    final income = totals['income'] ?? 0;
+    final expense = totals['expense'] ?? 0;
+    final transferIn = totals['transfer_in'] ?? 0;
+    final transferOut = totals['transfer_out'] ?? 0;
+
+    final totalIn = income + transferIn;
+    final totalOut = expense + transferOut;
 
     final catRows = await _local.getCategoryTotals(
       currencyCode: currencyCode,
@@ -50,10 +55,27 @@ class CashflowRepository {
       totalInCents: totalIn,
       totalOutCents: totalOut,
       netCents: totalIn - totalOut,
-      byCategory: _foldCategories(catRows, topN: topN),
-      byNature: _mapNatures(natRows),
+      byCategory: [
+        ..._foldCategories(catRows, topN: topN),
+        if (transferIn > 0) _transferEntry('income', transferIn),
+        if (transferOut > 0) _transferEntry('expense', transferOut),
+      ],
+      byNature: [
+        ..._mapNatures(natRows),
+        if (transferIn > 0) _transferEntry('income', transferIn),
+        if (transferOut > 0) _transferEntry('expense', transferOut),
+      ],
     );
   }
+
+  static CashflowBreakdownEntry _transferEntry(String kind, int amountCents) =>
+      CashflowBreakdownEntry(
+        id: 'transfers_$kind',
+        label: 'Transferencias',
+        kind: kind,
+        amountCents: amountCents,
+        isTransfer: true,
+      );
 
   List<CashflowBreakdownEntry> _foldCategories(
     List<Map<String, dynamic>> rows, {

@@ -60,8 +60,7 @@ class CategoryListRow extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        'prom. últimos ${windowMonths}m: '
-                        '${_fmt(item.avgMonthlyCents, item.currencyCode)}',
+                        _fmt(item.avgMonthlyCents, item.currencyCode),
                         style: GoogleFonts.ibmPlexSans(
                           fontSize: 12,
                           color: cs.onSurfaceVariant,
@@ -93,10 +92,10 @@ class CategoryListRow extends StatelessWidget {
   }
 
   static IconData _trendIcon(Trend t) => switch (t) {
-        Trend.up => Icons.trending_up,
-        Trend.down => Icons.trending_down,
-        Trend.flat => Icons.trending_flat,
-      };
+    Trend.up => Icons.trending_up,
+    Trend.down => Icons.trending_down,
+    Trend.flat => Icons.trending_flat,
+  };
 
   static Color _trendColor(Trend t, String kind, ColorScheme cs) {
     if (t == Trend.flat) return cs.onSurfaceVariant;

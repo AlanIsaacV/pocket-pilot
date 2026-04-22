@@ -6,9 +6,13 @@ import 'package:provider/provider.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
+import 'package:pocket_pilot/src/features/investments/domain/current_price_resolver.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_lot.dart';
+import 'package:pocket_pilot/src/features/investments/domain/pnl_math.dart';
+import 'package:pocket_pilot/src/features/investments/domain/position_math.dart';
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
+import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
@@ -41,7 +45,7 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
     final vm = context.read<InvestmentViewModel>();
     final accountStore = context.read<AccountLocalStore>();
 
-    await vm.loadHolding(widget.holdingId);
+    await vm.loadHoldingFull(widget.holdingId);
     if (!mounted) return;
 
     var found = vm.findHolding(widget.holdingId);
@@ -114,23 +118,6 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
     context.pop(true);
   }
 
-  Map<String, double> _computePosition(List<InvestmentLotModel> lots) {
-    double buys = 0;
-    double sells = 0;
-    double costBuys = 0;
-    for (final lot in lots) {
-      if (lot.isBuy) {
-        buys += lot.quantity;
-        costBuys += lot.quantity * lot.price;
-      } else {
-        sells += lot.quantity;
-      }
-    }
-    final net = buys - sells;
-    final weightedAvg = buys > 0 ? costBuys / buys : 0.0;
-    return {'net': net, 'weightedAvg': weightedAvg};
-  }
-
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<InvestmentViewModel>();
@@ -140,7 +127,26 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
       ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
     final isLoading = vm.isLoadingHolding(widget.holdingId);
 
-    final stats = _computePosition(lots);
+    final position = computePosition(lots);
+    RealizedPnL? realized;
+    try {
+      realized = computeRealizedPnL(lots);
+    } on InvestmentMathException {
+      realized = null;
+    }
+    final priceQuote = holding == null
+        ? (price: null, source: 'none')
+        : resolveCurrentPrice(
+            holding: holding,
+            marketPrice: vm.priceFor(holding.symbol, holding.exchange),
+            lots: lots,
+          );
+    final unrealized = computeUnrealizedPnL(
+      position: position,
+      currentPrice: priceQuote.price,
+    );
+    final dividends = vm.totalDividendsFor(widget.holdingId);
+    final lastDividend = vm.dividendsFor(widget.holdingId).firstOrNull;
 
     return Scaffold(
       appBar: AppBar(
@@ -185,7 +191,16 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
       ),
       body: Column(
         children: [
-          if (holding != null) _HoldingSummary(holding: holding, stats: stats),
+          if (holding != null)
+            _HoldingSummaryCard(
+              holding: holding,
+              position: position,
+              realizedTotal: realized?.totalRealized,
+              unrealized: unrealized,
+              priceQuote: priceQuote,
+              dividendsByCurrency: dividends,
+              lastDividend: lastDividend,
+            ),
           Expanded(
             child: PpScreenState(
               isLoading: isLoading && lots.isEmpty,
@@ -262,17 +277,33 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
   }
 }
 
-class _HoldingSummary extends StatelessWidget {
+class _HoldingSummaryCard extends StatelessWidget {
   final InvestmentHoldingModel holding;
-  final Map<String, double> stats;
+  final Position position;
+  final double? realizedTotal;
+  final double unrealized;
+  final PriceQuote priceQuote;
+  final Map<String, double> dividendsByCurrency;
+  final TransactionModel? lastDividend;
 
-  const _HoldingSummary({required this.holding, required this.stats});
+  const _HoldingSummaryCard({
+    required this.holding,
+    required this.position,
+    required this.realizedTotal,
+    required this.unrealized,
+    required this.priceQuote,
+    required this.dividendsByCurrency,
+    required this.lastDividend,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final net = stats['net'] ?? 0.0;
-    final avg = stats['weightedAvg'] ?? 0.0;
     final theme = Theme.of(context);
+    final ccy = holding.currencyCode;
+    final price = priceQuote.price;
+    final marketValue = (price != null && position.netQuantity > 0)
+        ? price * position.netQuantity
+        : null;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -285,20 +316,32 @@ class _HoldingSummary extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            holding.displayName,
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${holding.exchange} · ${holding.currencyCode}',
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 12,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      holding.displayName,
+                      style: GoogleFonts.ibmPlexSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${holding.exchange} · ${holding.currencyCode}',
+                      style: GoogleFonts.ibmPlexSans(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PriceSourceBadge(source: priceQuote.source),
+            ],
           ),
           const SizedBox(height: 12),
           Row(
@@ -306,27 +349,98 @@ class _HoldingSummary extends StatelessWidget {
               Expanded(
                 child: _StatTile(
                   label: 'Cantidad neta',
-                  value: _formatQty(net),
+                  value: formatQty(position.netQuantity),
                 ),
               ),
               Expanded(
                 child: _StatTile(
                   label: 'Costo prom.',
-                  value: avg > 0
-                      ? '${avg.toStringAsFixed(2)} ${holding.currencyCode}'
+                  value: position.weightedAvgCost > 0
+                      ? '${formatMoney(position.weightedAvgCost)} $ccy'
                       : '—',
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _StatTile(
+                  label: 'Precio actual',
+                  value: price == null
+                      ? '—'
+                      : '${formatMoney(price)} $ccy',
+                ),
+              ),
+              Expanded(
+                child: _StatTile(
+                  label: 'Valor de mercado',
+                  value: marketValue == null
+                      ? '—'
+                      : '${formatMoney(marketValue)} $ccy',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _PnLTile(
+                  label: 'P&L no realizado',
+                  amount: unrealized,
+                  currencyCode: ccy,
+                  basis: position.netQuantity > 0
+                      ? position.weightedAvgCost * position.netQuantity
+                      : 0,
+                  available: price != null && position.netQuantity > 0,
+                ),
+              ),
+              Expanded(
+                child: _PnLTile(
+                  label: 'P&L realizado',
+                  amount: realizedTotal ?? 0,
+                  currencyCode: ccy,
+                  basis: 0,
+                  available: realizedTotal != null,
+                ),
+              ),
+            ],
+          ),
+          if (dividendsByCurrency.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _StatTile(
+                    label: 'Dividendos',
+                    value: dividendsByCurrency.entries
+                        .map((e) =>
+                            '${formatMoney(e.value)} ${e.key}')
+                        .join(' · '),
+                  ),
+                ),
+                Expanded(
+                  child: _StatTile(
+                    label: 'Último dividendo',
+                    value: lastDividend == null
+                        ? '—'
+                        : '${_formatLotDate(lastDividend!.date)} · ${formatMoney(lastDividend!.amount / 100.0)} ${lastDividend!.currencyCode}',
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 
-  String _formatQty(double q) {
-    if (q == q.truncateToDouble()) return q.toInt().toString();
-    return q.toStringAsFixed(4);
+  String _formatLotDate(String iso) {
+    final parsed = DateTime.tryParse(iso);
+    if (parsed == null) return iso;
+    return formatDateDisplay(parsed);
   }
 }
 
@@ -360,6 +474,105 @@ class _StatTile extends StatelessWidget {
       ],
     );
   }
+}
+
+class _PnLTile extends StatelessWidget {
+  final String label;
+  final double amount;
+  final String currencyCode;
+  final double basis;
+  final bool available;
+
+  const _PnLTile({
+    required this.label,
+    required this.amount,
+    required this.currencyCode,
+    required this.basis,
+    required this.available,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (!available) {
+      return _StatTile(label: label, value: '—');
+    }
+    final color = amount > 0
+        ? Colors.green.shade600
+        : (amount < 0 ? theme.colorScheme.error : theme.colorScheme.onSurface);
+    final sign = amount > 0 ? '+' : '';
+    final pct = basis > 0 ? (amount / basis) * 100 : null;
+    final pctText = pct == null
+        ? ''
+        : ' (${amount > 0 ? '+' : ''}${pct.toStringAsFixed(2)}%)';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.ibmPlexSans(
+            fontSize: 11,
+            letterSpacing: 0.4,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$sign${formatMoney(amount)} $currencyCode$pctText',
+          style: GoogleFonts.ibmPlexSans(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class PriceSourceBadge extends StatelessWidget {
+  final String source;
+
+  const PriceSourceBadge({required this.source, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    if (source == 'none') return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final (label, color) = switch (source) {
+      'market' => ('Mercado', Colors.green.shade600),
+      'manual' => ('Manual', Colors.orange.shade700),
+      'last_lot' => ('Último lote', theme.colorScheme.onSurfaceVariant),
+      _ => (source, theme.colorScheme.onSurfaceVariant),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: AppTheme.radiusFull,
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.ibmPlexSans(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+String formatQty(double q) {
+  if (q.isNaN || q.isInfinite) return '—';
+  if (q == q.truncateToDouble()) return q.toInt().toString();
+  return q.toStringAsFixed(4);
+}
+
+String formatMoney(double v) {
+  return v.toStringAsFixed(2);
 }
 
 class _LotCard extends StatelessWidget {

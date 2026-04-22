@@ -26,6 +26,7 @@ import 'package:pocket_pilot/src/features/investments/data/investment_holding_lo
 import 'package:pocket_pilot/src/features/investments/data/investment_holding_repository.dart';
 import 'package:pocket_pilot/src/features/investments/data/investment_lot_local_store.dart';
 import 'package:pocket_pilot/src/features/investments/data/investment_lot_repository.dart';
+import 'package:pocket_pilot/src/features/investments/data/market_price_local_store.dart';
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
@@ -66,6 +67,9 @@ class AccountsRouteScope extends StatelessWidget {
         Provider<InvestmentLotLocalStore>(
           create: (ctx) =>
               InvestmentLotLocalStore(db: ctx.read<DatabaseHelper>()),
+        ),
+        Provider<MarketPriceLocalStore>(
+          create: (ctx) => MarketPriceLocalStore(db: ctx.read<DatabaseHelper>()),
         ),
         Provider<InvestmentHoldingRepository>(
           create: (ctx) => InvestmentHoldingRepository(
@@ -135,6 +139,8 @@ class AccountsRouteScope extends StatelessWidget {
           create: (ctx) => InvestmentViewModel(
             holdingRepo: ctx.read<InvestmentHoldingRepository>(),
             lotRepo: ctx.read<InvestmentLotRepository>(),
+            marketPriceStore: ctx.read<MarketPriceLocalStore>(),
+            transactionStore: ctx.read<TransactionLocalStore>(),
             syncService: ctx.read<SyncService>(),
             orchestrator: ctx.read<ScheduledGenerationOrchestrator>(),
           )..loadOnAppear(),

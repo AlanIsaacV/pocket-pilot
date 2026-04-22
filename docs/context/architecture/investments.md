@@ -2,22 +2,22 @@
 
 Architecture doc for the investments feature: **variable-income assets** (stocks, ETFs) that complement the existing `yield_configs` feature (which covers fixed-income). Tracks holdings with buy/sell lots, computes FIFO and weighted-average cost on the fly, and syncs daily market prices from the backend.
 
-**Status:** Fase 0 (contracts), Fase 1 (persistencia + sync scaffolding) and Fase 2 (UI CRUD + generator) implemented on 2026-04-21. Fases 3–6 pending — see [§Implementation Phases](#implementation-phases).
+**Status:** Fases 0–3 done (2026-04-21). Fases 4–6 pending — see [§Implementation Phases](#implementation-phases).
 
 ## Scope
 
-**In scope (whole feature):**
-- User-managed holdings (symbol + exchange) inside `investment` accounts.
-- Per-holding lots recording individual buys and sells with commissions and optional FX rate.
-- Deterministic transaction generation from lots (balance of the investment account reflects cash in/out).
-- Daily market price sync from a backend cron (Yahoo Finance + Finnhub).
+**In scope:**
+- User-managed holdings (symbol + exchange), globals — not tied to any account.
+- Per-holding lots recording buys/sells with commissions and optional FX rate. Each lot settles against its own `account_id` (the cash account).
+- Deterministic transaction generation from lots so the settlement account's balance reflects cash in/out.
+- Daily market price sync from a backend cron (Yahoo Finance).
 - On-the-fly FIFO and weighted-average cost calculations.
-- Portfolio screen with market value, P&L realized / unrealized, distribution charts.
+- Portfolio view (tabular) with market value, P&L realized/unrealized, dividends.
 - Dashboard allocation (liquid / investment_active / investment_passive / debt / revolving).
 
 **Out of scope:**
-- Stock splits and corporate actions (deferred to a post-MVP phase).
-- Dividend auto-detection — dividends are entered **manually** as income transactions with `holding_id` set and `nature='passive'`.
+- Stock splits and corporate actions (post-MVP).
+- Dividend auto-detection — dividends are entered **manually** as income transactions with `holding_id` set, `lot_id` NULL, and `nature='passive'`.
 - Tax/capital-gains reports.
 - Options/derivatives.
 - Margin / leverage.
@@ -25,67 +25,64 @@ Architecture doc for the investments feature: **variable-income assets** (stocks
 
 ## Key Design Decisions
 
-Anchor these in the doc so future sessions don't relitigate:
-
 | Decision | Choice | Why |
 |---|---|---|
-| Price source | Backend Go cron hitting a free public API (Yahoo first, Finnhub fallback) | Centralized, daily, covers both US and BMV via `.MX` suffix |
-| Cash model | **Implicit**: investment account balance = available cash | Matches broker mental model without a separate `cash_balance` column |
-| Dividend capture | Manual income transaction with `holding_id` | Simpler than extending `yield_configs`; auto-detection deferred |
-| Currency | Each holding has its own `currency_code`, independent of account | Allows mixed USD + MXN positions in a single account |
-| Splits / corporate actions | Not in MVP | Can be applied manually by editing the lot quantities and prices |
-| FIFO / weighted avg | Computed on the fly in Flutter from lots | Trivial compute volumes for personal portfolios; avoids materialization drift |
-| Transaction generation | Deterministic generator (UUIDv5 from lot id) | Same pattern as `YieldTransactionGenerator`; no cross-entity coordination in outbox |
-| market_prices sync | Read-only from client; global table with per-user cursor bump | Server-authoritative; clients never push prices |
+| Price source | Backend Go cron hitting Yahoo Finance (free public endpoint) | Centralized, daily, covers US and BMV via `.MX` suffix. Finnhub explicitly rejected: expensive for the value added on top of Yahoo |
+| Holdings scope | **Global**, not per-account. Each lot carries its own `account_id` | Lets a single symbol settle against multiple cash accounts |
+| Cash model | **Implicit**: settlement account balance = available cash | Matches broker mental model without a separate `cash_balance` column |
+| Dividend capture | Manual income transaction with `holding_id`, `lot_id IS NULL`, `nature='passive'` | Simpler than extending `yield_configs`; auto-detection deferred |
+| Currency | Each holding has its own `currency_code`, independent of the settlement account | Allows mixed USD + MXN positions |
+| FX per lot | `fx_rate` on the lot, required when `holding.currency_code != account.currency_code` | The derived transaction must debit the settlement account in its currency |
+| Splits / corporate actions | Not in MVP | Can be applied manually by editing lot quantities and prices |
+| FIFO / weighted avg | Computed on the fly in Flutter from lots (pure domain math) | Trivial compute for personal portfolios; avoids materialization drift |
+| Transaction generation | Deterministic (UUIDv5 from lot id) | Same pattern as `YieldTransactionGenerator`; no cross-entity coordination in outbox |
+| `market_prices` sync | Read-only from client; global table with per-user cursor bump | Server-authoritative; clients never push prices |
+| Portfolio UI location | The existing "Holdings" tab of `AccountsScreen` is the portfolio view | Avoids duplicating the global holdings list |
 
 ## Data Model
 
 ### Backend (PostgreSQL)
 
-Migration: `backend/migrations/003_investments.sql`.
+Initial migration: `backend/migrations/003_investments.sql`. Related follow-ups: `004` adds `investment_lots.account_id`; `005` drops `investment_holdings.account_id` (holdings are globals).
 
 **`investment_holdings`** — one row per position the user tracks:
-- Identity / ownership: `id uuid`, `user_id uuid`, `account_id uuid` (FK).
-- Asset identity: `symbol TEXT`, `exchange TEXT` (`NASDAQ | NYSE | BMV | OTHER`), `display_name TEXT`, `currency_code TEXT`.
+- Identity: `id uuid`, `user_id uuid`.
+- Asset: `symbol TEXT`, `exchange TEXT` (`NASDAQ | NYSE | BMV | OTHER`), `display_name TEXT`, `currency_code TEXT`.
 - Classification: `asset_type TEXT` (`stock | etf | other`), `status TEXT` (`active | closed`).
-- Valuation fallback: `manual_price NUMERIC(18,4) NULL` (escape-hatch when the market feed doesn't cover the symbol).
-- Metadata: `notes TEXT NULL`, `created_at`, `updated_at`, `deleted_at`.
-- Indexes: `user_id` (active), `user_id, updated_at`, `account_id` (active), `symbol, exchange` (active — used by the cron).
+- Valuation fallback: `manual_price NUMERIC(18,4) NULL` (escape-hatch when the feed doesn't cover the symbol).
+- Metadata: `notes TEXT NULL`, timestamps, `deleted_at`.
+- Indexes: `user_id` (active), `user_id, updated_at`, `symbol, exchange` (active — used by the cron).
 
 **`investment_lots`** — each buy or sell event:
-- `id uuid`, `user_id uuid`, `holding_id uuid` (FK).
-- `kind TEXT` (`buy | sell`) + `CHECK` constraint; `quantity NUMERIC(18,8)` + `CHECK (quantity > 0)`.
+- `id uuid`, `user_id uuid`, `holding_id uuid` (FK), `account_id uuid` (settlement account, added in migration 004).
+- `kind TEXT` (`buy | sell`) + `CHECK`; `quantity NUMERIC(18,8)` + `CHECK (quantity > 0)`.
 - `price NUMERIC(18,4)` per unit in the **holding** currency.
 - `fee_cents BIGINT` (commission, minor units of the holding currency).
-- `fx_rate NUMERIC(18,8) NULL` — **required** when `holding.currency_code != account.currency_code`; converts lot value to account currency for the derived transaction.
+- `fx_rate NUMERIC(18,8) NULL` — required when `holding.currency_code != account.currency_code`.
 - `occurred_at DATE`; `validity TEXT` (`valid | invalid`); `notes TEXT NULL`; timestamps.
 - Indexes: `user_id, updated_at`; `holding_id, occurred_at` (active).
 
 **`market_prices`** — server-populated price cache, read-only from client:
-- **PK compuesto** `(symbol, exchange)` — no UUID.
-- `currency_code TEXT`, `price NUMERIC(18,4)`, `price_date DATE`, `source TEXT` (`yahoo | finnhub | manual`).
+- **Composite PK** `(symbol, exchange)` — no UUID.
+- `currency_code TEXT`, `price NUMERIC(18,4)`, `price_date DATE`, `source TEXT` (`yahoo | manual`).
 - `fetched_at timestamptz`, `updated_at timestamptz`.
 - Index: `updated_at` for delta pulls.
 
 **`transactions`** link columns:
-- `ALTER TABLE transactions ADD COLUMN holding_id uuid`.
-- `ALTER TABLE transactions ADD COLUMN lot_id uuid`.
-- Partial indexes on both (`WHERE col IS NOT NULL`).
-- `CHECK NOT (yield_id IS NOT NULL AND holding_id IS NOT NULL)` — prevents a transaction from being simultaneously a yield and an investment event.
+- `holding_id uuid NULL`, `lot_id uuid NULL`, partial indexes on each.
+- `CHECK NOT (yield_id IS NOT NULL AND holding_id IS NOT NULL)`.
 
 ### Frontend (SQLite)
 
-Migration: `frontend/assets/migrations/002.sql`. DB `_version` bumped `1 → 2` in `frontend/lib/src/core/db/database_helper.dart`.
-
-Mirrors the backend schema without `user_id`. Same `CHECK` constraints on `kind` and `quantity`. Same trigger-based `updated_at` management.
+Initial migration: `frontend/assets/migrations/002.sql`. Follow-ups: `003.sql` (lot.account_id), `004.sql` (drop holding.account_id). DB `_version` currently `4` in `frontend/lib/src/core/db/database_helper.dart`. Schema mirrors the backend without `user_id`.
 
 ### Precision Rationale
 
-`NUMERIC(18,4)` for `price` (not `*_cents BIGINT`) because BRK.A quotes above $700,000 with 4-decimal precision and overflows int64-in-cents at the corner. `NUMERIC(18,8)` for `quantity` supports fractional ETF shares. In Dart these are mapped to `double`: precision loss is acceptable for personal-finance magnitudes (double provides ~15–17 significant figures, which covers the practical range).
+`NUMERIC(18,4)` for `price` and `NUMERIC(18,8)` for `quantity` (not `*_cents BIGINT`) — BRK.A quotes above $700,000 with 4 decimals overflow int64-in-cents. In Dart these are mapped to `double`: precision loss is acceptable for personal-finance magnitudes.
 
 ## gRPC Contracts
 
-Three new services in `proto/pocket_pilot/v1/`:
+Three services in `proto/pocket_pilot/v1/`:
 
 | Service | Proto file | RPCs |
 |---|---|---|
@@ -93,188 +90,155 @@ Three new services in `proto/pocket_pilot/v1/`:
 | `InvestmentLotService` | `investment_lot_service.proto` | List / Upsert / Delete |
 | `MarketPriceService` | `market_price_service.proto` | List **only** (read-only from client) |
 
-`proto/pocket_pilot/v1/transaction_service.proto` extended with:
-- `optional string holding_id = 19;`
-- `optional string lot_id = 20;`
-
-`scripts/gen_proto.sh` updated to include the three new protos for both Go and Dart output.
+`transaction_service.proto` extended with `optional string holding_id = 19;` and `optional string lot_id = 20;`. `scripts/gen_proto.sh` generates Go + Dart for all three.
 
 ## Sync Integration
 
-### New Entity Types
+### Entity Types
 
-`backend/internal/sync/entity_type.go` gained:
+`backend/internal/sync/entity_type.go`:
 - `EntityInvestmentHolding = "investment_holding"`
 - `EntityInvestmentLot = "investment_lot"`
 - `EntityMarketPrice = "market_price"`
 
 ### Sync Order
 
-Handlers must run in an order that respects FK and generator dependencies. Current order (with new entries bolded):
-
 1. `account`
 2. `category`
 3. `tag`
 4. `transaction_template`
-5. `yield_config` / `user_preference` (same order number, safe because independent)
-6. **`investment_holding`** (FK to account)
-7. **`investment_lot`** (FK to holding; generator runs after its pull)
-8. **`market_price`** (pull-only; ordered for stability)
+5. `yield_config` / `user_preference`
+6. **`investment_holding`**
+7. **`investment_lot`** (generator runs after its pull)
+8. **`market_price`** (pull-only)
 9. `transaction` (generator outputs push here)
 10. `goal`
 11. `budget`
 
 ### MarketPrice Sync Semantics
 
-- Client-side: `MarketPriceSyncHandler.pull()` is the only functional method. `pushUpsert` and `pushDelete` are documented no-ops. No `MarketPriceRepository` exists on the client because there's no local write path.
-- Server-side: `MarketPriceRepository.Upsert` (called by the cron in Fase 4) bumps the `market_price` cursor **only** for users who hold the `(symbol, exchange)` pair — via `INSERT ... SELECT DISTINCT user_id FROM investment_holdings WHERE symbol = $1 AND exchange = $2 AND deleted_at IS NULL`. Users without a relevant holding do not see their cursor bumped, so their clients skip the pull.
-- Global table, user-scoped cursors: trade-off is a small amount of irrelevant bytes on full-table `List` requests, in exchange for a trivial cron implementation.
+- **Client**: `MarketPriceSyncHandler.pull()` is the only functional method; `pushUpsert` / `pushDelete` are no-ops. No `MarketPriceRepository` on the client (no local write path).
+- **Server**: `MarketPriceRepository.Upsert` (called by the cron) bumps the `market_price` cursor **only** for users who hold the `(symbol, exchange)` — via `INSERT ... SELECT DISTINCT user_id FROM investment_holdings WHERE symbol = $1 AND exchange = $2 AND deleted_at IS NULL`. Users without a relevant holding skip the pull.
 
 ## Nature Classification
 
-Transactions derived from lots use these values to avoid polluting by-nature/by-category dashboards:
+Derived transactions use these values so they don't pollute by-nature/by-category dashboards:
 
 | Operation | `type` | `nature` | Rationale |
 |---|---|---|---|
-| Buy | `expense` | `''` (unspecified) | Cash → asset conversion; not consumption |
-| Sell | `income` | `windfall` | Matches the canonical "ventas ocasionales" definition |
+| Buy | `expense` | `investment` | Cash → asset conversion; not consumption |
+| Sell | `income` | `investment` | Asset → cash; not earned income |
 | Dividend (manual) | `income` | `passive` | Mirrors the yield pattern |
 
-**Critical filter (to implement in Fase 2):** `dashboard_local_store.dart` queries that aggregate spend by nature / by category **must** exclude `lot_id IS NOT NULL` so that portfolio operations don't appear in "monthly spend by category" style views.
+`dashboard_local_store.dart` excludes `AND t.lot_id IS NOT NULL` from `getMonthlySpendByCategory`, `getMonthlySpendByNature`, and `getMonthlySpendByTag`. `getBalancesPerAccount` is intentionally **not** filtered — derived transactions should affect the settlement account's balance.
 
-## Generator Pattern (pending in Fase 2)
+## Generator Pattern
 
-Same shape as `YieldTransactionGenerator`. Adds constant `kDeterministicInvestmentNamespace` in `frontend/lib/src/core/ids/deterministic_namespace.dart`.
+Located at `frontend/lib/src/features/investments/data/investment_transaction_generator.dart`. Namespace constant `kDeterministicInvestmentNamespace` in `frontend/lib/src/core/ids/deterministic_namespace.dart`. Full reconciliation via `queryAllIncludingDeleted()`: upserts active lots idempotently and soft-deletes transactions whose lot is soft-deleted. Wired in `CompositeScheduledGeneratorRunner` **after** `YieldTransactionGenerator`.
 
-For each non-deleted lot, upsert a transaction with:
+Per lot:
 - `id = uuidv5(kDeterministicInvestmentNamespace, "lot:${lotId}")`
 - `type = 'expense'` for buy, `'income'` for sell
-- `account_id = holding.account_id`
-- `currency_code = account.currency_code` (converted via `fx_rate` if needed)
+- `account_id = lot.account_id` (the settlement account)
+- `currency_code = account.currency_code` (converted via `fx_rate`)
 - `amount_cents`:
-  - Buy: `round((quantity * price + fee_cents/1e2) * fx_rate * 100)`
-  - Sell: `round((quantity * price - fee_cents/1e2) * fx_rate * 100)`
-- `category_id = null`, `nature` per §Nature Classification
-- `holding_id`, `lot_id` populated
-- `status = 'cleared'`, `date = lot.occurred_at`
+  - Buy: `round((quantity * price + fee_cents/100) * fx_rate * 100)`
+  - Sell: `round((quantity * price - fee_cents/100) * fx_rate * 100)`
+- `category_id = null`, `nature` per §Nature Classification, `holding_id` + `lot_id` populated, `status = 'cleared'`, `date = lot.occurred_at`.
 
-For lots with `deleted_at != null`: soft-delete the derived transaction and enqueue a `delete` outbox entry.
+## FIFO + Weighted Average (Domain Math)
 
-Wire into `CompositeScheduledGeneratorRunner` **after** `YieldTransactionGenerator`.
+Pure Dart, testable without Flutter, lives in `frontend/lib/src/features/investments/domain/`:
 
-## FIFO + Weighted Average (pending in Fase 3)
+- `position_math.dart` → `computePosition(lots) → { netQuantity, weightedAvgCost, fifoRemainingLots }`. Filters `deletedAt != null` or `validity != 'valid'`. Sorts `(occurredAt ASC, createdAt ASC)`. Weighted avg is **global** across all valid buys with fees prorated per unit. FIFO queue consumed by sells; `netQuantity` goes negative if a sell exceeds available.
+- `pnl_math.dart` → `computeRealizedPnL(lots)` (per-sell breakdown: `proceeds = qty*price - fee/100`, `costBasisConsumed = Σ slices`), `computeUnrealizedPnL({position, currentPrice})` (returns 0 when price null or `netQuantity <= 0`), `InvestmentMathException.sellExceedsAvailable` as defense (UI hard-blocks in `LotFormScreen`).
+- `current_price_resolver.dart` → precedence `market_price → holding.manualPrice → last valid lot → null`, returns a `source` tag for the UI pill.
 
-Domain math lives in `frontend/lib/src/features/investments/domain/`:
-- `position_math.dart`: `computePosition(lots) → { netQuantity, weightedAvgCost, fifoRemainingLots }`.
-- `pnl_math.dart`:
-  - `computeRealizedPnL(lots)`: walks lots chronologically; each sell consumes the oldest non-consumed buys (FIFO); returns per-sell P&L and total realized.
-  - `computeUnrealizedPnL(position, currentPrice)`: uses weighted-average cost.
-- Validation: attempting a sell that exceeds available quantity throws with a human-readable message; UI must hard-block the save.
+Tests: `frontend/test/position_math_test.dart`, `frontend/test/pnl_math_test.dart`.
 
-On-the-fly only — no `quantity_cached` / `avg_cost_cached` columns. For >10K lots consider adding a `last_generated_at` skip column; not needed for personal portfolios.
+No materialized columns — on-the-fly only. For >10K lots consider a skip cache; not expected for personal portfolios.
+
+## Portfolio UI
+
+Lives in the existing "Holdings" tab of `AccountsScreen` (`HoldingsListTab`) — **not** a separate `PortfolioScreen` route. Each row shows symbol / qty / avg / current price (with source pill: Mercado / Manual / Último lote) / market value / P&L chips (Unreal / Real / Div). Footer groups totals by currency; no FX conversion is attempted (no global fx table). Rows with `netQuantity < 0` render a "Datos inconsistentes" pill but don't crash the list.
+
+`HoldingDetailScreen` uses the same domain math for its summary card (qty, avg, price, market value, unrealized, realized, dividends totals + last dividend).
+
+`InvestmentViewModel` (`frontend/lib/src/features/investments/ui/investment_view_model.dart`) holds `_lotsByHolding`, `_priceBySymbolExchange`, `_dividendsByHolding`. `loadPortfolio()` paralelizes per-holding loads with `Future.wait(eagerError: false)`. Dividends read via `TransactionLocalStore.queryDividendsByHolding(holdingId)` (no `TransactionRepository` — it forces a date range; dividends need all-time). Dividend totals group by `tx.currencyCode` (not the holding's) so amounts stay truthful when the user booked them in another currency.
 
 ## Backend Cron (pending in Fase 4)
 
 Package `backend/internal/marketprice/`:
 - `provider.go`: interface `MarketPriceProvider { Fetch(ctx, []Symbol) ([]Quote, error) }`.
-- `yahoo_provider.go`: endpoint `https://query1.finance.yahoo.com/v7/finance/quote?symbols=...`. Batches ≤ 50 symbols, browser user-agent, 5 s per-request timeout, 3 retries with exponential backoff, long backoff on HTTP 429.
-- `finnhub_provider.go`: 60 calls/min free tier; US only; requires `FINNHUB_API_KEY`.
-- `scheduler.go`: `time.NewTicker(24 * time.Hour)`. Recommended fire time: **22:00 UTC** (covers NYSE close at 21:00 UTC and BMV close at 20:00 UTC). Selects distinct `(symbol, exchange)` across active holdings, fetches, calls `MarketPriceRepository.Upsert` per quote, which already bumps only the relevant users' cursors.
+- `yahoo_provider.go`: `https://query1.finance.yahoo.com/v7/finance/quote?symbols=...`. Batches ≤ 50 symbols, browser user-agent, 5 s per-request timeout, 3 retries with exponential backoff, long backoff on HTTP 429.
+- `scheduler.go`: `time.NewTicker(24 * time.Hour)`. Fire time **22:00 UTC** (covers NYSE close at 21:00 UTC and BMV close at 20:00 UTC). Selects distinct `(symbol, exchange)` across active holdings, calls `MarketPriceRepository.Upsert` per quote (already bumps only relevant users' cursors).
 - `admin_handler.go`: RPC `AdminRefreshMarketPrices(symbols[])` gated by `MARKETPRICE_ADMIN_TOKEN` for debugging and post-deploy kick.
 
-Env vars: `MARKETPRICE_ENABLED`, `MARKETPRICE_PROVIDER`, `FINNHUB_API_KEY`, `MARKETPRICE_ADMIN_TOKEN`.
+Env vars: `MARKETPRICE_ENABLED`, `MARKETPRICE_ADMIN_TOKEN`.
 
 Observability: log per tick — symbols fetched, failures, latency. Optional `market_price_fetch_errors` table for missing-symbol tracing.
 
 ## Dashboard Integration (pending in Fase 6)
 
 Extend `DashboardMetrics` with:
-- `marketValueOfHoldingsCents` — sum of `quantity * current_price * fx_rate_to_display_currency` across active holdings, where `current_price` prefers `market_prices` row, then `holdings.manual_price`, then last lot price.
-- `allocationByBucket: Map<String, int>` with buckets:
-  - `liquid` → sum of `bank + cash` balances.
-  - `investment_active` → sum of `marketValueOfHoldings`.
-  - `investment_passive` → sum of `amount_cents` across active `yield_configs`.
-  - `debt` → sum of negative balances on `loan` and `credit_card` accounts.
+- `marketValueOfHoldingsCents` — `Σ quantity * current_price * fx_to_display` across active holdings, where `current_price` prefers `market_prices`, then `holdings.manual_price`, then last lot price.
+- `allocationByBucket: Map<String, int>`:
+  - `liquid` → `bank + cash` balances.
+  - `investment_active` → `marketValueOfHoldings`.
+  - `investment_passive` → Σ `amount_cents` across active `yield_configs`.
+  - `debt` → negative balances on `loan` / `credit_card`.
   - `credit_revolving` → `credit_limit - balance` per credit card.
 
-`netWorth` becomes `accountBalances + marketValueOfHoldings`. The investment-account cash balance is already adjusted by the generator's derived transactions, so market value stacks on top without double counting.
+`netWorth` becomes `accountBalances + marketValueOfHoldings`. The settlement-account cash balance is already adjusted by the generator's derived transactions, so market value stacks on top without double counting.
 
 ## Cascade Behavior
 
-Archive cascade is orchestrated at the repository layer (no DB-level trigger cascade):
-- `InvestmentHoldingRepository.archive(id)` → soft-deletes the holding AND all its active lots. The generator then soft-deletes the derived transactions.
-- `AccountRepository.archive(id)` when `account.type == 'investment'` → cascades to all holdings of that account (and transitively to lots and derived transactions). Needs UI confirmation dialog: "esto archivará también N holdings y M operaciones."
-- Dividends (`holding_id IS NOT NULL AND lot_id IS NULL`) are **not** auto-deleted when a holding is archived — they survive as historical references.
+Archive cascade is orchestrated at the repository layer:
+- `InvestmentHoldingRepository.archive(id)` soft-deletes the holding and all its active lots. The generator then soft-deletes the derived transactions.
+- `AccountRepository.archive(id)` when `account.type == 'investment'` soft-deletes lots whose `account_id == archived` (holdings survive because they're globals). The UI confirmation dialog shows the impacted-lots count.
+- Dividends (`holding_id IS NOT NULL AND lot_id IS NULL`) are **not** auto-deleted — they survive as historical references.
 
 ## Edge Cases
 
-- **Sell > available**: validated at save time in the form. If multi-device edits produce an inconsistency post-sync, the lot is flagged `validity='invalid'` and UI notifies.
-- **Symbol absent from market feed**: UI shows "precio no disponible" and falls back to `manual_price` or the last lot price for valuation.
-- **Offline for days**: delta pull brings all deltas in one shot once reconnected; UI shows a "Precios actualizados hace N días" banner when the most recent `fetched_at` is stale.
-- **Currency mismatch without `fx_rate`**: hard-blocked at the form level. Without `fx_rate` the derived transaction cannot debit the account balance correctly.
-- **Multi-device LWW on lots**: standard LWW applies. A secondary device's change to the same lot may silently lose if `updated_at` is older.
+- **Sell > available**: validated at save time in the form. Post-sync inconsistency flags the lot `validity='invalid'`; math excludes it.
+- **Symbol absent from market feed**: UI falls back to `manual_price` or last lot price; source pill communicates it.
+- **Offline for days**: delta pull brings all deltas in one shot on reconnect; UI shows "Precios actualizados hace N días" when `fetched_at` is stale (banner wires in Fase 4 when the cron populates `fetched_at`).
+- **Currency mismatch without `fx_rate`**: hard-blocked at the form.
+- **Multi-device LWW on lots**: standard LWW; secondary device may silently lose if `updated_at` is older.
+- **Corrupt data (`netQuantity < 0`)**: list renders a "Datos inconsistentes" pill per row; the other rows keep rendering.
+- **Dividend in a currency ≠ holding.currencyCode**: totals group by `tx.currencyCode`, not holding currency, so footer numbers stay truthful.
 
 ## Implementation Phases
 
-Phase-by-phase plan. Each phase is independently deliverable and testable. Update status here as fases advance.
+Phase-by-phase roadmap. Permanent knowledge lives in the sections above; this table is just the roadmap + acceptance criteria for what's still pending.
 
-### Fase 0 — Contract freeze ✅ DONE (2026-04-21)
+### Done
 
-Protos, generated code, entity types, `transactions` link columns. See commit for exact set.
-
-### Fase 1 — Persistencia + Sync scaffolding ✅ DONE (2026-04-21)
-
-- PG migration `003_investments.sql` + SQLite `002.sql`.
-- Backend `backend/internal/investment/` package with 3 repos + 3 handlers + validation.
-- Frontend `lib/src/features/investments/` with domain models, local stores, remote services, 3 sync handlers, 2 repositories (holding, lot; market_price is pull-only).
-- Handlers registered in `backend/cmd/server/main.go` and `frontend/lib/main.dart`.
-- `make proto` regenerates Go + Dart. `go build ./...` and `flutter analyze` both clean.
-
-**Not done in Fase 1:** integration tests (project has no testing infrastructure for backend yet); migrations not applied (user runs `make migrate` when ready).
-
-### Fase 2 — UI CRUD holdings / lots + Generator ✅ DONE (2026-04-21)
-
-Implemented:
-- `InvestmentAccountDetailScreen` replaces the edit form when tapping an `account.type == 'investment'` in `AccountsScreen._onAccountTap`. Lists holdings with swipe-to-archive and an "Editar cuenta" button back to the account form.
-- `HoldingFormScreen` (create/edit) with symbol (uppercase), exchange dropdown (NASDAQ | NYSE | BMV | OTHER), currency picker using `kSuggestedCurrencies`, asset_type (stock | etf | other), display_name, notes, optional manual_price.
-- `HoldingDetailScreen` with summary (net quantity + simple weighted-avg cost from buys) and the list of lots ordered `occurred_at DESC`. Overflow menu: edit / archive holding. FAB with bottom sheet "Añadir compra" / "Añadir venta".
-- `LotFormScreen` with kind toggle, quantity, price, fee, occurred_at date picker, fx_rate (only visible when currencies differ; **hard-blocked** in save when empty or when sell > net available excluding the edited lot), notes.
-- `InvestmentTransactionGenerator` wired in `CompositeScheduledGeneratorRunner` **after** the yield generator. Iterates `queryAllIncludingDeleted()` for full reconciliation: upserts active lots' transactions (idempotent — skips when row matches existing) and soft-deletes transactions whose lot is soft-deleted. `txnId = uuidv5(kDeterministicInvestmentNamespace, "lot:$lotId")`.
-- `kDeterministicInvestmentNamespace = '5e7b2f8c-3a4d-4e9b-8c1f-6a2d7e3b4c8f'` added to `frontend/lib/src/core/ids/deterministic_namespace.dart`.
-- `dashboard_local_store.dart` excludes `AND t.lot_id IS NULL` from `getMonthlySpendByCategory`, `getMonthlySpendByNature`, and `getMonthlySpendByTag`. `getBalancesPerAccount` is intentionally not filtered — derived transactions SHOULD affect the investment account balance.
-- Archive cascade: `InvestmentHoldingRepository.archive(id)` accepts optional `InvestmentLotLocalStore` and soft-deletes lots + enqueues outbox deletes; the generator then soft-deletes derived transactions. `AccountRepository.archiveAccount(id)` accepts optional `InvestmentHoldingLocalStore` / `InvestmentLotLocalStore` and cascades holdings→lots when `type=='investment'`. `AccountsRouteScope` wires both stores.
-- `AccountsScreen` archive confirmation dialog uses `AccountsViewModel.countInvestmentHoldings(accountId)` to show "Se archivará la cuenta X y sus N holding(s) con todas sus operaciones." when the account is an investment.
-
-**DoD met:** User creates holding AAPL in an investment account, adds 2 buys + 1 sell via the UI; lots enqueue outbox upserts; the generator derives transactions with `holding_id` + `lot_id` populated; the account balance reflects net cash flow; Dashboard by-category / by-nature / by-tag aggregations exclude those transactions.
-
-**Not done in Fase 2:** FIFO with per-sell realized P&L (simple weighted avg only — pulido in Fase 3); portfolio-wide screen; integration tests (no testing infra for this feature yet).
-
-### Fase 3 — FIFO + weighted + portfolio screen ⏳ PENDING
-
-Acceptance:
-- `position_math.dart` and `pnl_math.dart` implemented with unit tests covering FIFO, partial sells, multi-price buys, sell > available.
-- `PortfolioScreen` (new route) with a table: symbol / quantity / avg cost / current price (market → manual → last lot) / unrealized P&L / realized P&L / total.
-- No charts yet — tabular only.
-
-**DoD:** For a seeded holding with multiple buys and a sell, the UI shows mathematically correct avg cost, realized P&L, unrealized P&L.
+| # | Phase | Completed | Notes |
+|---|---|---|---|
+| 0 | Contract freeze (protos + entity types + transaction link columns) | 2026-04-21 | See §gRPC Contracts, §Sync Integration |
+| 1 | Persistence + sync scaffolding | 2026-04-21 | See §Data Model, §Sync Integration. Migrations applied via `make migrate` |
+| 2 | UI CRUD + transaction generator | 2026-04-21 | See §Generator Pattern, §Cascade Behavior |
+| 3 | FIFO + weighted avg + P&L in UI | 2026-04-21 | See §FIFO + Weighted Average, §Portfolio UI. 27 unit tests |
 
 ### Fase 4 — Backend cron for market_prices ⏳ PENDING
 
 Acceptance:
-- `backend/internal/marketprice/` package with provider interface + Yahoo + Finnhub implementations.
-- `scheduler.go` wired into `cmd/server/main.go` with graceful shutdown.
+- `backend/internal/marketprice/` package with `provider.go` + `yahoo_provider.go` + `scheduler.go` + `admin_handler.go`.
+- Scheduler wired into `cmd/server/main.go` with graceful shutdown.
 - `AdminRefreshMarketPrices` RPC for manual kicks.
-- Env var configuration (`MARKETPRICE_ENABLED`, `MARKETPRICE_PROVIDER`, `FINNHUB_API_KEY`, `MARKETPRICE_ADMIN_TOKEN`).
+- Env var configuration (`MARKETPRICE_ENABLED`, `MARKETPRICE_ADMIN_TOKEN`).
 - Observability logs per tick.
+- Frontend banner "Precios actualizados hace N días" in `HoldingsListTab` when most recent `fetched_at` > N days.
 
-**DoD:** Staging deployment ingests prices for seeded US + MX holdings over 24 h; clients receive prices via delta pull; `PortfolioScreen` shows fresh values; a symbol with no feed coverage degrades gracefully.
+**DoD:** Staging ingests prices for seeded US + MX holdings over 24 h; clients receive prices via delta pull; `HoldingsListTab` shows fresh values with `source='market'` pill; a symbol with no feed coverage degrades to `manual` / `last_lot` cleanly.
 
 ### Fase 5 — Charts ⏳ PENDING
 
 Acceptance:
 - PieChart of portfolio distribution by market value per holding.
-- LineChart of 30-day historical performance reconstructed on the fly from `market_prices` cross `lots`-at-date.
-- Tab switcher on `PortfolioScreen`: Distribución | Performance | Holdings.
+- LineChart of 30-day historical performance reconstructed on the fly from `market_prices × lots-at-date`.
+- Tab switcher inside `HoldingsListTab` (or a sibling screen): Distribución | Performance | Holdings.
 
 **DoD:** Smooth render with ≥ 50 holdings; widget tests for both charts.
 
@@ -298,18 +262,20 @@ Acceptance:
 ## Critical Files
 
 **Backend:**
-- `backend/migrations/003_investments.sql`
-- `backend/internal/investment/model.go`, `validation.go`, `holding_repository.go`, `lot_repository.go`, `market_price_repository.go`, `handler.go`
-- `backend/internal/sync/entity_type.go` (lines 8–21)
-- `backend/cmd/server/main.go` (investment handlers wired near the other handlers)
+- `backend/migrations/003_investments.sql`, `004_investment_lots_account.sql`, `005_drop_holding_account.sql`
+- `backend/internal/investment/` (model, validation, `holding_repository.go`, `lot_repository.go`, `market_price_repository.go`, `handler.go`)
+- `backend/internal/sync/entity_type.go`
+- `backend/cmd/server/main.go`
 
 **Frontend:**
-- `frontend/assets/migrations/002.sql`
-- `frontend/lib/src/core/db/database_helper.dart` (`_version = 2`)
+- `frontend/assets/migrations/002.sql`, `003.sql`, `004.sql`
+- `frontend/lib/src/core/db/database_helper.dart` (`_version`)
 - `frontend/lib/src/features/investments/` (whole directory)
+- `frontend/lib/src/features/accounts/ui/accounts_route_scope.dart` (DI wiring)
 - `frontend/lib/main.dart` (sync handlers registered in `SyncService.handlers`)
+- `frontend/test/position_math_test.dart`, `frontend/test/pnl_math_test.dart`
 
-**Patterns to mirror when continuing:**
+**Patterns to mirror when extending:**
 - Generator: `frontend/lib/src/features/yield_configs/data/yield_transaction_generator.dart`.
 - Deterministic namespace: `frontend/lib/src/core/ids/deterministic_namespace.dart`.
 - Repository with cursor bump: `backend/internal/yieldconfig/repository.go`.
@@ -317,7 +283,7 @@ Acceptance:
 
 ## Known Risks
 
-- **Yahoo endpoint instability**: it's a non-official API. Mitigation: provider interface with Finnhub fallback, feature flag, fixture-backed tests.
-- **Cron cursor bumping at scale**: for N users × M symbols, many `INSERT ... ON CONFLICT` writes. Fine for personal-scale; consider batched writes if it grows.
-- **Precision drift on doubles**: for users with extreme quantities or prices, consider a pgtype.Numeric / Decimal path later. Not expected in practice.
-- **Multi-device edit races on the same lot**: standard LWW behavior. Banner for "conflict resolved" is already shown by the sync infrastructure.
+- **Yahoo endpoint instability**: it's a non-official API. Mitigation: retry + exponential backoff + long backoff on 429, feature flag (`MARKETPRICE_ENABLED`), fixture-backed tests. If Yahoo breaks for good we pick a different free provider at that moment rather than carrying a paid fallback we don't need today.
+- **Cron cursor bumping at scale**: for N users × M symbols, many `INSERT ... ON CONFLICT`. Fine for personal-scale; batch writes if it grows.
+- **Precision drift on doubles**: for extreme quantities/prices, consider a `pgtype.Numeric` / Decimal path later. Not expected in practice.
+- **Multi-device edit races on the same lot**: standard LWW; existing "conflict resolved" banner in the sync infra already surfaces it.

@@ -114,6 +114,20 @@ class TransactionLocalStore {
     return (fromAccountId: fromAccountId, toAccountId: toAccountId);
   }
 
+  /// Retorna las transacciones marcadas como dividendos para un holding:
+  /// holding_id presente, lot_id NULL (no deriva de un lote) y activas.
+  Future<List<Map<String, dynamic>>> queryDividendsByHolding(
+    String holdingId,
+  ) async {
+    final db = await _db.database;
+    return db.query(
+      'transactions',
+      where: 'holding_id = ? AND lot_id IS NULL AND deleted_at IS NULL',
+      whereArgs: [holdingId],
+      orderBy: 'date DESC, created_at DESC',
+    );
+  }
+
   /// Queries transactions matching [filter] with a dynamic WHERE clause.
   /// Returns raw maps (repository enriches with category type).
   Future<List<Map<String, dynamic>>> queryRowsFiltered(

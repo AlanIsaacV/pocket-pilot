@@ -4,9 +4,92 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
+import 'package:pocket_pilot/src/features/investments/domain/current_price_resolver.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
+import 'package:pocket_pilot/src/features/investments/domain/pnl_math.dart';
+import 'package:pocket_pilot/src/features/investments/domain/position_math.dart';
+import 'package:pocket_pilot/src/features/investments/ui/holding_detail_screen.dart'
+    show PriceSourceBadge, formatMoney, formatQty;
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
+
+/// Holding row stats precomputed once per frame.
+class _HoldingStats {
+  final InvestmentHoldingModel holding;
+  final Position position;
+  final PriceQuote priceQuote;
+  final double? marketValue;
+  final double unrealized;
+  final double? realized;
+  final Map<String, double> dividends;
+  final bool hasError;
+
+  const _HoldingStats({
+    required this.holding,
+    required this.position,
+    required this.priceQuote,
+    required this.marketValue,
+    required this.unrealized,
+    required this.realized,
+    required this.dividends,
+    required this.hasError,
+  });
+}
+
+_HoldingStats _buildStats(
+  InvestmentHoldingModel h,
+  InvestmentViewModel vm,
+) {
+  final lots = vm.lotsFor(h.id);
+  try {
+    final position = computePosition(lots);
+    final price = vm.priceFor(h.symbol, h.exchange);
+    final quote = resolveCurrentPrice(
+      holding: h,
+      marketPrice: price,
+      lots: lots,
+    );
+    final mv = (quote.price != null && position.netQuantity > 0)
+        ? quote.price! * position.netQuantity
+        : null;
+    final unreal = computeUnrealizedPnL(
+      position: position,
+      currentPrice: quote.price,
+    );
+    double? realized;
+    try {
+      realized = computeRealizedPnL(lots).totalRealized;
+    } on InvestmentMathException {
+      realized = null;
+    }
+    final dividends = vm.totalDividendsFor(h.id);
+    return _HoldingStats(
+      holding: h,
+      position: position,
+      priceQuote: quote,
+      marketValue: mv,
+      unrealized: unreal,
+      realized: realized,
+      dividends: dividends,
+      hasError: position.netQuantity < 0,
+    );
+  } catch (_) {
+    return _HoldingStats(
+      holding: h,
+      position: (
+        netQuantity: 0,
+        weightedAvgCost: 0,
+        fifoRemainingLots: const [],
+      ),
+      priceQuote: (price: null, source: 'none'),
+      marketValue: null,
+      unrealized: 0,
+      realized: null,
+      dividends: const {},
+      hasError: true,
+    );
+  }
+}
 
 class HoldingsListTab extends StatelessWidget {
   const HoldingsListTab({super.key});
@@ -17,6 +100,8 @@ class HoldingsListTab extends StatelessWidget {
       builder: (context, vm, _) {
         final holdings = [...vm.allHoldings]
           ..sort((a, b) => a.symbol.compareTo(b.symbol));
+
+        final stats = holdings.map((h) => _buildStats(h, vm)).toList();
 
         return Column(
           children: [
@@ -39,35 +124,36 @@ class HoldingsListTab extends StatelessWidget {
                 child: ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                  itemCount: holdings.length,
+                  itemCount: stats.length,
                   itemBuilder: (ctx, index) {
-                    final holding = holdings[index];
+                    final s = stats[index];
                     return Dismissible(
-                      key: ValueKey(holding.id),
+                      key: ValueKey(s.holding.id),
                       direction: DismissDirection.endToStart,
                       background: _ArchiveBackground(),
                       confirmDismiss: (_) =>
-                          _confirmArchive(ctx, holding.symbol),
+                          _confirmArchive(ctx, s.holding.symbol),
                       onDismissed: (_) async {
-                        await vm.archiveHolding(holding);
+                        await vm.archiveHolding(s.holding);
                         if (!ctx.mounted) return;
                         ScaffoldMessenger.of(ctx).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Holding "${holding.symbol}" archivado',
+                              'Holding "${s.holding.symbol}" archivado',
                             ),
                           ),
                         );
                       },
-                      child: _HoldingCard(
-                        holding: holding,
-                        onTap: () => _openHolding(ctx, holding),
+                      child: _HoldingPnLCard(
+                        stats: s,
+                        onTap: () => _openHolding(ctx, s.holding),
                       ),
                     );
                   },
                 ),
               ),
             ),
+            if (stats.isNotEmpty) _TotalsFooter(stats: stats),
           ],
         );
       },
@@ -79,7 +165,7 @@ class HoldingsListTab extends StatelessWidget {
         .push('/accounts/holdings/${holding.id}', extra: holding)
         .then((_) {
       if (!context.mounted) return;
-      context.read<InvestmentViewModel>().loadAll();
+      context.read<InvestmentViewModel>().loadPortfolio();
     });
   }
 
@@ -106,65 +192,409 @@ class HoldingsListTab extends StatelessWidget {
   }
 }
 
-class _HoldingCard extends StatelessWidget {
-  final InvestmentHoldingModel holding;
+class _HoldingPnLCard extends StatelessWidget {
+  final _HoldingStats stats;
   final VoidCallback onTap;
 
-  const _HoldingCard({required this.holding, required this.onTap});
+  const _HoldingPnLCard({required this.stats, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ccy = stats.holding.currencyCode;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainer,
-          borderRadius: AppTheme.radiusMedium,
-          border: Border.all(
-            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppTheme.radiusMedium,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainer,
+            borderRadius: AppTheme.radiusMedium,
+            border: Border.all(color: theme.colorScheme.surfaceContainerHigh),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary
+                          .withValues(alpha: 0.12),
+                      borderRadius: AppTheme.radiusFull,
+                    ),
+                    child: Icon(
+                      Icons.stacked_line_chart_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          stats.holding.symbol,
+                          style: GoogleFonts.ibmPlexSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          [
+                            stats.holding.displayName,
+                            stats.holding.exchange,
+                            ccy,
+                          ].where((e) => e.isNotEmpty).join(' · '),
+                          style: GoogleFonts.ibmPlexSans(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (stats.hasError)
+                    _ErrorPill()
+                  else
+                    PriceSourceBadge(source: stats.priceQuote.source),
+                ],
+              ),
+              const SizedBox(height: 10),
+              LayoutBuilder(
+                builder: (ctx, c) {
+                  final narrow = c.maxWidth < 480;
+                  final tiles = [
+                    _MetricTile(
+                      label: 'Cant.',
+                      value: formatQty(stats.position.netQuantity),
+                    ),
+                    _MetricTile(
+                      label: 'Avg',
+                      value: stats.position.weightedAvgCost > 0
+                          ? formatMoney(stats.position.weightedAvgCost)
+                          : '—',
+                    ),
+                    _MetricTile(
+                      label: 'Px',
+                      value: stats.priceQuote.price == null
+                          ? '—'
+                          : formatMoney(stats.priceQuote.price!),
+                    ),
+                    _MetricTile(
+                      label: 'Valor',
+                      value: stats.marketValue == null
+                          ? '—'
+                          : formatMoney(stats.marketValue!),
+                      emphasis: true,
+                    ),
+                  ];
+                  if (narrow) {
+                    return Column(
+                      children: [
+                        Row(children: [
+                          Expanded(child: tiles[0]),
+                          Expanded(child: tiles[1]),
+                        ]),
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          Expanded(child: tiles[2]),
+                          Expanded(child: tiles[3]),
+                        ]),
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: tiles.map((t) => Expanded(child: t)).toList(),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 14,
+                runSpacing: 4,
+                children: [
+                  _PnLChip(
+                    label: 'Unreal',
+                    amount: stats.priceQuote.price == null
+                        ? null
+                        : stats.unrealized,
+                    currencyCode: ccy,
+                  ),
+                  _PnLChip(
+                    label: 'Real',
+                    amount: stats.realized,
+                    currencyCode: ccy,
+                  ),
+                  if (stats.dividends.isNotEmpty)
+                    _PnLChip(
+                      label: 'Div',
+                      amount: stats.dividends[ccy],
+                      currencyCode: ccy,
+                    ),
+                ],
+              ),
+            ],
           ),
         ),
-        child: ListTile(
-          onTap: onTap,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          leading: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
-              borderRadius: AppTheme.radiusFull,
-            ),
-            child: Icon(
-              Icons.stacked_line_chart_rounded,
-              color: Theme.of(context).colorScheme.primary,
-              size: 22,
-            ),
-          ),
-          title: Text(
-            holding.symbol,
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          subtitle: Text(
-            [
-              holding.displayName,
-              holding.exchange,
-              holding.currencyCode,
-            ].where((e) => e.isNotEmpty).join(' · '),
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          trailing: Icon(
-            Icons.chevron_right_rounded,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            size: 20,
+      ),
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool emphasis;
+
+  const _MetricTile({
+    required this.label,
+    required this.value,
+    this.emphasis = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.ibmPlexSans(
+            fontSize: 10,
+            letterSpacing: 0.4,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
+        Text(
+          value,
+          style: GoogleFonts.ibmPlexSans(
+            fontSize: emphasis ? 15 : 13,
+            fontWeight: emphasis ? FontWeight.w700 : FontWeight.w600,
+            color: emphasis ? theme.colorScheme.primary : null,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PnLChip extends StatelessWidget {
+  final String label;
+  final double? amount;
+  final String currencyCode;
+
+  const _PnLChip({
+    required this.label,
+    required this.amount,
+    required this.currencyCode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (amount == null) {
+      return _chipText(
+        context,
+        '$label —',
+        theme.colorScheme.onSurfaceVariant,
+      );
+    }
+    final v = amount!;
+    final color = v > 0
+        ? Colors.green.shade600
+        : (v < 0 ? theme.colorScheme.error : theme.colorScheme.onSurface);
+    final sign = v > 0 ? '+' : (v < 0 ? '' : '');
+    return _chipText(
+      context,
+      '$label $sign${formatMoney(v)} $currencyCode',
+      color,
+    );
+  }
+
+  Widget _chipText(BuildContext context, String text, Color color) {
+    return Text(
+      text,
+      style: GoogleFonts.ibmPlexSans(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: color,
+      ),
+    );
+  }
+}
+
+class _ErrorPill extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.error;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: AppTheme.radiusFull,
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        'Datos inconsistentes',
+        style: GoogleFonts.ibmPlexSans(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+class _TotalsFooter extends StatelessWidget {
+  final List<_HoldingStats> stats;
+
+  const _TotalsFooter({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final valueByCcy = <String, double>{};
+    final unrealByCcy = <String, double>{};
+    final realByCcy = <String, double>{};
+    final divByCcy = <String, double>{};
+
+    for (final s in stats) {
+      final ccy = s.holding.currencyCode;
+      if (s.marketValue != null) {
+        valueByCcy[ccy] = (valueByCcy[ccy] ?? 0) + s.marketValue!;
+      }
+      if (s.priceQuote.price != null) {
+        unrealByCcy[ccy] = (unrealByCcy[ccy] ?? 0) + s.unrealized;
+      }
+      if (s.realized != null) {
+        realByCcy[ccy] = (realByCcy[ccy] ?? 0) + s.realized!;
+      }
+      for (final e in s.dividends.entries) {
+        divByCcy[e.key] = (divByCcy[e.key] ?? 0) + e.value;
+      }
+    }
+
+    final currencies = <String>{
+      ...valueByCcy.keys,
+      ...unrealByCcy.keys,
+      ...realByCcy.keys,
+      ...divByCcy.keys,
+    }.toList()
+      ..sort();
+
+    if (currencies.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHigh,
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.surfaceContainerHighest),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final ccy in currencies)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: _TotalsRow(
+                currency: ccy,
+                value: valueByCcy[ccy],
+                unreal: unrealByCcy[ccy],
+                real: realByCcy[ccy],
+                div: divByCcy[ccy],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TotalsRow extends StatelessWidget {
+  final String currency;
+  final double? value;
+  final double? unreal;
+  final double? real;
+  final double? div;
+
+  const _TotalsRow({
+    required this.currency,
+    required this.value,
+    required this.unreal,
+    required this.real,
+    required this.div,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 14,
+      runSpacing: 2,
+      children: [
+        Text(
+          'Total $currency',
+          style: GoogleFonts.ibmPlexSans(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        if (value != null)
+          _TotalsItem(label: 'Valor', amount: value!, neutral: true),
+        if (unreal != null)
+          _TotalsItem(label: 'Unreal', amount: unreal!),
+        if (real != null) _TotalsItem(label: 'Real', amount: real!),
+        if (div != null) _TotalsItem(label: 'Div', amount: div!, neutral: true),
+      ],
+    );
+  }
+}
+
+class _TotalsItem extends StatelessWidget {
+  final String label;
+  final double amount;
+  final bool neutral;
+
+  const _TotalsItem({
+    required this.label,
+    required this.amount,
+    this.neutral = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = neutral
+        ? theme.colorScheme.onSurface
+        : (amount > 0
+            ? Colors.green.shade600
+            : (amount < 0
+                ? theme.colorScheme.error
+                : theme.colorScheme.onSurface));
+    final sign = (!neutral && amount > 0) ? '+' : '';
+    return Text(
+      '$label $sign${formatMoney(amount)}',
+      style: GoogleFonts.ibmPlexSans(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: color,
       ),
     );
   }

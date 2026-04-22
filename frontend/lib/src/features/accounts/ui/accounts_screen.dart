@@ -14,6 +14,8 @@ import 'package:pocket_pilot/src/features/budgets/ui/budget_view_model.dart';
 import 'package:pocket_pilot/src/features/budgets/ui/budgets_list_tab.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goals_list_tab.dart';
+import 'package:pocket_pilot/src/features/investments/ui/holdings_list_tab.dart';
+import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/notification_bell.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
@@ -62,7 +64,7 @@ class _AccountsScreenState extends State<AccountsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -83,6 +85,7 @@ class _AccountsScreenState extends State<AccountsScreen>
             Tab(text: 'Cuentas'),
             Tab(text: 'Metas'),
             Tab(text: 'Presupuestos'),
+            Tab(text: 'Holdings'),
           ],
           labelStyle: GoogleFonts.ibmPlexSans(
             fontSize: 14,
@@ -102,6 +105,7 @@ class _AccountsScreenState extends State<AccountsScreen>
           _AccountsListTab(),
           const GoalsListTab(),
           const BudgetsListTab(),
+          const HoldingsListTab(),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -184,6 +188,18 @@ class _AccountsScreenState extends State<AccountsScreen>
                   });
                 },
               ),
+              SheetItem(
+                icon: Icons.stacked_line_chart_rounded,
+                label: 'Nuevo holding',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.push('/accounts/holdings/new').then((_) {
+                    if (context.mounted) {
+                      context.read<InvestmentViewModel>().loadAll();
+                    }
+                  });
+                },
+              ),
             ],
           ),
         ),
@@ -250,7 +266,7 @@ class _AccountsListTab extends StatelessWidget {
                                   direction: DismissDirection.endToStart,
                                   background: _ArchiveBackground(),
                                   confirmDismiss: (_) =>
-                                      _confirmArchive(context, account.name),
+                                      _confirmArchive(context, account),
                                   onDismissed: (_) async {
                                     try {
                                       await vm.archiveAccount(account.id);
@@ -350,19 +366,33 @@ class _AccountsListTab extends StatelessWidget {
     });
   }
 
-  Future<bool?> _confirmArchive(BuildContext context, String accountName) {
+  Future<bool?> _confirmArchive(
+    BuildContext context,
+    AccountModel account,
+  ) async {
+    var content = 'Se archivara la cuenta "${account.name}".';
+    if (account.type == 'investment') {
+      final lots = await context
+          .read<AccountsViewModel>()
+          .countInvestmentLots(account.id);
+      if (lots > 0) {
+        content =
+            'Se archivará la cuenta "${account.name}". Se marcarán como eliminadas sus $lots operación(es) de inversión; los holdings permanecen.';
+      }
+    }
+    if (!context.mounted) return false;
     return showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Archivar cuenta'),
-        content: Text('Se archivara la cuenta "$accountName".'),
+        content: Text(content),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Cancelar'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Archivar'),
           ),
         ],

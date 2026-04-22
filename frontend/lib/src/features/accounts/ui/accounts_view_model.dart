@@ -213,6 +213,9 @@ class AccountsViewModel extends ChangeNotifier {
     return grouped;
   }
 
+  Future<int> countInvestmentLots(String accountId) =>
+      _repository.countInvestmentLots(accountId);
+
   Future<void> archiveAccount(String id) async {
     await _repository.archiveAccount(id);
     await _reloadAll();

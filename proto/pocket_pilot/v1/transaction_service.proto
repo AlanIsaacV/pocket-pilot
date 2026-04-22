@@ -35,6 +35,10 @@ message Transaction {
   optional string yield_id = 16;
   int32 installments_count = 17;
   FinancialNature nature = 18;
+  // Set on transactions derived from InvestmentLot via the deterministic
+  // generator. When lot_id is set, holding_id is also set.
+  optional string holding_id = 19;
+  optional string lot_id = 20;
 }
 
 service TransactionService {

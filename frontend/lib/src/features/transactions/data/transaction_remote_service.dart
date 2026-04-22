@@ -84,6 +84,12 @@ class TransactionRemoteService {
       if (map['yield_id'] != null) {
         transaction.yieldId = map['yield_id'] as String;
       }
+      if (map['holding_id'] != null) {
+        transaction.holdingId = map['holding_id'] as String;
+      }
+      if (map['lot_id'] != null) {
+        transaction.lotId = map['lot_id'] as String;
+      }
       return await _client.upsertTransaction(
         UpsertTransactionRequest(transaction: transaction),
       );

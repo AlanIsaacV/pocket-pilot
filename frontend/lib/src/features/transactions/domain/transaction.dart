@@ -15,6 +15,8 @@ class TransactionModel {
   final String? linkedTransactionId;
   final String? templateId;
   final String? yieldId;
+  final String? holdingId;
+  final String? lotId;
 
   /// Monto en unidades menores (centavos).
   final int amount;
@@ -42,6 +44,8 @@ class TransactionModel {
     this.linkedTransactionId,
     this.templateId,
     this.yieldId,
+    this.holdingId,
+    this.lotId,
     required this.amount,
     required int installmentsCount,
     required this.currencyCode,
@@ -68,6 +72,8 @@ class TransactionModel {
           : null,
       templateId: proto.hasTemplateId() ? proto.templateId : null,
       yieldId: proto.hasYieldId() ? proto.yieldId : null,
+      holdingId: proto.hasHoldingId() ? proto.holdingId : null,
+      lotId: proto.hasLotId() ? proto.lotId : null,
       amount: proto.amountCents.toInt(),
       installmentsCount: proto.installmentsCount,
       currencyCode: proto.currencyCode,
@@ -93,6 +99,8 @@ class TransactionModel {
       linkedTransactionId: map['linked_transaction_id'] as String?,
       templateId: map['template_id'] as String?,
       yieldId: map['yield_id'] as String?,
+      holdingId: map['holding_id'] as String?,
+      lotId: map['lot_id'] as String?,
       amount: map['amount_cents'] as int,
       installmentsCount: map['installments_count'] as int,
       currencyCode: map['currency_code'] as String,
@@ -118,6 +126,8 @@ class TransactionModel {
       'linked_transaction_id': linkedTransactionId,
       'template_id': templateId,
       'yield_id': yieldId,
+      'holding_id': holdingId,
+      'lot_id': lotId,
       'amount_cents': amount,
       'installments_count': installmentsCount,
       'currency_code': currencyCode,
@@ -142,6 +152,8 @@ class TransactionModel {
       'linked_transaction_id': linkedTransactionId,
       'template_id': templateId,
       'yield_id': yieldId,
+      'holding_id': holdingId,
+      'lot_id': lotId,
       'amount_cents': amount,
       'installments_count': installmentsCount,
       'currency_code': currencyCode,
@@ -224,6 +236,8 @@ class TransactionModel {
         return 'windfall';
       case FinancialNature.NATURE_ADJUSTMENT:
         return 'adjustment';
+      case FinancialNature.NATURE_INVESTMENT:
+        return 'investment';
       default:
         return '';
     }
@@ -245,6 +259,8 @@ class TransactionModel {
         return FinancialNature.NATURE_WINDFALL;
       case 'adjustment':
         return FinancialNature.NATURE_ADJUSTMENT;
+      case 'investment':
+        return FinancialNature.NATURE_INVESTMENT;
       default:
         return FinancialNature.NATURE_UNSPECIFIED;
     }

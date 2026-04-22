@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+// InvestmentHolding represents an asset position (e.g. AAPL in the user's
+// brokerage account). It is a container; individual buys and sells are
+// InvestmentLot records. Quantities and P&L are derived on-the-fly from lots.
+message InvestmentHolding {
+  google.protobuf.Timestamp created_at = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  google.protobuf.Timestamp deleted_at = 3;
+  string id = 4;
+  // Field 5 reserved (was account_id; holdings are now globals, a lot settles
+  // against its own account_id).
+  reserved 5;
+  reserved "account_id";
+
+  // Symbol as traded on the exchange. Example: AAPL, WALMEX.
+  string symbol = 6;
+  // Exchange code. Canonical values: NASDAQ, NYSE, BMV, OTHER.
+  // Used together with symbol as the natural key for market_prices.
+  string exchange = 7;
+
+  // Human-readable name. Example: "Apple Inc.".
+  string display_name = 8;
+
+  // ISO 4217 currency the asset trades in. Independent of account.currency_code.
+  string currency_code = 9;
+
+  // Asset kind: stock, etf, other.
+  string asset_type = 10;
+
+  // Lifecycle status: active, closed (qty 0 but history kept).
+  string status = 11;
+
+  // Optional manual override price when the market feed does not cover the
+  // symbol. When set, takes precedence over market_prices for valuation.
+  // Uses double for convenience; source of truth is NUMERIC(18,4) in DB.
+  optional double manual_price = 12;
+
+  optional string notes = 13;
+}
+
+service InvestmentHoldingService {
+  rpc ListInvestmentHoldings(ListInvestmentHoldingsRequest) returns (ListInvestmentHoldingsResponse);
+  rpc UpsertInvestmentHolding(UpsertInvestmentHoldingRequest) returns (UpsertInvestmentHoldingResponse);
+  rpc DeleteInvestmentHolding(DeleteInvestmentHoldingRequest) returns (google.protobuf.Empty);
+}
+
+message ListInvestmentHoldingsRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListInvestmentHoldingsResponse {
+  repeated InvestmentHolding holdings = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertInvestmentHoldingRequest {
+  InvestmentHolding holding = 1;
+}
+
+message UpsertInvestmentHoldingResponse {
+  InvestmentHolding holding = 1;
+  bool conflict_resolved = 2;
+}
+
+message DeleteInvestmentHoldingRequest {
+  string id = 1;
+  google.protobuf.Timestamp deleted_at = 2;
+}

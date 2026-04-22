@@ -15,6 +15,9 @@ const (
 	EntityTransactionTemplate EntityType = "transaction_template"
 	EntityUserPreference      EntityType = "user_preference"
 	EntityYieldConfig         EntityType = "yield_config"
+	EntityInvestmentHolding   EntityType = "investment_holding"
+	EntityInvestmentLot       EntityType = "investment_lot"
+	EntityMarketPrice         EntityType = "market_price"
 )
 
 // AllEntityTypes returns every entity type a client may ask about.
@@ -31,5 +34,8 @@ func AllEntityTypes() []EntityType {
 		EntityTransactionTemplate,
 		EntityUserPreference,
 		EntityYieldConfig,
+		EntityInvestmentHolding,
+		EntityInvestmentLot,
+		EntityMarketPrice,
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/AlanIsaacV/pocket-pilot/internal/database"
 	pb "github.com/AlanIsaacV/pocket-pilot/internal/gen/proto/pocket_pilot/v1/pocket_pilot/v1"
 	"github.com/AlanIsaacV/pocket-pilot/internal/goal"
+	"github.com/AlanIsaacV/pocket-pilot/internal/investment"
 	"github.com/AlanIsaacV/pocket-pilot/internal/jwks"
 	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
 	"github.com/AlanIsaacV/pocket-pilot/internal/sync"
@@ -62,6 +63,11 @@ func main() {
 	tagHandler := tag.NewHandler(tag.NewRepository(pool, cursorStore))
 	userPreferenceHandler := userpreference.NewHandler(userpreference.NewRepository(pool, cursorStore))
 
+	// Investments: renta variable (acciones, ETFs).
+	holdingHandler := investment.NewHoldingHandler(investment.NewHoldingRepository(pool, cursorStore))
+	lotHandler := investment.NewLotHandler(investment.NewLotRepository(pool, cursorStore))
+	marketPriceHandler := investment.NewMarketPriceHandler(investment.NewMarketPriceRepository(pool, cursorStore))
+
 	// SyncService handler (preflight GetSyncStatus).
 	syncHandler := sync.NewHandler(cursorStore)
 
@@ -94,6 +100,9 @@ func main() {
 	pb.RegisterBudgetServiceServer(srv, budgetHandler)
 	pb.RegisterTagServiceServer(srv, tagHandler)
 	pb.RegisterUserPreferenceServiceServer(srv, userPreferenceHandler)
+	pb.RegisterInvestmentHoldingServiceServer(srv, holdingHandler)
+	pb.RegisterInvestmentLotServiceServer(srv, lotHandler)
+	pb.RegisterMarketPriceServiceServer(srv, marketPriceHandler)
 	pb.RegisterAIAssistantServiceServer(srv, aiHandler)
 	pb.RegisterAuthServiceServer(srv, authHandler)
 	pb.RegisterSyncServiceServer(srv, syncHandler)

@@ -27,4 +27,5 @@ enum FinancialNature {
   NATURE_PASSIVE     = 5; // Ingresos: rendimientos, rentas
   NATURE_WINDFALL    = 6; // Ingresos: bonos, regalos, ventas ocasionales
   NATURE_ADJUSTMENT  = 7; // Ajustes manuales de saldo
+  NATURE_INVESTMENT  = 8; // Operaciones de inversión (buy/sell de holdings)
 }

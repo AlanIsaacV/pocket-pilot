@@ -6,6 +6,7 @@ Supported types: `bank`, `cash`, `credit_card`, `loan`, `investment`, `crypto`, 
 
 - `contact` is a special type used only by the debts feature. It is filtered out from all normal account views, transaction forms, dashboard metrics, and the account type selector in the form.
 - Account type is **editable** after creation. The form shows the type selector in both create and edit modes.
+- `investment` accounts host variable-income positions (stocks, ETFs) via `investment_holdings` + `investment_lots`. The account balance represents available cash (implicit cash model); market value of holdings is added separately to net worth. See [investments.md](investments.md). When archiving an `investment` account, the cascade also archives the account's holdings, lots, and derived transactions (orchestrated by `AccountRepository.archive`, not by DB triggers).
 
 ### Type-specific fields
 

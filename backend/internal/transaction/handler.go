@@ -76,6 +76,8 @@ func financialNatureToString(n pb.FinancialNature) string {
 		return "windfall"
 	case pb.FinancialNature_NATURE_ADJUSTMENT:
 		return "adjustment"
+	case pb.FinancialNature_NATURE_INVESTMENT:
+		return "investment"
 	default:
 		return ""
 	}
@@ -97,6 +99,8 @@ func stringToFinancialNature(s string) pb.FinancialNature {
 		return pb.FinancialNature_NATURE_WINDFALL
 	case "adjustment":
 		return pb.FinancialNature_NATURE_ADJUSTMENT
+	case "investment":
+		return pb.FinancialNature_NATURE_INVESTMENT
 	default:
 		return pb.FinancialNature_NATURE_UNSPECIFIED
 	}
@@ -164,6 +168,14 @@ func toProto(t *Transaction) *pb.Transaction {
 		s := t.YieldID.String()
 		proto.YieldId = &s
 	}
+	if t.HoldingID != nil {
+		s := t.HoldingID.String()
+		proto.HoldingId = &s
+	}
+	if t.LotID != nil {
+		s := t.LotID.String()
+		proto.LotId = &s
+	}
 	if t.DeletedAt != nil {
 		proto.DeletedAt = timestamppb.New(*t.DeletedAt)
 	}
@@ -220,6 +232,24 @@ func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
 		yieldID = &yid
 	}
 
+	var holdingID *uuid.UUID
+	if p.HoldingId != nil && *p.HoldingId != "" {
+		hid, err := parseUUID(*p.HoldingId, "transaction.holding_id")
+		if err != nil {
+			return nil, err
+		}
+		holdingID = &hid
+	}
+
+	var lotID *uuid.UUID
+	if p.LotId != nil && *p.LotId != "" {
+		lid, err := parseUUID(*p.LotId, "transaction.lot_id")
+		if err != nil {
+			return nil, err
+		}
+		lotID = &lid
+	}
+
 	var date time.Time
 	if p.Date != nil {
 		date = p.Date.AsTime().UTC().Truncate(24 * time.Hour)
@@ -233,6 +263,8 @@ func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
 		LinkedTransactionID: linkedID,
 		TemplateID:          templateID,
 		YieldID:             yieldID,
+		HoldingID:           holdingID,
+		LotID:               lotID,
 		Type:                transactionTypeToString(p.Type),
 		AmountCents:         p.AmountCents,
 		InstallmentsCount:   p.InstallmentsCount,

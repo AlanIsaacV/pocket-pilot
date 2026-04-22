@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+// MarketPrice is a read-only entity from the client's perspective. The backend
+// cron populates it daily. The natural key is (symbol, exchange).
+message MarketPrice {
+  google.protobuf.Timestamp updated_at = 1;
+
+  string symbol = 2;
+  string exchange = 3;
+  string currency_code = 4;
+
+  // Latest close price in the quote currency. Source of truth: NUMERIC(18,4).
+  double price = 5;
+
+  // Date the price corresponds to (YYYY-MM-DD, usually market close).
+  string price_date = 6;
+
+  // Data source: yahoo, finnhub, manual.
+  string source = 7;
+
+  // When the server actually fetched/wrote this row.
+  google.protobuf.Timestamp fetched_at = 8;
+}
+
+service MarketPriceService {
+  // Read-only list with delta pull semantics. Clients never push market prices.
+  rpc ListMarketPrices(ListMarketPricesRequest) returns (ListMarketPricesResponse);
+}
+
+message ListMarketPricesRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListMarketPricesResponse {
+  repeated MarketPrice prices = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}

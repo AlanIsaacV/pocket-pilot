@@ -4,24 +4,12 @@
 //
 // Responsabilidad única: armar el grafo de dependencias de la feature
 // Accounts y proveer el ViewModel al subárbol de widgets.
-//
-// Árbol de dependencias que monta este scope:
-//   context.read<DatabaseHelper>()
-//     ├─ AccountLocalStore(db)              ← DAO, solo SQL
-//     └─ TransactionLocalStore(db)          ← DAO, solo SQL
-//   context.read<SyncOutbox>()          ← compartido con SyncService
-//   AccountRepository(local, outbox)    ← local-first + encola en outbox
-//   TransactionRepository(local, outbox) ← local-first + encola en outbox
-//   context.read<SyncService>()         ← singleton global de sync
-//   AccountsViewModel(accountsRepo, txRepo, sync) ← estado de la UI
-//
-// Nota: AccountRepository ya no habla directamente con el servidor.
-// SyncService (provisto desde main.dart) gestiona todas las operaciones remotas.
 
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
+import 'package:pocket_pilot/src/core/sync/scheduled_generation_orchestrator.dart';
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_adjustment_service.dart';
@@ -34,6 +22,11 @@ import 'package:pocket_pilot/src/features/budgets/ui/budget_view_model.dart';
 import 'package:pocket_pilot/src/features/goals/data/goal_local_store.dart';
 import 'package:pocket_pilot/src/features/goals/data/goal_repository.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_holding_local_store.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_holding_repository.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_lot_local_store.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_lot_repository.dart';
+import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
 
@@ -63,22 +56,42 @@ class AccountsRouteScope extends StatelessWidget {
             repository: ctx.read<TransactionRepository>(),
           ),
         ),
+        Provider<AccountLocalStore>(
+          create: (ctx) => AccountLocalStore(db: ctx.read<DatabaseHelper>()),
+        ),
+        Provider<InvestmentHoldingLocalStore>(
+          create: (ctx) =>
+              InvestmentHoldingLocalStore(db: ctx.read<DatabaseHelper>()),
+        ),
+        Provider<InvestmentLotLocalStore>(
+          create: (ctx) =>
+              InvestmentLotLocalStore(db: ctx.read<DatabaseHelper>()),
+        ),
+        Provider<InvestmentHoldingRepository>(
+          create: (ctx) => InvestmentHoldingRepository(
+            local: ctx.read<InvestmentHoldingLocalStore>(),
+            outbox: ctx.read<SyncOutbox>(),
+            lotLocal: ctx.read<InvestmentLotLocalStore>(),
+          ),
+        ),
+        Provider<InvestmentLotRepository>(
+          create: (ctx) => InvestmentLotRepository(
+            local: ctx.read<InvestmentLotLocalStore>(),
+            outbox: ctx.read<SyncOutbox>(),
+          ),
+        ),
         ChangeNotifierProvider(
           create: (ctx) {
-            final db = ctx.read<DatabaseHelper>();
-            final outbox = ctx.read<SyncOutbox>();
-            final syncService = ctx.read<SyncService>();
-
-            final localStore = AccountLocalStore(db: db);
             final repository = AccountRepository(
-              local: localStore,
-              outbox: outbox,
+              local: ctx.read<AccountLocalStore>(),
+              outbox: ctx.read<SyncOutbox>(),
+              investmentLotLocal: ctx.read<InvestmentLotLocalStore>(),
             );
 
             return AccountsViewModel(
               repository: repository,
               transactionRepository: ctx.read<TransactionRepository>(),
-              syncService: syncService,
+              syncService: ctx.read<SyncService>(),
             )..loadOnAppear();
           },
         ),
@@ -117,6 +130,14 @@ class AccountsRouteScope extends StatelessWidget {
               syncService: syncService,
             )..loadOnAppear();
           },
+        ),
+        ChangeNotifierProvider<InvestmentViewModel>(
+          create: (ctx) => InvestmentViewModel(
+            holdingRepo: ctx.read<InvestmentHoldingRepository>(),
+            lotRepo: ctx.read<InvestmentLotRepository>(),
+            syncService: ctx.read<SyncService>(),
+            orchestrator: ctx.read<ScheduledGenerationOrchestrator>(),
+          )..loadOnAppear(),
         ),
       ],
       child: child,

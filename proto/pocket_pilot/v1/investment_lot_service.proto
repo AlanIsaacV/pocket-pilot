@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+// InvestmentLot represents a single buy or sell event for a holding.
+// Each lot deterministically generates an expense or income transaction via
+// InvestmentTransactionGenerator (UUIDv5 based on lot id).
+message InvestmentLot {
+  google.protobuf.Timestamp created_at = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  google.protobuf.Timestamp deleted_at = 3;
+  string id = 4;
+  string holding_id = 5;
+
+  // Event kind: buy, sell.
+  string kind = 6;
+
+  // Quantity transacted. Fractional shares supported. Source of truth:
+  // NUMERIC(18,8). Uses double in proto for convenience.
+  double quantity = 7;
+
+  // Unit price in the holding's currency. Source of truth: NUMERIC(18,4).
+  double price = 8;
+
+  // Broker commission in minor units (cents) of the holding's currency.
+  int64 fee_cents = 9;
+
+  // Exchange rate from holding currency to account currency.
+  // Required when holding.currency_code != account.currency_code.
+  optional double fx_rate = 10;
+
+  // Date the operation occurred (YYYY-MM-DD).
+  string occurred_at = 11;
+
+  // Lot status. Normal: "valid". Marked "invalid" when post-sync FIFO
+  // validation detects a sell exceeding available buys (multi-device edit).
+  string validity = 12;
+
+  optional string notes = 13;
+
+  // Account the lot settles against (cash in/out flows here). May differ from
+  // holding.account_id when the user's broker cash lives in a separate account
+  // from the one that "owns" the holding (e.g. transfers between brokers).
+  string account_id = 14;
+}
+
+service InvestmentLotService {
+  rpc ListInvestmentLots(ListInvestmentLotsRequest) returns (ListInvestmentLotsResponse);
+  rpc UpsertInvestmentLot(UpsertInvestmentLotRequest) returns (UpsertInvestmentLotResponse);
+  rpc DeleteInvestmentLot(DeleteInvestmentLotRequest) returns (google.protobuf.Empty);
+}
+
+message ListInvestmentLotsRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListInvestmentLotsResponse {
+  repeated InvestmentLot lots = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertInvestmentLotRequest {
+  InvestmentLot lot = 1;
+}
+
+message UpsertInvestmentLotResponse {
+  InvestmentLot lot = 1;
+  bool conflict_resolved = 2;
+}
+
+message DeleteInvestmentLotRequest {
+  string id = 1;
+  google.protobuf.Timestamp deleted_at = 2;
+}

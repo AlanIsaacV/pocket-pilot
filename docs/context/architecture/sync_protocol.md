@@ -14,18 +14,19 @@ Pocket Pilot uses an offline-first strategy based on an Outbox pattern for write
 - **Mechanism:** Before the per-entity pull loop, the client calls `SyncService.GetSyncStatus()` once per sync cycle. The server returns a map `{entity_type: cursor_at}` with the latest `updated_at` observed across the user's rows for each of the 9 sync entities (missing entities report the Unix epoch so the map is always complete).
 - **Skip rule:** For each handler, if `server_cursor <= local_last_synced_at` AND `local_last_synced_at != null`, the client skips the entity's pull entirely. A null local cursor (first sync) always forces a pull regardless of the preflight result.
 - **Cursor maintenance:** The cursor lives in PostgreSQL table `user_sync_cursors(user_id, entity_type, cursor_at)`. Every repository's `Upsert` and `SoftDelete` calls `sync.CursorStore.Bump(tx, userID, entityType, updatedAt)` inside the same transaction as the triggering write. The bump uses LWW semantics (`WHERE cursor_at < EXCLUDED.cursor_at`), so rejected LWW upserts do not move the cursor.
-- **Observability:** `SyncService.lastCycleSkippedCount` (frontend) holds `N/9` for the most recent cycle and is surfaced on the Sync Status screen.
-- **Fallback:** If `GetSyncStatus` fails for any reason (network, 5xx), the client logs and falls back to the previous behavior (pull all 9 entities). The optimization is purely additive — never blocks sync.
+- **Observability:** `SyncService.lastCycleSkippedCount` (frontend) holds `N/total` for the most recent cycle (total = number of registered handlers) and is surfaced on the Sync Status screen.
+- **Fallback:** If `GetSyncStatus` fails for any reason (network, 5xx), the client logs and falls back to the previous behavior (pull every entity). The optimization is purely additive — never blocks sync.
 - **Canonical entity list:** `backend/internal/sync.AllEntityTypes()` is the source of truth. Adding a new sync-participating entity requires:
     1. Appending to `AllEntityTypes()`.
     2. Calling `cursor.Bump(ctx, tx, userID, sync.EntityX, updatedAt)` inside that repo's `Upsert`/`SoftDelete`, transactionalizing them if they were not already.
     3. Adding an integration test in `backend/internal/<repo>/cursor_integration_test.go` covering Upsert bump, SoftDelete bump, and LWW-rejection no-bump.
+- **Registered entities (as of 2026-04-21):** `account`, `category`, `tag`, `budget`, `goal`, `transaction`, `transaction_template`, `yield_config`, `user_preference`, `investment_holding`, `investment_lot`, `market_price`. `market_price` is special: global table with **per-user cursor bumps** driven by the backend cron (bumps only for users who hold the affected `(symbol, exchange)`); the client's `MarketPriceSyncHandler` implements `pull()` only — `pushUpsert`/`pushDelete` are documented no-ops.
 
 ### 2. Sync Outbox (Push)
 - **Mechanism:** Every local write (insert/update/delete) is enqueued in a `sync_outbox` table in SQLite.
 - **Deduplication:** The outbox only keeps the latest operation per `(entity_type, entity_id)` to avoid redundant network calls.
 - **Retry Logic:** Each entry has a `retry_count` (max 3 retries per cycle). At the start of every sync cycle, `resetAllRetries()` resets all retry counts to 0, making previously failed entries eligible again. The max-retries limit only prevents infinite loops within a single cycle — entries are never permanently abandoned.
-- **Push Order:** Handlers are sorted by `syncOrder` to respect FK dependencies: accounts (1) → categories (2) → tags (3) → transaction_templates (4) → transactions (5) → user_preferences (6). This prevents FK errors when pushing entities that reference other entities.
+- **Push Order:** Handlers are sorted by `syncOrder` to respect FK dependencies. Current order: `account=1` → `category=2` → `tag=3` → `transaction_template=4` → `yield_config=5` / `user_preference=5` → `investment_holding=6` → `investment_lot=7` → `market_price=8` → `transaction=9` → `goal=10` → `budget=11`. Investment entities run before `transaction` because the `InvestmentTransactionGenerator` derives transactions from lots within the sync cycle; those derived rows must be pushed after lots have been persisted locally.
 - **Concurrent Sync Calls:** If `sync()` is requested while another sync cycle is running, the request is coalesced and an additional pass runs immediately after the current one finishes (no request is dropped).
 
 ### 2.1 Scheduled Generation Cycle

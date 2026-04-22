@@ -40,6 +40,11 @@ import 'package:pocket_pilot/src/features/debts/ui/debt_detail_screen.dart';
 import 'package:pocket_pilot/src/features/debts/ui/debt_form_screen.dart';
 import 'package:pocket_pilot/src/features/goals/domain/goal.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_form_screen.dart';
+import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
+import 'package:pocket_pilot/src/features/investments/domain/investment_lot.dart';
+import 'package:pocket_pilot/src/features/investments/ui/holding_detail_screen.dart';
+import 'package:pocket_pilot/src/features/investments/ui/holding_form_screen.dart';
+import 'package:pocket_pilot/src/features/investments/ui/lot_form_screen.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_route_scope.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_screen.dart';
@@ -306,6 +311,49 @@ GoRouter buildRouter(AuthProvider authProvider) {
                     accountId: state.pathParameters['accountId'],
                   ),
                 ),
+              ),
+              GoRoute(
+                path: 'holdings/new',
+                builder: (context, state) => const AccountsRouteScope(
+                  child: HoldingFormScreen(),
+                ),
+              ),
+              GoRoute(
+                path: 'holdings/:holdingId',
+                builder: (context, state) => AccountsRouteScope(
+                  child: HoldingDetailScreen(
+                    holdingId: state.pathParameters['holdingId']!,
+                    initialHolding: state.extra as InvestmentHoldingModel?,
+                  ),
+                ),
+                routes: [
+                  GoRoute(
+                    path: 'edit',
+                    builder: (context, state) => AccountsRouteScope(
+                      child: HoldingFormScreen(
+                        holding: state.extra as InvestmentHoldingModel?,
+                      ),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'lots/new',
+                    builder: (context, state) => AccountsRouteScope(
+                      child: LotFormScreen(
+                        holdingId: state.pathParameters['holdingId']!,
+                        initialKind: state.uri.queryParameters['kind'],
+                      ),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'lots/:lotId/edit',
+                    builder: (context, state) => AccountsRouteScope(
+                      child: LotFormScreen(
+                        holdingId: state.pathParameters['holdingId']!,
+                        lot: state.extra as InvestmentLotModel?,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               GoRoute(
                 path: 'goals/new',

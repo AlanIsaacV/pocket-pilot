@@ -53,6 +53,16 @@ import 'package:pocket_pilot/src/features/dashboard/data/dashboard_repository.da
 import 'package:pocket_pilot/src/features/goals/data/goal_local_store.dart';
 import 'package:pocket_pilot/src/features/goals/data/goal_remote_service.dart';
 import 'package:pocket_pilot/src/features/goals/data/goal_sync_handler.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_holding_local_store.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_holding_remote_service.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_holding_sync_handler.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_lot_local_store.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_lot_remote_service.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_lot_sync_handler.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_transaction_generator.dart';
+import 'package:pocket_pilot/src/features/investments/data/market_price_local_store.dart';
+import 'package:pocket_pilot/src/features/investments/data/market_price_remote_service.dart';
+import 'package:pocket_pilot/src/features/investments/data/market_price_sync_handler.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_remote_service.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_sync_handler.dart';
@@ -181,6 +191,21 @@ Future<void> main() async {
     remote: BudgetRemoteService(),
   );
 
+  final investmentHoldingSyncHandler = InvestmentHoldingSyncHandler(
+    local: InvestmentHoldingLocalStore(db: dbHelper),
+    remote: InvestmentHoldingRemoteService(),
+  );
+
+  final investmentLotSyncHandler = InvestmentLotSyncHandler(
+    local: InvestmentLotLocalStore(db: dbHelper),
+    remote: InvestmentLotRemoteService(),
+  );
+
+  final marketPriceSyncHandler = MarketPriceSyncHandler(
+    local: MarketPriceLocalStore(db: dbHelper),
+    remote: MarketPriceRemoteService(),
+  );
+
   final syncStatusRemoteService = SyncStatusRemoteService();
 
   final syncService = SyncService(
@@ -193,6 +218,9 @@ Future<void> main() async {
       tagSyncHandler,
       transactionTemplateSyncHandler,
       yieldConfigSyncHandler,
+      investmentHoldingSyncHandler,
+      investmentLotSyncHandler,
+      marketPriceSyncHandler,
       transactionSyncHandler,
       userPreferenceSyncHandler,
       goalSyncHandler,
@@ -229,8 +257,24 @@ Future<void> main() async {
     accounts: YieldAccountLookupAdapter(local: AccountLocalStore(db: dbHelper)),
   );
 
+  final investmentGenerator = InvestmentTransactionGenerator(
+    lots: InvestmentLotStoreAdapter(
+      local: InvestmentLotLocalStore(db: dbHelper),
+    ),
+    holdings: InvestmentHoldingLookupAdapter(
+      local: InvestmentHoldingLocalStore(db: dbHelper),
+    ),
+    accounts: InvestmentAccountLookupAdapter(
+      local: AccountLocalStore(db: dbHelper),
+    ),
+    transactions: InvestmentTransactionStoreAdapter(
+      local: TransactionLocalStore(db: dbHelper),
+    ),
+    outbox: InvestmentOutboxWriterAdapter(outbox: syncOutbox),
+  );
+
   final compositeGenerator = CompositeScheduledGeneratorRunner(
-    runners: [scheduledGenerator, yieldGenerator],
+    runners: [scheduledGenerator, yieldGenerator, investmentGenerator],
   );
 
   final scheduledOrchestrator = ScheduledGenerationOrchestrator(

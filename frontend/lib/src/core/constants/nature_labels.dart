@@ -8,6 +8,7 @@ String natureDisplayLabel(String nature) {
     'passive' => 'Pasivo',
     'windfall' => 'Extraordinario',
     'adjustment' => 'Ajuste',
+    'investment' => 'Inversion',
     _ => 'Sin definir',
   };
 }

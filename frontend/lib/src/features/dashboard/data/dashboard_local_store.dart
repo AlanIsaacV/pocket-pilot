@@ -76,6 +76,7 @@ class DashboardLocalStore {
       "t.deleted_at IS NULL"
       " AND t.status = 'cleared'"
       " AND t.type IN ('expense', 'income')"
+      " AND t.lot_id IS NULL"
       ' AND t.date >= ?'
       ' AND t.date <= ?',
     );
@@ -128,6 +129,7 @@ class DashboardLocalStore {
       "t.deleted_at IS NULL"
       " AND t.status = 'cleared'"
       " AND t.type IN ('expense', 'income')"
+      " AND t.lot_id IS NULL"
       ' AND t.date >= ?'
       ' AND t.date <= ?',
     );
@@ -178,6 +180,7 @@ class DashboardLocalStore {
       "t.deleted_at IS NULL"
       " AND t.status = 'cleared'"
       " AND t.type IN ('expense', 'income')"
+      " AND t.lot_id IS NULL"
       ' AND t.date >= ?'
       ' AND t.date <= ?'
       " AND t.tags IS NOT NULL"

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -23,6 +25,7 @@ import (
 	"github.com/AlanIsaacV/pocket-pilot/internal/goal"
 	"github.com/AlanIsaacV/pocket-pilot/internal/investment"
 	"github.com/AlanIsaacV/pocket-pilot/internal/jwks"
+	"github.com/AlanIsaacV/pocket-pilot/internal/marketprice"
 	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
 	"github.com/AlanIsaacV/pocket-pilot/internal/sync"
 	"github.com/AlanIsaacV/pocket-pilot/internal/tag"
@@ -63,10 +66,14 @@ func main() {
 	tagHandler := tag.NewHandler(tag.NewRepository(pool, cursorStore))
 	userPreferenceHandler := userpreference.NewHandler(userpreference.NewRepository(pool, cursorStore))
 
-	// Investments: renta variable (acciones, ETFs).
-	holdingHandler := investment.NewHoldingHandler(investment.NewHoldingRepository(pool, cursorStore))
+	// Investments: renta variable (acciones, ETFs). Repositories extracted
+	// to variables so the market price scheduler and admin handler share
+	// them with the read-path handlers.
+	holdingRepo := investment.NewHoldingRepository(pool, cursorStore)
+	marketPriceRepo := investment.NewMarketPriceRepository(pool, cursorStore)
+	holdingHandler := investment.NewHoldingHandler(holdingRepo)
 	lotHandler := investment.NewLotHandler(investment.NewLotRepository(pool, cursorStore))
-	marketPriceHandler := investment.NewMarketPriceHandler(investment.NewMarketPriceRepository(pool, cursorStore))
+	marketPriceHandler := investment.NewMarketPriceHandler(marketPriceRepo)
 
 	// SyncService handler (preflight GetSyncStatus).
 	syncHandler := sync.NewHandler(cursorStore)
@@ -84,10 +91,16 @@ func main() {
 	authRepo := auth.NewRepository(pool)
 	authHandler := auth.NewHandler(authRepo, verifier, tokenService)
 
+	// Admin RPCs bypass JWT when the caller presents
+	// MARKETPRICE_ADMIN_TOKEN (see middleware/auth.go).
+	adminMethods := map[string]bool{
+		pb.MarketPriceAdminService_AdminRefreshMarketPrices_FullMethodName: true,
+	}
+
 	// gRPC server with chained interceptors: auth first, then logging.
 	srv := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			middleware.NewUnaryAuthInterceptor(cfg.JWTSecret),
+			middleware.NewUnaryAuthInterceptor(cfg.JWTSecret, cfg.MarketPriceAdminToken, adminMethods),
 			middleware.NewUnaryLoggingInterceptor(),
 		),
 	)
@@ -107,6 +120,31 @@ func main() {
 	pb.RegisterAuthServiceServer(srv, authHandler)
 	pb.RegisterSyncServiceServer(srv, syncHandler)
 
+	// Market price cron — gated by MARKETPRICE_ENABLED so dev machines do
+	// not hit Yahoo on boot unless explicitly asked.
+	var priceScheduler *marketprice.Scheduler
+	if cfg.MarketPriceEnabled {
+		httpClient := &http.Client{Timeout: 5 * time.Second}
+		var provider marketprice.MarketPriceProvider
+		switch cfg.MarketPriceProvider {
+		case "yahoo":
+			provider = marketprice.NewYahooProvider(httpClient)
+		default:
+			slog.Error("marketprice: unknown provider", "provider", cfg.MarketPriceProvider)
+			os.Exit(1)
+		}
+		priceScheduler = marketprice.NewScheduler(provider, marketPriceRepo, holdingRepo, cfg.MarketPriceRunOnBoot)
+		priceScheduler.Start(ctx)
+
+		adminHandler := marketprice.NewAdminHandler(priceScheduler, holdingRepo)
+		pb.RegisterMarketPriceAdminServiceServer(srv, adminHandler)
+		slog.Info("marketprice: scheduler registered",
+			"provider", provider.Name(),
+			"run_on_boot", cfg.MarketPriceRunOnBoot,
+			"admin_rpc", cfg.MarketPriceAdminToken != "",
+		)
+	}
+
 	reflection.Register(srv)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPCPort))
@@ -121,6 +159,9 @@ func main() {
 	go func() {
 		<-quit
 		slog.Info("shutting down...")
+		if priceScheduler != nil {
+			priceScheduler.Stop()
+		}
 		srv.GracefulStop()
 	}()
 

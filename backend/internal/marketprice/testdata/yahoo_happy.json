@@ -1,0 +1,15 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "AAPL",
+          "regularMarketPrice": 175.23,
+          "regularMarketTime": 1713398400
+        }
+      }
+    ],
+    "error": null
+  }
+}

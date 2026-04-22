@@ -15,6 +15,12 @@ type Config struct {
 	GoogleClientID      string
 	AppleClientID       string
 	JWTSecret           string
+
+	// Market price cron (Fase 4 of investments).
+	MarketPriceEnabled    bool
+	MarketPriceRunOnBoot  bool
+	MarketPriceProvider   string
+	MarketPriceAdminToken string
 }
 
 func Load() (Config, error) {
@@ -52,14 +58,35 @@ func Load() (Config, error) {
 		}
 	}
 
+	marketProvider := os.Getenv("MARKETPRICE_PROVIDER")
+	if marketProvider == "" {
+		marketProvider = "yahoo"
+	}
+
 	return Config{
-		DatabaseURL:         dbURL,
-		GRPCPort:            port,
-		GeminiAPIKey:        geminiKey,
-		AIDailyRequestLimit: dailyLimit,
-		AIMonthlyTokenLimit: monthlyTokenLimit,
-		GoogleClientID:      os.Getenv("GOOGLE_CLIENT_ID"),
-		AppleClientID:       os.Getenv("APPLE_CLIENT_ID"),
-		JWTSecret:           jwtSecret,
+		DatabaseURL:           dbURL,
+		GRPCPort:              port,
+		GeminiAPIKey:          geminiKey,
+		AIDailyRequestLimit:   dailyLimit,
+		AIMonthlyTokenLimit:   monthlyTokenLimit,
+		GoogleClientID:        os.Getenv("GOOGLE_CLIENT_ID"),
+		AppleClientID:         os.Getenv("APPLE_CLIENT_ID"),
+		JWTSecret:             jwtSecret,
+		MarketPriceEnabled:    parseBoolEnv("MARKETPRICE_ENABLED", false),
+		MarketPriceRunOnBoot:  parseBoolEnv("MARKETPRICE_RUN_ON_BOOT", false),
+		MarketPriceProvider:   marketProvider,
+		MarketPriceAdminToken: os.Getenv("MARKETPRICE_ADMIN_TOKEN"),
 	}, nil
+}
+
+func parseBoolEnv(key string, fallback bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return fallback
+	}
+	return b
 }

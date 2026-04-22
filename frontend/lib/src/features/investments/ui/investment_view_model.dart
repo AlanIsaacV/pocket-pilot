@@ -25,6 +25,7 @@ class InvestmentViewModel extends ChangeNotifier {
   final Map<String, List<InvestmentLotModel>> _lotsByHolding = {};
   final Map<String, MarketPriceModel?> _priceBySymbolExchange = {};
   final Map<String, List<TransactionModel>> _dividendsByHolding = {};
+  DateTime? _maxFetchedAt;
 
   bool _isLoadingAll = false;
   String? _loadingHoldingId;
@@ -56,6 +57,11 @@ class InvestmentViewModel extends ChangeNotifier {
 
   List<TransactionModel> dividendsFor(String holdingId) =>
       _dividendsByHolding[holdingId] ?? const [];
+
+  /// Wall-clock of the freshest `market_prices.fetched_at` row cached
+  /// locally. `null` when no prices have been synced (user with no
+  /// covered symbols, or backend cron not yet active).
+  DateTime? get maxFetchedAt => _maxFetchedAt;
 
   /// Total de dividendos (solo `cleared`) agrupados por currency del tx.
   /// Se usa `currency_code` del tx (no del holding) para que, si el usuario
@@ -149,6 +155,11 @@ class InvestmentViewModel extends ChangeNotifier {
         }());
       }
       await Future.wait(futures, eagerError: false);
+      try {
+        _maxFetchedAt = await _marketPriceStore.getMaxFetchedAt();
+      } catch (_) {
+        _maxFetchedAt = null;
+      }
       _errorMessage = null;
     } catch (e) {
       _errorMessage = e.toString();

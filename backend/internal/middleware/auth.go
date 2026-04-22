@@ -22,7 +22,16 @@ var publicMethods = map[string]bool{
 	"/pocket_pilot.v1.AuthService/Logout":       true,
 }
 
-func NewUnaryAuthInterceptor(jwtSecret string) grpc.UnaryServerInterceptor {
+// NewUnaryAuthInterceptor builds the auth interceptor for the gRPC server.
+//
+//   - publicMethods always bypass (see top of file).
+//   - Methods in adminMethods bypass JWT when the caller presents
+//     "Authorization: Bearer <adminToken>". adminToken "" disables the path.
+//   - Everything else validates the JWT with jwtSecret.
+//
+// Admin-authenticated calls do NOT carry a user_id in context; handlers for
+// those RPCs must not use middleware.UserIDFromCtx.
+func NewUnaryAuthInterceptor(jwtSecret, adminToken string, adminMethods map[string]bool) grpc.UnaryServerInterceptor {
 	secret := []byte(jwtSecret)
 
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
@@ -38,6 +47,12 @@ func NewUnaryAuthInterceptor(jwtSecret string) grpc.UnaryServerInterceptor {
 		authHeader := md["authorization"]
 		if len(authHeader) == 0 {
 			return nil, status.Error(codes.Unauthenticated, "authorization token missing")
+		}
+
+		if adminToken != "" && adminMethods[info.FullMethod] {
+			if authHeader[0] == "Bearer "+adminToken {
+				return handler(ctx, req)
+			}
 		}
 
 		tokenString := strings.TrimPrefix(authHeader[0], "Bearer ")

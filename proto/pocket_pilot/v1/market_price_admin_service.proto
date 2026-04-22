@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+// MarketPriceAdminService hosts operations gated by a static admin token
+// (MARKETPRICE_ADMIN_TOKEN) rather than a user JWT. Clients generated for
+// Flutter never call these; only ops-style tooling (grpcurl, curl, scripts)
+// should hit them.
+service MarketPriceAdminService {
+  // AdminRefreshMarketPrices triggers an immediate fetch+upsert cycle for
+  // the requested symbols, or for every distinct (symbol, exchange) across
+  // active holdings when the list is empty.
+  rpc AdminRefreshMarketPrices(AdminRefreshMarketPricesRequest)
+      returns (AdminRefreshMarketPricesResponse);
+}
+
+message AdminRefreshMarketPricesRequest {
+  // Empty => refresh all distinct (symbol, exchange) pairs from
+  // investment_holdings WHERE deleted_at IS NULL AND status = 'active'.
+  repeated SymbolExchange symbols = 1;
+}
+
+message SymbolExchange {
+  string symbol = 1;
+  string exchange = 2;
+}
+
+message AdminRefreshMarketPricesResponse {
+  int32 updated = 1;
+  int32 failed = 2;
+  repeated SymbolError errors = 3;
+  int64 duration_ms = 4;
+}
+
+message SymbolError {
+  string symbol = 1;
+  string exchange = 2;
+  // Short machine-readable tag (e.g. "not_found", "http_500", "parse_error").
+  string reason = 3;
+}

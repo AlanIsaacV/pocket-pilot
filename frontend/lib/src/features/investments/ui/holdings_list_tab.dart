@@ -91,6 +91,11 @@ _HoldingStats _buildStats(
   }
 }
 
+/// Threshold beyond which the banner warns the user that prices may be
+/// outdated. The backend cron runs every 24h; two days is a conservative
+/// floor that avoids noise on a single missed tick.
+const Duration _kStalePriceThreshold = Duration(days: 2);
+
 class HoldingsListTab extends StatelessWidget {
   const HoldingsListTab({super.key});
 
@@ -112,6 +117,8 @@ class HoldingsListTab extends StatelessWidget {
                     Theme.of(context).colorScheme.surfaceContainerHigh,
                 minHeight: 2,
               ),
+            if (_shouldShowStaleBanner(vm.maxFetchedAt))
+              _StalePricesBanner(maxFetchedAt: vm.maxFetchedAt!),
             Expanded(
               child: PpScreenState(
                 isLoading: vm.isLoadingAll && holdings.isEmpty,
@@ -595,6 +602,48 @@ class _TotalsItem extends StatelessWidget {
         fontSize: 12,
         fontWeight: FontWeight.w600,
         color: color,
+      ),
+    );
+  }
+}
+
+bool _shouldShowStaleBanner(DateTime? maxFetchedAt) {
+  if (maxFetchedAt == null) return false;
+  return DateTime.now().difference(maxFetchedAt) > _kStalePriceThreshold;
+}
+
+class _StalePricesBanner extends StatelessWidget {
+  final DateTime maxFetchedAt;
+
+  const _StalePricesBanner({required this.maxFetchedAt});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final days = DateTime.now().difference(maxFetchedAt).inDays;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: theme.colorScheme.tertiary.withValues(alpha: 0.12),
+      child: Row(
+        children: [
+          Icon(
+            Icons.access_time_rounded,
+            size: 16,
+            color: theme.colorScheme.tertiary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Precios actualizados hace $days ${days == 1 ? "día" : "días"}',
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.tertiary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

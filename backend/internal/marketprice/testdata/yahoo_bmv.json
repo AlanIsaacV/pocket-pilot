@@ -1,0 +1,15 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "MXN",
+          "symbol": "VAS.MX",
+          "regularMarketPrice": 350.45,
+          "regularMarketTime": 1713398400
+        }
+      }
+    ],
+    "error": null
+  }
+}

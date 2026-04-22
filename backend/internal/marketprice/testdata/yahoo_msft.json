@@ -1,0 +1,15 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "MSFT",
+          "regularMarketPrice": 412.45,
+          "regularMarketTime": 1713398400
+        }
+      }
+    ],
+    "error": null
+  }
+}

@@ -45,6 +45,15 @@ type Lot struct {
 	DeletedAt  *time.Time
 }
 
+// SymbolExchange is the natural identifier for an asset quote: the ticker
+// together with the exchange it trades on. Exposed here (not in the
+// marketprice package) to break the import cycle — investment is a
+// leaf package, marketprice depends on it.
+type SymbolExchange struct {
+	Symbol   string
+	Exchange string
+}
+
 // MarketPrice mirrors the market_prices table (natural key: symbol+exchange).
 type MarketPrice struct {
 	Symbol       string

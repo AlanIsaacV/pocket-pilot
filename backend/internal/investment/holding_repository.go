@@ -165,6 +165,34 @@ func (r *HoldingRepository) Upsert(ctx context.Context, h *Holding) (*Holding, b
 	return current, true, nil
 }
 
+// ListActiveSymbolExchanges returns the distinct set of (symbol, exchange)
+// pairs across all non-deleted, active holdings — regardless of owner. Used
+// by the market price cron to build the fetch list. Results are stable
+// alphabetically so log output is deterministic.
+func (r *HoldingRepository) ListActiveSymbolExchanges(ctx context.Context) ([]SymbolExchange, error) {
+	rows, err := r.pool.Query(
+		ctx,
+		`SELECT DISTINCT symbol, exchange
+		 FROM investment_holdings
+		 WHERE deleted_at IS NULL AND status = 'active'
+		 ORDER BY symbol, exchange`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var pairs []SymbolExchange
+	for rows.Next() {
+		var pair SymbolExchange
+		if err := rows.Scan(&pair.Symbol, &pair.Exchange); err != nil {
+			return nil, err
+		}
+		pairs = append(pairs, pair)
+	}
+	return pairs, rows.Err()
+}
+
 func (r *HoldingRepository) SoftDelete(ctx context.Context, id, userID uuid.UUID, deletedAt time.Time) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {

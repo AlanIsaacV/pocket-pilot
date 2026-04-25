@@ -7,11 +7,15 @@ import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/investments/domain/current_price_resolver.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
 import 'package:pocket_pilot/src/features/investments/domain/pnl_math.dart';
+import 'package:pocket_pilot/src/features/investments/domain/portfolio_distribution.dart';
 import 'package:pocket_pilot/src/features/investments/domain/position_math.dart';
 import 'package:pocket_pilot/src/features/investments/ui/holding_detail_screen.dart'
     show PriceSourceBadge, formatMoney, formatQty;
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
+import 'package:pocket_pilot/src/features/investments/ui/widgets/portfolio_pie_chart.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
+
+enum _HoldingsView { list, distribution }
 
 /// Holding row stats precomputed once per frame.
 class _HoldingStats {
@@ -96,8 +100,15 @@ _HoldingStats _buildStats(
 /// floor that avoids noise on a single missed tick.
 const Duration _kStalePriceThreshold = Duration(days: 2);
 
-class HoldingsListTab extends StatelessWidget {
+class HoldingsListTab extends StatefulWidget {
   const HoldingsListTab({super.key});
+
+  @override
+  State<HoldingsListTab> createState() => _HoldingsListTabState();
+}
+
+class _HoldingsListTabState extends State<HoldingsListTab> {
+  _HoldingsView _view = _HoldingsView.list;
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +118,7 @@ class HoldingsListTab extends StatelessWidget {
           ..sort((a, b) => a.symbol.compareTo(b.symbol));
 
         final stats = holdings.map((h) => _buildStats(h, vm)).toList();
+        final showSwitcher = stats.isNotEmpty;
 
         return Column(
           children: [
@@ -119,6 +131,10 @@ class HoldingsListTab extends StatelessWidget {
               ),
             if (_shouldShowStaleBanner(vm.maxFetchedAt))
               _StalePricesBanner(maxFetchedAt: vm.maxFetchedAt!),
+            if (showSwitcher) _ViewSwitcher(
+              value: _view,
+              onChanged: (v) => setState(() => _view = v),
+            ),
             Expanded(
               child: PpScreenState(
                 isLoading: vm.isLoadingAll && holdings.isEmpty,
@@ -128,36 +144,9 @@ class HoldingsListTab extends StatelessWidget {
                 emptyLabel: 'Sin holdings aún',
                 emptySubLabel: 'Presiona + para agregar uno',
                 onRefresh: vm.refresh,
-                child: ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                  itemCount: stats.length,
-                  itemBuilder: (ctx, index) {
-                    final s = stats[index];
-                    return Dismissible(
-                      key: ValueKey(s.holding.id),
-                      direction: DismissDirection.endToStart,
-                      background: _ArchiveBackground(),
-                      confirmDismiss: (_) =>
-                          _confirmArchive(ctx, s.holding.symbol),
-                      onDismissed: (_) async {
-                        await vm.archiveHolding(s.holding);
-                        if (!ctx.mounted) return;
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Holding "${s.holding.symbol}" archivado',
-                            ),
-                          ),
-                        );
-                      },
-                      child: _HoldingPnLCard(
-                        stats: s,
-                        onTap: () => _openHolding(ctx, s.holding),
-                      ),
-                    );
-                  },
-                ),
+                child: _view == _HoldingsView.list
+                    ? _buildList(vm, stats)
+                    : _buildDistribution(vm),
               ),
             ),
             if (stats.isNotEmpty) _TotalsFooter(stats: stats),
@@ -165,6 +154,47 @@ class HoldingsListTab extends StatelessWidget {
         );
       },
     );
+  }
+
+  Widget _buildList(InvestmentViewModel vm, List<_HoldingStats> stats) {
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+      itemCount: stats.length,
+      itemBuilder: (ctx, index) {
+        final s = stats[index];
+        return Dismissible(
+          key: ValueKey(s.holding.id),
+          direction: DismissDirection.endToStart,
+          background: _ArchiveBackground(),
+          confirmDismiss: (_) => _confirmArchive(ctx, s.holding.symbol),
+          onDismissed: (_) async {
+            await vm.archiveHolding(s.holding);
+            if (!ctx.mounted) return;
+            ScaffoldMessenger.of(ctx).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Holding "${s.holding.symbol}" archivado',
+                ),
+              ),
+            );
+          },
+          child: _HoldingPnLCard(
+            stats: s,
+            onTap: () => _openHolding(ctx, s.holding),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDistribution(InvestmentViewModel vm) {
+    final distribution = computePortfolioDistribution(
+      holdings: vm.allHoldings,
+      lotsFor: vm.lotsFor,
+      priceFor: vm.priceFor,
+    );
+    return PortfolioPieChart(distribution: distribution);
   }
 
   void _openHolding(BuildContext context, InvestmentHoldingModel holding) {
@@ -194,6 +224,37 @@ class HoldingsListTab extends StatelessWidget {
             child: const Text('Archivar'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ViewSwitcher extends StatelessWidget {
+  final _HoldingsView value;
+  final ValueChanged<_HoldingsView> onChanged;
+
+  const _ViewSwitcher({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: SegmentedButton<_HoldingsView>(
+        segments: const [
+          ButtonSegment(
+            value: _HoldingsView.list,
+            label: Text('Holdings'),
+            icon: Icon(Icons.view_list_rounded),
+          ),
+          ButtonSegment(
+            value: _HoldingsView.distribution,
+            label: Text('Distribución'),
+            icon: Icon(Icons.pie_chart_outline_rounded),
+          ),
+        ],
+        selected: {value},
+        onSelectionChanged: (s) => onChanged(s.first),
+        showSelectedIcon: false,
       ),
     );
   }

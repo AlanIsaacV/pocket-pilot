@@ -2,7 +2,7 @@
 
 Architecture doc for the investments feature: **variable-income assets** (stocks, ETFs) that complement the existing `yield_configs` feature (which covers fixed-income). Tracks holdings with buy/sell lots, computes FIFO and weighted-average cost on the fly, and syncs daily market prices from the backend.
 
-**Status:** Fases 0–3 done (2026-04-21). Fases 4–6 pending — see [§Implementation Phases](#implementation-phases).
+**Status:** Fases 0–4 done (2026-04-21). Fase 5 parcial (PieChart de distribución landed); Fase 5.1 (LineChart 30 días) y Fase 6 pendientes — see [§Implementation Phases](#implementation-phases).
 
 ## Scope
 
@@ -166,13 +166,19 @@ Lives in the existing "Holdings" tab of `AccountsScreen` (`HoldingsListTab`) —
 
 `InvestmentViewModel` (`frontend/lib/src/features/investments/ui/investment_view_model.dart`) holds `_lotsByHolding`, `_priceBySymbolExchange`, `_dividendsByHolding`. `loadPortfolio()` paralelizes per-holding loads with `Future.wait(eagerError: false)`. Dividends read via `TransactionLocalStore.queryDividendsByHolding(holdingId)` (no `TransactionRepository` — it forces a date range; dividends need all-time). Dividend totals group by `tx.currencyCode` (not the holding's) so amounts stay truthful when the user booked them in another currency.
 
-## Backend Cron (pending in Fase 4)
+### Distribution chart (Fase 5)
+
+`HoldingsListTab` hosts a `SegmentedButton` (`Distribución | Holdings`) above the list; state is local to the tab (`enum _HoldingsView`). No nested `TabBar` — `AccountsScreen` already owns the outer 4-tab bar, and the cashflow feature sets the precedent of using `SegmentedButton` for view toggles.
+
+The distribution view renders `PortfolioPieChart` (`features/investments/ui/widgets/portfolio_pie_chart.dart`), which consumes a `Map<String currencyCode, List<PortfolioSlice>>` built by the pure function `computePortfolioDistribution` (`features/investments/domain/portfolio_distribution.dart`). The function mirrors the list's exclusion rules — deleted, non-active, `netQuantity <= 0`, and `currentPrice == null` holdings are dropped — groups the rest by currency (same pattern as `_TotalsFooter`, no FX), orders slices desc by market value, and computes per-currency percentages. One `PieChart` is rendered per currency, stacked vertically with a header and a `Wrap` legend of chips `[dot] SYMBOL · XX.X%`. Slice colors are picked deterministically from `AppColors.categoryPresets` (14 Catpuccin Latte colors) via `holdingId.hashCode % 14`, so the color of a given holding is stable frame to frame. The `_TotalsFooter` stays visible in both views — it anchors the absolute numbers (market value, P&L, dividends) that the pie intentionally does not surface.
+
+## Backend Cron
 
 Package `backend/internal/marketprice/`:
-- `provider.go`: interface `MarketPriceProvider { Fetch(ctx, []Symbol) ([]Quote, error) }`.
-- `yahoo_provider.go`: `https://query1.finance.yahoo.com/v7/finance/quote?symbols=...`. Batches ≤ 50 symbols, browser user-agent, 5 s per-request timeout, 3 retries with exponential backoff, long backoff on HTTP 429.
-- `scheduler.go`: `time.NewTicker(24 * time.Hour)`. Fire time **22:00 UTC** (covers NYSE close at 21:00 UTC and BMV close at 20:00 UTC). Selects distinct `(symbol, exchange)` across active holdings, calls `MarketPriceRepository.Upsert` per quote (already bumps only relevant users' cursors).
-- `admin_handler.go`: RPC `AdminRefreshMarketPrices(symbols[])` gated by `MARKETPRICE_ADMIN_TOKEN` for debugging and post-deploy kick.
+- `provider.go`: interface `MarketPriceProvider { Fetch(ctx, []investment.SymbolExchange) ([]Quote, []SymbolError, error); Name() string }`.
+- `yahoo_provider.go`: `https://query1.finance.yahoo.com/v8/finance/chart/{SYMBOL}`. **One HTTP GET per symbol, no auth**. The older `v7/finance/quote` batch endpoint now gates anonymous traffic behind a crumb+cookie flow (returns HTTP 401), so batching was traded for a stateless per-symbol call — cheap enough at MVP holding counts on a 24h cadence. Browser user-agent, 5 s per-request timeout, 3 retries with exponential backoff (`{500ms, 2s, 8s}`), long backoff (60 s) on HTTP 429. `doWithRetries` **short-circuits on 4xx-non-429** (a 404/401 is deterministic — retrying won't change it). HTTP 404 or a 200 with `chart.error != nil`/empty `chart.result` → `SymbolError{Reason:"not_found"}`. Options: `WithBaseURL`, `WithUserAgent`, `WithBackoffs`, `WithRateLimitSleep`.
+- `scheduler.go`: `time.NewTimer` aligned to **22:00 UTC** (covers NYSE close at 21:00 UTC and BMV close at 20:00 UTC), recomputed each cycle to avoid drift. Selects distinct `(symbol, exchange)` across active holdings via `HoldingRepository.ListActiveSymbolExchanges`, calls `MarketPriceRepository.Upsert` per quote (bumps only relevant users' cursors). `runOnBoot=true` triggers one `Tick` before the first timer.
+- `admin_handler.go`: RPC `AdminRefreshMarketPrices(symbols[])` gated by `MARKETPRICE_ADMIN_TOKEN` for debugging and post-deploy kick (empty `symbols` ⇒ refresh all active holdings).
 
 Env vars: `MARKETPRICE_ENABLED`, `MARKETPRICE_ADMIN_TOKEN`.
 
@@ -220,27 +226,22 @@ Phase-by-phase roadmap. Permanent knowledge lives in the sections above; this ta
 | 1 | Persistence + sync scaffolding | 2026-04-21 | See §Data Model, §Sync Integration. Migrations applied via `make migrate` |
 | 2 | UI CRUD + transaction generator | 2026-04-21 | See §Generator Pattern, §Cascade Behavior |
 | 3 | FIFO + weighted avg + P&L in UI | 2026-04-21 | See §FIFO + Weighted Average, §Portfolio UI. 27 unit tests |
+| 4 | Backend cron for `market_prices` + frontend staleness banner | 2026-04-21 | See §Backend Cron. Yahoo `v8/finance/chart/{SYMBOL}` per-symbol; `_StalePricesBanner` when `maxFetchedAt > 2 días` |
+| 5 (parcial) | Charts — PieChart de distribución | 2026-04-21 | See §Distribution chart (Fase 5). LineChart movido a Fase 5.1 — no hay historia diaria en `market_prices` |
 
-### Fase 4 — Backend cron for market_prices ⏳ PENDING
+### Fase 5.1 — Performance LineChart (30 días) ⏳ PENDING
 
-Acceptance:
-- `backend/internal/marketprice/` package with `provider.go` + `yahoo_provider.go` + `scheduler.go` + `admin_handler.go`.
-- Scheduler wired into `cmd/server/main.go` with graceful shutdown.
-- `AdminRefreshMarketPrices` RPC for manual kicks.
-- Env var configuration (`MARKETPRICE_ENABLED`, `MARKETPRICE_ADMIN_TOKEN`).
-- Observability logs per tick.
-- Frontend banner "Precios actualizados hace N días" in `HoldingsListTab` when most recent `fetched_at` > N days.
+Bloqueado hoy por el schema de `market_prices` (PK `(symbol, exchange)` → una sola fila por símbolo, sin historia diaria). Requiere su propio diseño antes de implementarse.
 
-**DoD:** Staging ingests prices for seeded US + MX holdings over 24 h; clients receive prices via delta pull; `HoldingsListTab` shows fresh values with `source='market'` pill; a symbol with no feed coverage degrades to `manual` / `last_lot` cleanly.
+Acceptance (plan tentativo):
+- Nueva tabla `market_price_history(symbol, exchange, price_date)` con PK compuesta — o rediseño de `market_prices` para soportar historia.
+- Backend cron extendido: el endpoint Yahoo `v8/finance/chart/{SYMBOL}` ya devuelve serie diaria si se pide `range=1mo&interval=1d`; el parser actual sólo lee `meta.regularMarketPrice`, hay que extender para persistir la serie. Backfill en el primer tick tras migrar.
+- Nuevo sync handler `market_price_history` pull-only con cursor por usuario (mirror del pattern de `market_price`).
+- Frontend migration v4→v5, nuevo `MarketPriceHistoryLocalStore`.
+- LineChart 30 días reconstruido on-the-fly: `Σ over holdings of (lotQtyAtDate(t) × priceAt(t))` por día, sobre la ventana.
+- Extender el `SegmentedButton` de `HoldingsListTab` a 3 segments (`Holdings | Distribución | Performance`).
 
-### Fase 5 — Charts ⏳ PENDING
-
-Acceptance:
-- PieChart of portfolio distribution by market value per holding.
-- LineChart of 30-day historical performance reconstructed on the fly from `market_prices × lots-at-date`.
-- Tab switcher inside `HoldingsListTab` (or a sibling screen): Distribución | Performance | Holdings.
-
-**DoD:** Smooth render with ≥ 50 holdings; widget tests for both charts.
+**DoD:** LineChart renderiza con ≥ 30 días de historia + ≥ 50 holdings; widget test del chart; la curva refleja performance real (no la curva cantidad-valorada-a-precio-de-hoy, que es un anti-patrón considerado y rechazado durante la brainstorm de Fase 5).
 
 ### Fase 6 — Allocation in dashboard ⏳ PENDING
 
@@ -270,10 +271,10 @@ Acceptance:
 **Frontend:**
 - `frontend/assets/migrations/002.sql`, `003.sql`, `004.sql`
 - `frontend/lib/src/core/db/database_helper.dart` (`_version`)
-- `frontend/lib/src/features/investments/` (whole directory)
+- `frontend/lib/src/features/investments/` (whole directory, incluye `domain/portfolio_distribution.dart` y `ui/widgets/portfolio_pie_chart.dart`)
 - `frontend/lib/src/features/accounts/ui/accounts_route_scope.dart` (DI wiring)
 - `frontend/lib/main.dart` (sync handlers registered in `SyncService.handlers`)
-- `frontend/test/position_math_test.dart`, `frontend/test/pnl_math_test.dart`
+- `frontend/test/position_math_test.dart`, `frontend/test/pnl_math_test.dart`, `frontend/test/portfolio_distribution_test.dart`, `frontend/test/portfolio_pie_chart_test.dart`
 
 **Patterns to mirror when extending:**
 - Generator: `frontend/lib/src/features/yield_configs/data/yield_transaction_generator.dart`.
@@ -283,7 +284,7 @@ Acceptance:
 
 ## Known Risks
 
-- **Yahoo endpoint instability**: it's a non-official API. Mitigation: retry + exponential backoff + long backoff on 429, feature flag (`MARKETPRICE_ENABLED`), fixture-backed tests. If Yahoo breaks for good we pick a different free provider at that moment rather than carrying a paid fallback we don't need today.
+- **Yahoo endpoint instability**: it's a non-official API. Precedent: `v7/finance/quote` went behind crumb+cookie auth (401) and we migrated to `v8/finance/chart` per-symbol. Mitigation: retry + exponential backoff + long backoff on 429, **short-circuit on 4xx-non-429 so a future auth flip bails on the first 401 instead of exhausting the ladder**, feature flag (`MARKETPRICE_ENABLED`), fixture-backed tests. If Yahoo breaks for good we pick a different free provider at that moment rather than reimplementing crumb+cookie state (fragile) or carrying a paid fallback we don't need today.
 - **Cron cursor bumping at scale**: for N users × M symbols, many `INSERT ... ON CONFLICT`. Fine for personal-scale; batch writes if it grows.
 - **Precision drift on doubles**: for extreme quantities/prices, consider a `pgtype.Numeric` / Decimal path later. Not expected in practice.
 - **Multi-device edit races on the same lot**: standard LWW; existing "conflict resolved" banner in the sync infra already surfaces it.

@@ -7,6 +7,10 @@ import 'package:pocket_pilot/src/features/dashboard/data/dashboard_local_store.d
 import 'package:pocket_pilot/src/features/dashboard/data/dashboard_repository.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_view_model.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_holding_local_store.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_lot_local_store.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_split_local_store.dart';
+import 'package:pocket_pilot/src/features/investments/data/market_price_local_store.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_local_store.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/statistics_view_model.dart';
@@ -34,7 +38,13 @@ class DashboardRouteScope extends StatelessWidget {
           create: (ctx) {
             final db = ctx.read<DatabaseHelper>();
             final localStore = DashboardLocalStore(db: db);
-            final repository = DashboardRepository(local: localStore);
+            final repository = DashboardRepository(
+              local: localStore,
+              holdingStore: InvestmentHoldingLocalStore(db: db),
+              lotStore: InvestmentLotLocalStore(db: db),
+              splitStore: InvestmentSplitLocalStore(db: db),
+              marketPriceStore: MarketPriceLocalStore(db: db),
+            );
             final filterVM = ctx.read<DashboardFilterViewModel>();
             return DashboardViewModel(
               repository: repository,

@@ -395,6 +395,158 @@ func (h *LotHandler) DeleteInvestmentLot(ctx context.Context, req *pb.DeleteInve
 }
 
 // -----------------------------------------------------------------------------
+// InvestmentSplit handler
+// -----------------------------------------------------------------------------
+
+type SplitHandler struct {
+	pb.UnimplementedInvestmentSplitServiceServer
+	repo *SplitRepository
+}
+
+func NewSplitHandler(repo *SplitRepository) *SplitHandler {
+	return &SplitHandler{repo: repo}
+}
+
+func splitToProto(s *Split) *pb.InvestmentSplit {
+	proto := &pb.InvestmentSplit{
+		Id:         s.ID.String(),
+		HoldingId:  s.HoldingID.String(),
+		RatioNum:   s.RatioNum,
+		RatioDen:   s.RatioDen,
+		OccurredAt: dateOnly(s.OccurredAt).Format("2006-01-02"),
+		CreatedAt:  timestamppb.New(s.CreatedAt),
+		UpdatedAt:  timestamppb.New(s.UpdatedAt),
+	}
+	if s.Notes != nil {
+		v := *s.Notes
+		proto.Notes = &v
+	}
+	if s.DeletedAt != nil {
+		proto.DeletedAt = timestamppb.New(*s.DeletedAt)
+	}
+	return proto
+}
+
+func splitFromProto(p *pb.InvestmentSplit, userID uuid.UUID) (*Split, error) {
+	id, err := parseUUID(p.Id, "split.id")
+	if err != nil {
+		return nil, err
+	}
+	holdingID, err := parseUUID(p.HoldingId, "split.holding_id")
+	if err != nil {
+		return nil, err
+	}
+	occurredAt, err := parseDateOnly(p.OccurredAt, "split.occurred_at")
+	if err != nil {
+		return nil, err
+	}
+
+	createdAt := time.Now().UTC()
+	if p.CreatedAt != nil {
+		createdAt = p.CreatedAt.AsTime().UTC()
+	}
+	updatedAt := time.Now().UTC()
+	if p.UpdatedAt != nil {
+		updatedAt = p.UpdatedAt.AsTime().UTC()
+	}
+
+	s := &Split{
+		ID:         id,
+		UserID:     userID,
+		HoldingID:  holdingID,
+		RatioNum:   p.RatioNum,
+		RatioDen:   p.RatioDen,
+		OccurredAt: occurredAt,
+		CreatedAt:  createdAt,
+		UpdatedAt:  updatedAt,
+	}
+	if p.Notes != nil {
+		v := *p.Notes
+		s.Notes = &v
+	}
+	return s, nil
+}
+
+func (h *SplitHandler) ListInvestmentSplits(ctx context.Context, req *pb.ListInvestmentSplitsRequest) (*pb.ListInvestmentSplitsResponse, error) {
+	userID, err := middleware.UserIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var updatedSince *time.Time
+	if req.UpdatedSince != nil {
+		t := req.UpdatedSince.AsTime()
+		updatedSince = &t
+	}
+
+	limit, offset := parsePage(req.Page)
+	items, syncedAt, err := h.repo.List(ctx, userID, updatedSince, limit, offset)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "list splits: %v", err)
+	}
+
+	pbItems := make([]*pb.InvestmentSplit, len(items))
+	for i, s := range items {
+		pbItems[i] = splitToProto(s)
+	}
+
+	nextToken := ""
+	if updatedSince == nil {
+		nextToken = nextPageToken(offset, limit, len(items))
+	}
+
+	return &pb.ListInvestmentSplitsResponse{
+		Splits:   pbItems,
+		Page:     &pb.PageResponse{NextPageToken: nextToken},
+		SyncedAt: timestamppb.New(syncedAt),
+	}, nil
+}
+
+func (h *SplitHandler) UpsertInvestmentSplit(ctx context.Context, req *pb.UpsertInvestmentSplitRequest) (*pb.UpsertInvestmentSplitResponse, error) {
+	if req.Split == nil {
+		return nil, status.Error(codes.InvalidArgument, "split is required")
+	}
+	userID, err := middleware.UserIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	m, err := splitFromProto(req.Split, userID)
+	if err != nil {
+		return nil, err
+	}
+	if err := ValidateSplit(*m); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid split: %v", err)
+	}
+	result, conflict, err := h.repo.Upsert(ctx, m)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "upsert split: %v", err)
+	}
+	return &pb.UpsertInvestmentSplitResponse{
+		Split:            splitToProto(result),
+		ConflictResolved: conflict,
+	}, nil
+}
+
+func (h *SplitHandler) DeleteInvestmentSplit(ctx context.Context, req *pb.DeleteInvestmentSplitRequest) (*emptypb.Empty, error) {
+	userID, err := middleware.UserIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	id, err := parseUUID(req.Id, "id")
+	if err != nil {
+		return nil, err
+	}
+	deletedAt := time.Now().UTC()
+	if req.DeletedAt != nil {
+		deletedAt = req.DeletedAt.AsTime()
+	}
+	if err := h.repo.SoftDelete(ctx, id, userID, deletedAt); err != nil {
+		return nil, status.Errorf(codes.Internal, "delete split: %v", err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+// -----------------------------------------------------------------------------
 // MarketPrice handler (read-only)
 // -----------------------------------------------------------------------------
 

@@ -59,6 +59,9 @@ import 'package:pocket_pilot/src/features/investments/data/investment_holding_sy
 import 'package:pocket_pilot/src/features/investments/data/investment_lot_local_store.dart';
 import 'package:pocket_pilot/src/features/investments/data/investment_lot_remote_service.dart';
 import 'package:pocket_pilot/src/features/investments/data/investment_lot_sync_handler.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_split_local_store.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_split_remote_service.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_split_sync_handler.dart';
 import 'package:pocket_pilot/src/features/investments/data/investment_transaction_generator.dart';
 import 'package:pocket_pilot/src/features/investments/data/market_price_local_store.dart';
 import 'package:pocket_pilot/src/features/investments/data/market_price_remote_service.dart';
@@ -201,6 +204,11 @@ Future<void> main() async {
     remote: InvestmentLotRemoteService(),
   );
 
+  final investmentSplitSyncHandler = InvestmentSplitSyncHandler(
+    local: InvestmentSplitLocalStore(db: dbHelper),
+    remote: InvestmentSplitRemoteService(),
+  );
+
   final marketPriceSyncHandler = MarketPriceSyncHandler(
     local: MarketPriceLocalStore(db: dbHelper),
     remote: MarketPriceRemoteService(),
@@ -220,6 +228,7 @@ Future<void> main() async {
       yieldConfigSyncHandler,
       investmentHoldingSyncHandler,
       investmentLotSyncHandler,
+      investmentSplitSyncHandler,
       marketPriceSyncHandler,
       transactionSyncHandler,
       userPreferenceSyncHandler,

@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+// InvestmentSplit represents a stock split event for a holding (forward or
+// reverse). The math walks (lots ∪ splits) chronologically and adjusts the
+// FIFO state in-flight: at a split with ratio = num/den, every queued lot has
+// `qty *= ratio` and `price /= ratio`. Splits do not generate transactions.
+message InvestmentSplit {
+  string id = 1;
+  string holding_id = 2;
+
+  // Split ratio numerator. NUMERIC(18,8) source of truth.
+  // 2:1 forward → ratio_num=2, ratio_den=1.
+  // 1:10 reverse → ratio_num=1, ratio_den=10.
+  double ratio_num = 3;
+  double ratio_den = 4;
+
+  // Effective date of the split (YYYY-MM-DD).
+  string occurred_at = 5;
+
+  optional string notes = 6;
+
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  google.protobuf.Timestamp deleted_at = 9;
+}
+
+service InvestmentSplitService {
+  rpc ListInvestmentSplits(ListInvestmentSplitsRequest) returns (ListInvestmentSplitsResponse);
+  rpc UpsertInvestmentSplit(UpsertInvestmentSplitRequest) returns (UpsertInvestmentSplitResponse);
+  rpc DeleteInvestmentSplit(DeleteInvestmentSplitRequest) returns (google.protobuf.Empty);
+}
+
+message ListInvestmentSplitsRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListInvestmentSplitsResponse {
+  repeated InvestmentSplit splits = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertInvestmentSplitRequest {
+  InvestmentSplit split = 1;
+}
+
+message UpsertInvestmentSplitResponse {
+  InvestmentSplit split = 1;
+  bool conflict_resolved = 2;
+}
+
+message DeleteInvestmentSplitRequest {
+  string id = 1;
+  google.protobuf.Timestamp deleted_at = 2;
+}

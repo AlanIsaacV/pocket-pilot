@@ -112,4 +112,11 @@ class _FakeDashboardLocalStore extends DashboardLocalStore {
       ),
     ];
   }
+
+  @override
+  Future<Map<String, int>> getYieldsValueByCurrency({
+    Set<String>? accountIds,
+  }) async {
+    return const {};
+  }
 }

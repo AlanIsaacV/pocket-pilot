@@ -17,6 +17,7 @@ const (
 	EntityYieldConfig         EntityType = "yield_config"
 	EntityInvestmentHolding   EntityType = "investment_holding"
 	EntityInvestmentLot       EntityType = "investment_lot"
+	EntityInvestmentSplit     EntityType = "investment_split"
 	EntityMarketPrice         EntityType = "market_price"
 )
 
@@ -36,6 +37,7 @@ func AllEntityTypes() []EntityType {
 		EntityYieldConfig,
 		EntityInvestmentHolding,
 		EntityInvestmentLot,
+		EntityInvestmentSplit,
 		EntityMarketPrice,
 	}
 }

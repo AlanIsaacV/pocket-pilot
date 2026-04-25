@@ -1,6 +1,7 @@
 import 'package:pocket_pilot/src/features/investments/domain/current_price_resolver.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_lot.dart';
+import 'package:pocket_pilot/src/features/investments/domain/investment_split.dart';
 import 'package:pocket_pilot/src/features/investments/domain/market_price.dart';
 import 'package:pocket_pilot/src/features/investments/domain/position_math.dart';
 
@@ -30,10 +31,17 @@ typedef PortfolioSlice = ({
 /// Slices within each currency group are ordered descending by `marketValue`.
 /// `percentage` is `marketValue / sum(marketValue of the group)`; if the group
 /// total is zero it is dropped from the result.
+///
+/// [splitsFor] returns the active splits for a given holding. When omitted it
+/// defaults to "no splits", preserving the pre-Fase-8 behavior. Both
+/// `computePosition` and `resolveCurrentPrice` honor splits so the resulting
+/// market value matches the post-split share count multiplied by the
+/// post-split price.
 Map<String, List<PortfolioSlice>> computePortfolioDistribution({
   required List<InvestmentHoldingModel> holdings,
   required List<InvestmentLotModel> Function(String holdingId) lotsFor,
   required MarketPriceModel? Function(String symbol, String exchange) priceFor,
+  List<InvestmentSplitModel> Function(String holdingId)? splitsFor,
 }) {
   final byCurrency = <String, List<_RawSlice>>{};
 
@@ -42,13 +50,15 @@ Map<String, List<PortfolioSlice>> computePortfolioDistribution({
     if (holding.status != 'active') continue;
 
     final lots = lotsFor(holding.id);
-    final position = computePosition(lots);
+    final splits = splitsFor?.call(holding.id) ?? const <InvestmentSplitModel>[];
+    final position = computePosition(lots, splits: splits);
     if (position.netQuantity <= 0) continue;
 
     final quote = resolveCurrentPrice(
       holding: holding,
       marketPrice: priceFor(holding.symbol, holding.exchange),
       lots: lots,
+      splits: splits,
     );
     final price = quote.price;
     if (price == null) continue;

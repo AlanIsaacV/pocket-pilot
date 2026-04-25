@@ -38,6 +38,25 @@ func ValidateHolding(h Holding) error {
 	return nil
 }
 
+func ValidateSplit(s Split) error {
+	if s.HoldingID == uuid.Nil {
+		return fmt.Errorf("holding_id is required")
+	}
+	if s.RatioNum <= 0 {
+		return fmt.Errorf("ratio_num must be > 0")
+	}
+	if s.RatioDen <= 0 {
+		return fmt.Errorf("ratio_den must be > 0")
+	}
+	if s.RatioNum == s.RatioDen {
+		return fmt.Errorf("ratio_num must differ from ratio_den")
+	}
+	if s.OccurredAt.IsZero() {
+		return fmt.Errorf("occurred_at is required")
+	}
+	return nil
+}
+
 func ValidateLot(l Lot) error {
 	if l.AccountID == uuid.Nil {
 		return fmt.Errorf("account_id is required")

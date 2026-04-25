@@ -1,8 +1,26 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_lot.dart';
+import 'package:pocket_pilot/src/features/investments/domain/investment_split.dart';
 import 'package:pocket_pilot/src/features/investments/domain/market_price.dart';
 import 'package:pocket_pilot/src/features/investments/domain/portfolio_distribution.dart';
+
+InvestmentSplitModel makeSplitForDist({
+  String id = 'sp1',
+  String holdingId = 'h1',
+  double ratioNum = 2,
+  double ratioDen = 1,
+  String occurredAt = '2026-02-01',
+}) =>
+    InvestmentSplitModel(
+      id: id,
+      holdingId: holdingId,
+      ratioNum: ratioNum,
+      ratioDen: ratioDen,
+      occurredAt: occurredAt,
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
+    );
 
 InvestmentHoldingModel makeHolding({
   String id = 'h1',
@@ -285,6 +303,59 @@ void main() {
         priceFor: (s, e) => makePrice(symbol: s, exchange: e, price: 100),
       );
       expect(result['USD']!.first.marketValue, closeTo(100, 1e-9));
+    });
+
+    test('post-split market value reflects adjusted qty × post-split price',
+        () {
+      // Buy 10 @ $100 (pre-split). 2:1 split. Yahoo gives $60 (post-split).
+      // Expected market value = 20 × $60 = $1200 (not 10 × $60 = $600).
+      final holding = makeHolding(id: 'h1', symbol: 'AAPL');
+      final lots = [
+        makeLot(
+            id: 'b1',
+            holdingId: 'h1',
+            quantity: 10,
+            price: 100,
+            occurredAt: '2026-01-01'),
+      ];
+      final splits = [
+        makeSplitForDist(occurredAt: '2026-02-01', ratioNum: 2, ratioDen: 1),
+      ];
+      final result = computePortfolioDistribution(
+        holdings: [holding],
+        lotsFor: (_) => lots,
+        splitsFor: (_) => splits,
+        priceFor: (s, e) => makePrice(symbol: s, exchange: e, price: 60),
+      );
+      expect(result['USD'], hasLength(1));
+      expect(result['USD']!.first.marketValue, closeTo(1200, 1e-9));
+    });
+
+    test('manual price fallback is taken at face value (no auto-adjustment)',
+        () {
+      // The manualPrice is the user's escape-hatch and assumed already in
+      // the current share count, so we don't apply ratios to it.
+      final holding =
+          makeHolding(id: 'h1', symbol: 'AAPL', manualPrice: 50);
+      final lots = [
+        makeLot(
+            id: 'b1',
+            holdingId: 'h1',
+            quantity: 10,
+            price: 100,
+            occurredAt: '2026-01-01'),
+      ];
+      final splits = [
+        makeSplitForDist(occurredAt: '2026-02-01', ratioNum: 2, ratioDen: 1),
+      ];
+      final result = computePortfolioDistribution(
+        holdings: [holding],
+        lotsFor: (_) => lots,
+        splitsFor: (_) => splits,
+        priceFor: (_, _) => null,
+      );
+      // qty post-split = 20, manual price = $50 -> $1000.
+      expect(result['USD']!.first.marketValue, closeTo(1000, 1e-9));
     });
   });
 }

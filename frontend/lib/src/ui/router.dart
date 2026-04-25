@@ -42,9 +42,11 @@ import 'package:pocket_pilot/src/features/goals/domain/goal.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_form_screen.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_lot.dart';
+import 'package:pocket_pilot/src/features/investments/domain/investment_split.dart';
 import 'package:pocket_pilot/src/features/investments/ui/holding_detail_screen.dart';
 import 'package:pocket_pilot/src/features/investments/ui/holding_form_screen.dart';
 import 'package:pocket_pilot/src/features/investments/ui/lot_form_screen.dart';
+import 'package:pocket_pilot/src/features/investments/ui/split_form_screen.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_route_scope.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_screen.dart';
@@ -350,6 +352,23 @@ GoRouter buildRouter(AuthProvider authProvider) {
                       child: LotFormScreen(
                         holdingId: state.pathParameters['holdingId']!,
                         lot: state.extra as InvestmentLotModel?,
+                      ),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'splits/new',
+                    builder: (context, state) => AccountsRouteScope(
+                      child: SplitFormScreen(
+                        holdingId: state.pathParameters['holdingId']!,
+                      ),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'splits/:splitId/edit',
+                    builder: (context, state) => AccountsRouteScope(
+                      child: SplitFormScreen(
+                        holdingId: state.pathParameters['holdingId']!,
+                        split: state.extra as InvestmentSplitModel?,
                       ),
                     ),
                   ),

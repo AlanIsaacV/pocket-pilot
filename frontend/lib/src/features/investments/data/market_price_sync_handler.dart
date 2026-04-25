@@ -20,10 +20,10 @@ class MarketPriceSyncHandler implements SyncHandler {
   @override
   String get entityType => 'market_price';
 
-  /// After lots so UI that reads prices can resolve them after a fresh pull,
-  /// and before transaction to keep the order stable.
+  /// After lots and splits so UI that reads prices can resolve them after a
+  /// fresh pull, and before transaction to keep the order stable.
   @override
-  int get syncOrder => 8;
+  int get syncOrder => 9;
 
   @override
   Future<SyncPullResult> pull(DateTime? updatedSince) async {

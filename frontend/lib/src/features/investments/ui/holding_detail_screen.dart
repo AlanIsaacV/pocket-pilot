@@ -9,6 +9,7 @@ import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/investments/domain/current_price_resolver.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_lot.dart';
+import 'package:pocket_pilot/src/features/investments/domain/investment_split.dart';
 import 'package:pocket_pilot/src/features/investments/domain/pnl_math.dart';
 import 'package:pocket_pilot/src/features/investments/domain/position_math.dart';
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
@@ -78,6 +79,21 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
         .then((_) => _load());
   }
 
+  void _onAddSplit() {
+    context
+        .push('/accounts/holdings/${widget.holdingId}/splits/new')
+        .then((_) => _load());
+  }
+
+  void _onEditSplit(InvestmentSplitModel split) {
+    context
+        .push(
+          '/accounts/holdings/${widget.holdingId}/splits/${split.id}/edit',
+          extra: split,
+        )
+        .then((_) => _load());
+  }
+
   void _onEditHolding() {
     final holding = _holding;
     if (holding == null) return;
@@ -123,14 +139,21 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
     final vm = context.watch<InvestmentViewModel>();
     final holding = _holding;
     final lots = vm.lotsFor(widget.holdingId);
-    final sortedLots = [...lots]
-      ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+    final splits = vm.splitsFor(widget.holdingId);
+    final events = <_HoldingEvent>[
+      ...lots.map(_LotEvent.new),
+      ...splits.map(_SplitEvent.new),
+    ]..sort((a, b) {
+        final byDate = b.occurredAt.compareTo(a.occurredAt);
+        if (byDate != 0) return byDate;
+        return b.createdAt.compareTo(a.createdAt);
+      });
     final isLoading = vm.isLoadingHolding(widget.holdingId);
 
-    final position = computePosition(lots);
+    final position = computePosition(lots, splits: splits);
     RealizedPnL? realized;
     try {
-      realized = computeRealizedPnL(lots);
+      realized = computeRealizedPnL(lots, splits: splits);
     } on InvestmentMathException {
       realized = null;
     }
@@ -140,6 +163,7 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
             holding: holding,
             marketPrice: vm.priceFor(holding.symbol, holding.exchange),
             lots: lots,
+            splits: splits,
           );
     final unrealized = computeUnrealizedPnL(
       position: position,
@@ -203,24 +227,32 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
             ),
           Expanded(
             child: PpScreenState(
-              isLoading: isLoading && lots.isEmpty,
-              isEmpty: !isLoading && lots.isEmpty,
+              isLoading: isLoading && events.isEmpty,
+              isEmpty: !isLoading && events.isEmpty,
               emptyIcon: Icons.receipt_long_outlined,
               emptyLabel: 'Sin operaciones aún',
-              emptySubLabel: 'Añade una compra o venta',
+              emptySubLabel: 'Añade una compra, venta o split',
               onRefresh: _load,
               child: ListView.builder(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-                itemCount: sortedLots.length,
+                itemCount: events.length,
                 itemBuilder: (ctx, index) {
-                  final lot = sortedLots[index];
-                  final account = _accountsById[lot.accountId];
-                  return _LotCard(
-                    lot: lot,
-                    holdingCurrencyCode: holding?.currencyCode ?? '',
-                    accountName: account?.name,
-                    onTap: () => _onEditLot(lot),
+                  final ev = events[index];
+                  if (ev is _LotEvent) {
+                    final lot = ev.lot;
+                    final account = _accountsById[lot.accountId];
+                    return _LotCard(
+                      lot: lot,
+                      holdingCurrencyCode: holding?.currencyCode ?? '',
+                      accountName: account?.name,
+                      onTap: () => _onEditLot(lot),
+                    );
+                  }
+                  final split = (ev as _SplitEvent).split;
+                  return _SplitCard(
+                    split: split,
+                    onTap: () => _onEditSplit(split),
                   );
                 },
               ),
@@ -267,14 +299,48 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
                 title: const Text('Añadir venta'),
                 onTap: () => Navigator.pop(ctx, 'sell'),
               ),
+              ListTile(
+                leading: const Icon(Icons.call_split_rounded),
+                title: const Text('Registrar split'),
+                onTap: () => Navigator.pop(ctx, 'split'),
+              ),
             ],
           ),
         ),
       ),
     ).then((kind) {
-      if (kind != null) _onAddLot(kind);
+      if (kind == null) return;
+      if (kind == 'split') {
+        _onAddSplit();
+      } else {
+        _onAddLot(kind);
+      }
     });
   }
+}
+
+/// Marker base for events shown in the holding's mixed timeline.
+sealed class _HoldingEvent {
+  String get occurredAt;
+  DateTime get createdAt;
+}
+
+class _LotEvent implements _HoldingEvent {
+  final InvestmentLotModel lot;
+  _LotEvent(this.lot);
+  @override
+  String get occurredAt => lot.occurredAt;
+  @override
+  DateTime get createdAt => lot.createdAt;
+}
+
+class _SplitEvent implements _HoldingEvent {
+  final InvestmentSplitModel split;
+  _SplitEvent(this.split);
+  @override
+  String get occurredAt => split.occurredAt;
+  @override
+  DateTime get createdAt => split.createdAt;
 }
 
 class _HoldingSummaryCard extends StatelessWidget {
@@ -645,6 +711,73 @@ class _LotCard extends StatelessWidget {
   String _formatQty(double q) {
     if (q == q.truncateToDouble()) return q.toInt().toString();
     return q.toStringAsFixed(4);
+  }
+
+  String _safeDate(String iso) {
+    final parsed = DateTime.tryParse(iso);
+    if (parsed == null) return iso;
+    return formatDateDisplay(parsed);
+  }
+}
+
+class _SplitCard extends StatelessWidget {
+  final InvestmentSplitModel split;
+  final VoidCallback onTap;
+
+  const _SplitCard({required this.split, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.tertiary;
+    final dateLabel = _safeDate(split.occurredAt);
+    final n = _stripDouble(split.ratioNum);
+    final d = _stripDouble(split.ratioDen);
+    final kind = split.isReverse ? 'reverso' : 'forward';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: AppTheme.radiusMedium,
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: ListTile(
+          onTap: onTap,
+          leading: CircleAvatar(
+            backgroundColor: color.withValues(alpha: 0.12),
+            child: Icon(Icons.call_split_rounded, color: color, size: 20),
+          ),
+          title: Text(
+            'Split $n a $d ($kind)',
+            style: GoogleFonts.ibmPlexSans(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            split.notes == null || split.notes!.isEmpty
+                ? dateLabel
+                : '$dateLabel · ${split.notes}',
+            style: GoogleFonts.ibmPlexSans(
+              fontSize: 12,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          trailing: Icon(
+            Icons.chevron_right_rounded,
+            color: theme.colorScheme.onSurfaceVariant,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _stripDouble(double v) {
+    if (v == v.truncateToDouble()) return v.toInt().toString();
+    return v.toStringAsFixed(4);
   }
 
   String _safeDate(String iso) {

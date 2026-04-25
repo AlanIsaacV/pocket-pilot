@@ -46,6 +46,7 @@ protoc \
     pocket_pilot/v1/sync_service.proto \
     pocket_pilot/v1/investment_holding_service.proto \
     pocket_pilot/v1/investment_lot_service.proto \
+    pocket_pilot/v1/investment_split_service.proto \
     pocket_pilot/v1/market_price_service.proto \
     pocket_pilot/v1/market_price_admin_service.proto
 
@@ -73,6 +74,7 @@ protoc \
     pocket_pilot/v1/sync_service.proto \
     pocket_pilot/v1/investment_holding_service.proto \
     pocket_pilot/v1/investment_lot_service.proto \
+    pocket_pilot/v1/investment_split_service.proto \
     pocket_pilot/v1/market_price_service.proto \
     pocket_pilot/v1/market_price_admin_service.proto
 

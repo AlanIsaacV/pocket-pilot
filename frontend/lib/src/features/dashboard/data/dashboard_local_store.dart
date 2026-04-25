@@ -307,4 +307,48 @@ class DashboardLocalStore {
 
     return rows.map(CreditCardMovementDTO.fromMap).toList();
   }
+
+  /// Sum of `amount_cents` over active, non-deleted yield_configs grouped by
+  /// the currency of their settlement account. Used by the dashboard to size
+  /// the `investment_passive` segment of the allocation bar.
+  ///
+  /// Note on accounting model: yield principals are assumed to already be
+  /// included in their account's bank/cash balance (Mexican digital-account
+  /// pattern, e.g. BBVA Libretón pagaré). The allocation bar subtracts this
+  /// value from `liquidAssetsCents` to avoid double-counting.
+  Future<Map<String, int>> getYieldsValueByCurrency({
+    Set<String>? accountIds,
+  }) async {
+    final db = await _db.database;
+    final where = StringBuffer(
+      "y.deleted_at IS NULL"
+      " AND y.status = 'active'"
+      " AND a.deleted_at IS NULL",
+    );
+    final args = <dynamic>[];
+
+    if (accountIds != null && accountIds.isNotEmpty) {
+      final placeholders = List.filled(accountIds.length, '?').join(',');
+      where.write(' AND a.id IN ($placeholders)');
+      args.addAll(accountIds);
+    }
+
+    final rows = await db.rawQuery('''
+      SELECT
+        a.currency_code AS currency_code,
+        COALESCE(SUM(y.amount_cents), 0) AS total_cents
+      FROM yield_configs y
+      INNER JOIN accounts a ON a.id = y.account_id
+      WHERE ${where.toString()}
+      GROUP BY a.currency_code
+    ''', args);
+
+    final result = <String, int>{};
+    for (final row in rows) {
+      final ccy = (row['currency_code'] as String).toUpperCase();
+      final total = (row['total_cents'] as num?)?.toInt() ?? 0;
+      if (total > 0) result[ccy] = total;
+    }
+    return result;
+  }
 }

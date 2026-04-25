@@ -2,7 +2,7 @@
 
 Architecture doc for the investments feature: **variable-income assets** (stocks, ETFs) that complement the existing `yield_configs` feature (which covers fixed-income). Tracks holdings with buy/sell lots, computes FIFO and weighted-average cost on the fly, and syncs daily market prices from the backend.
 
-**Status:** Fases 0–4 done (2026-04-21). Fase 5 parcial (PieChart de distribución landed); Fase 5.1 (LineChart 30 días) y Fase 6 pendientes — see [§Implementation Phases](#implementation-phases).
+**Status:** Fases 0–4 done (2026-04-21). Fase 5 parcial (PieChart de distribución, 2026-04-21). Fase 6 done (Allocation card en Dashboard, 2026-04-25). Fases 7 y 8 done (Splits — persistencia + sync + math + UI + dashboard, 2026-04-25). Fase 5.1 (LineChart 30 días) pendiente — see [§Implementation Phases](#implementation-phases).
 
 ## Scope
 
@@ -16,7 +16,7 @@ Architecture doc for the investments feature: **variable-income assets** (stocks
 - Dashboard allocation (liquid / investment_active / investment_passive / debt / revolving).
 
 **Out of scope:**
-- Stock splits and corporate actions (post-MVP).
+- Corporate actions other than splits (spinoffs, mergers, rights issues — out for MVP).
 - Dividend auto-detection — dividends are entered **manually** as income transactions with `holding_id` set, `lot_id` NULL, and `nature='passive'`.
 - Tax/capital-gains reports.
 - Options/derivatives.
@@ -33,7 +33,8 @@ Architecture doc for the investments feature: **variable-income assets** (stocks
 | Dividend capture | Manual income transaction with `holding_id`, `lot_id IS NULL`, `nature='passive'` | Simpler than extending `yield_configs`; auto-detection deferred |
 | Currency | Each holding has its own `currency_code`, independent of the settlement account | Allows mixed USD + MXN positions |
 | FX per lot | `fx_rate` on the lot, required when `holding.currency_code != account.currency_code` | The derived transaction must debit the settlement account in its currency |
-| Splits / corporate actions | Not in MVP | Can be applied manually by editing lot quantities and prices |
+| Splits | First-class entity `investment_split` (Fases 7–8) | Math walks `(lots ∪ splits)` chronologically and adjusts FIFO state in-flight (qty *= ratio, price /= ratio). Lots remain immutable |
+| Corporate actions ≠ splits | Not in MVP | Spinoffs, mergers, rights issues mutate cost basis differently; deferred |
 | FIFO / weighted avg | Computed on the fly in Flutter from lots (pure domain math) | Trivial compute for personal portfolios; avoids materialization drift |
 | Transaction generation | Deterministic (UUIDv5 from lot id) | Same pattern as `YieldTransactionGenerator`; no cross-entity coordination in outbox |
 | `market_prices` sync | Read-only from client; global table with per-user cursor bump | Server-authoritative; clients never push prices |
@@ -99,6 +100,7 @@ Three services in `proto/pocket_pilot/v1/`:
 `backend/internal/sync/entity_type.go`:
 - `EntityInvestmentHolding = "investment_holding"`
 - `EntityInvestmentLot = "investment_lot"`
+- `EntityInvestmentSplit = "investment_split"`
 - `EntityMarketPrice = "market_price"`
 
 ### Sync Order
@@ -110,10 +112,11 @@ Three services in `proto/pocket_pilot/v1/`:
 5. `yield_config` / `user_preference`
 6. **`investment_holding`**
 7. **`investment_lot`** (generator runs after its pull)
-8. **`market_price`** (pull-only)
-9. `transaction` (generator outputs push here)
-10. `goal`
-11. `budget`
+8. **`investment_split`** (no generator — splits do not produce transactions)
+9. **`market_price`** (pull-only)
+10. `transaction` (generator outputs push here)
+11. `goal`
+12. `budget`
 
 ### MarketPrice Sync Semantics
 
@@ -158,6 +161,61 @@ Tests: `frontend/test/position_math_test.dart`, `frontend/test/pnl_math_test.dar
 
 No materialized columns — on-the-fly only. For >10K lots consider a skip cache; not expected for personal portfolios.
 
+## Splits
+
+Forward and reverse stock splits are first-class events. Lots remain immutable; the math walks the union `(lots ∪ splits)` chronologically and adjusts the FIFO state in flight.
+
+### Schema
+
+**Backend** (`backend/migrations/007_investment_splits.sql`): table `investment_splits` with `id, user_id, holding_id (FK), ratio_num NUMERIC(18,8), ratio_den NUMERIC(18,8), occurred_at DATE, notes, created_at, updated_at, deleted_at`. Indexes `(user_id, updated_at)` (sync cursor) and `(holding_id, occurred_at) WHERE deleted_at IS NULL` (math). CHECKs `ratio_num > 0` and `ratio_den > 0`. `set_updated_at_investment_splits` trigger.
+
+**Frontend** (`frontend/assets/migrations/005.sql`): mirror without `user_id`. DB `_version` 4 → 5.
+
+### Sync
+
+- `EntityInvestmentSplit = "investment_split"`. Sync order **8**, between `investment_lot` (7) and `market_price` (which moved 8 → 9). Splits depend on holdings/lots already being local; they are themselves prerequisites for math reading current state.
+- Server: `SplitRepository.Upsert/SoftDelete` bumpea cursor `investment_split` para el `user_id` afectado dentro de la misma transacción (mismo patrón que lots).
+- Client: `InvestmentSplitSyncHandler` con pull/pushUpsert/pushDelete completos (writable). LWW resolution server-side via `conflict_resolved` flag, igual que lots.
+- **No transaction generator for splits** — splits do not produce cash flow.
+
+### Math walk
+
+`computePosition(lots, {splits = const []})` and `computeRealizedPnL(lots, {splits = const []})` build a unified event timeline sorted `(occurredAt ASC, createdAt ASC)`:
+
+- **Buy**: enqueue FIFO slice `(qty, effectivePrice = (qty*price + fee/100)/qty)`; accumulate global `totalBuyQty` and `totalBuyCost`.
+- **Sell**: consume FIFO from the head; accumulate `totalSellQty`. In `pnl_math`, also accumulates `costBasisConsumed` and emits a `RealizedSellEntry`.
+- **Split**: `ratio = num/den`. Every queued FIFO slice has `qty *= ratio` and `effectivePrice /= ratio`. Global `totalBuyQty *= ratio` and `totalSellQty *= ratio`. `totalBuyCost` stays — the avg cost (`cost/qty`) naturally divides by `ratio`.
+
+Soft-deleted splits (`deletedAt != null`) are filtered out before the walk. The result `Position.netQuantity` and `weightedAvgCost` are reported in the **post-split share count**, so consumers can multiply directly by today's market price.
+
+**Algoritmo elegido: walk vs effective-ratio-per-lot.** El walk cronológico se prefirió sobre el approach alternativo (calcular Π de ratios posteriores a cada lot y aplicarlo solo a la cola FIFO consumible al momento del sell) porque generaliza naturalmente a multi-split y al sell-entre-splits sin manejar acumuladores externos.
+
+### Current price fallback
+
+`resolveCurrentPrice(..., {splits = const []})` preserva la precedencia `market → manual → último lote → null`. Cuando llega al fallback de último lote, ahora computa `cumulativeRatio = Π(s.ratioNum/s.ratioDen) for s in splits where s.occurredAt > lot.occurredAt && deletedAt == null` y retorna `lot.price / cumulativeRatio`. Splits anteriores o con misma fecha que el lot no aplican (la fecha del lot ya es post-split). El fallback de `manualPrice` se toma face-value: el usuario se asume que lo registró ya en post-split share count.
+
+### UI
+
+- **`HoldingDetailScreen`**: el FAB bottom sheet gana 3ra acción "Registrar split" (`Icons.call_split`). La lista cambia de `ListView.builder` sobre lots a un timeline mixto sealed `_HoldingEvent = _LotEvent | _SplitEvent`, sorted `(occurredAt DESC, createdAt DESC)`. La card de split usa `Icons.call_split`, fondo `surfaceContainerHighest`, label "Split N a D (forward)" o "(reverso)" según `ratioNum > ratioDen`. `_HoldingSummaryCard` ahora pasa `splits` a `computePosition`/`computeRealizedPnL`/`resolveCurrentPrice`.
+- **`SplitFormScreen`** (nuevo): form con `ratio_num`, `ratio_den`, `occurred_at` (date picker) y `notes` opcional. Validación: ambos > 0, num != den (no-op bloqueado), occurred_at requerido. Hint inline "2 a 1 = forward; 1 a 10 = reverso" + preview en vivo. Bloquea save sobre holdings archivados. Rutas anidadas bajo `AccountsRouteScope`: `/accounts/holdings/:holdingId/splits/new` y `:splitId/edit`.
+- **`HoldingsListTab`**: `_buildStats` y `_buildDistribution` pasan `vm.splitsFor` a la math. Sin cambios estructurales — los números nuevos los emite la math.
+
+### ViewModel + DI
+
+- `InvestmentViewModel` recibe `InvestmentSplitRepository`. Cachea `_splitsByHolding`. `loadPortfolio()` paraleliza splits junto con lots/price/dividends por holding (4to future en `Future.wait(eagerError: false)`). Métodos `saveSplit/deleteSplit` recargan via `loadHoldingFull` y disparan `_syncInBackground` (no orchestrator — splits no generan transactions).
+- `AccountsRouteScope` provee `InvestmentSplitLocalStore` y `InvestmentSplitRepository`, e inyecta el repo al VM.
+- `DashboardRouteScope` instancia `InvestmentSplitLocalStore` y se lo pasa a `DashboardRepository(splitStore: ...)`.
+- `DashboardRepository._loadMarketValueByCurrency` carga splits por holding y los pasa via callback `splitsFor` a `computePortfolioDistribution`. Si `splitStore == null` (legacy) el callback retorna `[]` y la math se comporta como pre-Fase-8.
+
+### Edge cases
+
+- **Sell > available post-split**: cubierto por `InvestmentMathException.sellExceedsAvailable` — el walk lo detecta naturalmente.
+- **Split con fecha futura**: se aplica igual (los anuncios son anteriores al effective date).
+- **Holdings archivados**: el form bloquea registrar splits cuando `holding.deletedAt != null`.
+- **Soft-deleted splits**: math y resolver los filtran.
+- **Multi-device LWW**: estándar (mismo patrón que lots).
+- **Fractional shares post-reverso**: permitidas (NUMERIC(18,8)). Si el broker pagó cash por la fractional, se registra como sell aparte.
+
 ## Portfolio UI
 
 Lives in the existing "Holdings" tab of `AccountsScreen` (`HoldingsListTab`) — **not** a separate `PortfolioScreen` route. Each row shows symbol / qty / avg / current price (with source pill: Mercado / Manual / Último lote) / market value / P&L chips (Unreal / Real / Div). Footer groups totals by currency; no FX conversion is attempted (no global fx table). Rows with `netQuantity < 0` render a "Datos inconsistentes" pill but don't crash the list.
@@ -184,18 +242,28 @@ Env vars: `MARKETPRICE_ENABLED`, `MARKETPRICE_ADMIN_TOKEN`.
 
 Observability: log per tick — symbols fetched, failures, latency. Optional `market_price_fetch_errors` table for missing-symbol tracing.
 
-## Dashboard Integration (pending in Fase 6)
+## Dashboard Integration (Fase 6)
 
-Extend `DashboardMetrics` with:
-- `marketValueOfHoldingsCents` — `Σ quantity * current_price * fx_to_display` across active holdings, where `current_price` prefers `market_prices`, then `holdings.manual_price`, then last lot price.
-- `allocationByBucket: Map<String, int>`:
-  - `liquid` → `bank + cash` balances.
-  - `investment_active` → `marketValueOfHoldings`.
-  - `investment_passive` → Σ `amount_cents` across active `yield_configs`.
-  - `debt` → negative balances on `loan` / `credit_card`.
-  - `credit_revolving` → `credit_limit - balance` per credit card.
+`DashboardMetrics` (per-currency, en `features/dashboard/domain/dashboard_metrics.dart`) gana cuatro campos sobre los cuatro originales:
 
-`netWorth` becomes `accountBalances + marketValueOfHoldings`. The settlement-account cash balance is already adjusted by the generator's derived transactions, so market value stacks on top without double counting.
+- `marketValueOfHoldingsCents` — `Σ quantity * current_price` sobre holdings activos cuyo `currencyCode` coincide con la entrada del map. `current_price` por precedencia `market_price → manual_price → último lote válido` (mismo `current_price_resolver` que la lista de holdings y el PieChart).
+- `yieldsValueCents` — `Σ amount_cents` de yield_configs activos cuya `account.currency_code` coincide. JOIN nuevo `yield_configs ⨝ accounts` en `DashboardLocalStore.getYieldsValueByCurrency`.
+- `debtCents` — `|Σ balance|` para cuentas `credit_card` o `loan` con balance < 0.
+- `revolvingCreditCents` — `Σ (credit_limit + balance)` cuando > 0 sobre tarjetas. (Antes era una variable local dentro de `calculateAllMetrics`; ahora se expone para que el AllocationCard la lea.)
+
+`netWorthCents` se redefine: `Σ todos los balances + marketValueOfHoldings`. Los yields **no** se suman aparte porque su principal **ya está dentro del balance bancario** (modelo cuenta digital MX, e.g. pagaré BBVA Libretón). Esta suposición ancla todo el resto del diseño.
+
+`liquidAssetsCents` (gross bank+cash) se conserva sin cambios; `safeToSpend`/`buyingPower` siguen leyéndolo y no se ajustan. La diferencia entre "liquid total" y "free liquid" se materializa **solo en el render del AllocationCard**, donde el segmento "Líquido" del bar = `liquidAssetsCents - yieldsValueCents` (clamped a 0).
+
+**`AllocationCard`** (`features/dashboard/ui/widgets/allocation_card.dart`, archivo dedicado mirror del patrón de `portfolio_pie_chart.dart`) renderiza una barra horizontal apilada de **3 segmentos** que suman 100% del activo positivo: free liquid (`cs.primary`), stocks (`AppColors.catSapphire`), yields (`AppColors.income`). Implementación: `Row` de `Expanded(flex: ((cents/total)*1000).round())` dentro de un `ClipRRect` — sin `fl_chart` (no se necesita para 3 segmentos). Debajo del bar: legend de chips por segmento `[dot] Label · XX% · $amount`. Auxiliares `Wrap` (no `Row`, evita overflow horizontal): "Deuda actual: -$X" en `cs.error` y "Crédito disp.: +$Y" en `onSurfaceVariant`. Renderiza `SizedBox.shrink()` cuando los 3 buckets son 0; oculta cada chip auxiliar cuando su valor es 0; con un solo bucket > 0, ocupa el bar completo.
+
+Posicionado en `DashboardSummaryTab` entre `_NetWorthCard` y `_MetricsGrid`.
+
+**Filtro de cuentas** (`accountIds` del `DashboardFilterViewModel`): liquid / yields / debt / revolving lo respetan via SQL. **Holdings lo ignoran** — son globales (mismo principio que `HoldingsListTab` en `/accounts`); `_loadMarketValueByCurrency` siempre lee todos los holdings activos. Cuando el usuario filtra cuentas, ve "en mis N cuentas seleccionadas $X liquid, mi portfolio global tiene $Y stocks". Asimetría intencional, consistente con la decisión de holdings-globales del feature.
+
+**DI**: `DashboardRepository` recibe ahora `InvestmentHoldingLocalStore`, `InvestmentLotLocalStore`, `MarketPriceLocalStore` como dependencias **opcionales**. Si null (legacy / tests), el bucket de stocks contribuye 0. `DashboardRouteScope` los instancia inline desde el `DatabaseHelper` (mismo patrón que `DashboardLocalStore`). `_loadMarketValueByCurrency` reusa `computePortfolioDistribution` y suma `slice.marketValue` por currency convirtiendo a cents (`(value * 100).round()`).
+
+**Invariante post-buy** (cubierta por test): cuenta USD con $1000, compra 5 × $100 + $5 fee → balance $495 + market value $500 = net worth $995. Diferencia vs pre-buy = $5 (los fees). Después de un cambio de precio el net worth fluctúa por `Σ qty × Δprice`.
 
 ## Cascade Behavior
 
@@ -228,6 +296,9 @@ Phase-by-phase roadmap. Permanent knowledge lives in the sections above; this ta
 | 3 | FIFO + weighted avg + P&L in UI | 2026-04-21 | See §FIFO + Weighted Average, §Portfolio UI. 27 unit tests |
 | 4 | Backend cron for `market_prices` + frontend staleness banner | 2026-04-21 | See §Backend Cron. Yahoo `v8/finance/chart/{SYMBOL}` per-symbol; `_StalePricesBanner` when `maxFetchedAt > 2 días` |
 | 5 (parcial) | Charts — PieChart de distribución | 2026-04-21 | See §Distribution chart (Fase 5). LineChart movido a Fase 5.1 — no hay historia diaria en `market_prices` |
+| 6 | Allocation in dashboard | 2026-04-25 | See §Dashboard Integration (Fase 6). 3-bucket bar (free liquid / stocks / yields) + chips de deuda / crédito disp. Yields restados de liquid en render para evitar doble conteo |
+| 7 | Splits — persistencia + sync (infraestructura silenciada hasta Fase 8) | 2026-04-25 | See §Splits. Migración 007 backend / 005 frontend (`_version` 4→5). Proto `InvestmentSplitService`. Sync order 8 (market_price bumpeado a 9). DI wireado en `AccountsRouteScope`; math y UI todavía no consumen |
+| 8 | Splits — math + UI + dashboard | 2026-04-25 | See §Splits. Walk cronológico de `(lots ∪ splits)` en `position_math`/`pnl_math`; fallback ajustado en `current_price_resolver`; callback `splitsFor` en `portfolio_distribution`. `SplitFormScreen` nueva, FAB sheet con 3ra acción, timeline mixto (sealed `_HoldingEvent`). `DashboardRepository` consume splits para market value correcto |
 
 ### Fase 5.1 — Performance LineChart (30 días) ⏳ PENDING
 
@@ -243,18 +314,9 @@ Acceptance (plan tentativo):
 
 **DoD:** LineChart renderiza con ≥ 30 días de historia + ≥ 50 holdings; widget test del chart; la curva refleja performance real (no la curva cantidad-valorada-a-precio-de-hoy, que es un anti-patrón considerado y rechazado durante la brainstorm de Fase 5).
 
-### Fase 6 — Allocation in dashboard ⏳ PENDING
-
-Acceptance:
-- `DashboardMetrics` extended with `marketValueOfHoldingsCents` and `allocationByBucket`.
-- New widget (horizontal stacked bar) in Dashboard or Estadísticas.
-- `netWorth` includes market value; invariant: immediately after a buy, net worth is stable (cash down = market value up).
-
-**DoD:** Dashboard reflects correct net worth post-purchase; fluctuates with subsequent price moves.
-
 ### Deferred (post-MVP)
 
-- Splits and corporate actions.
+- Corporate actions other than splits (spinoffs, mergers, rights issues).
 - Auto dividend detection.
 - Tax / capital-gains reports.
 - Snapshot materialization for performance charts (only if >50 holdings hurts render time).
@@ -263,18 +325,24 @@ Acceptance:
 ## Critical Files
 
 **Backend:**
-- `backend/migrations/003_investments.sql`, `004_investment_lots_account.sql`, `005_drop_holding_account.sql`
-- `backend/internal/investment/` (model, validation, `holding_repository.go`, `lot_repository.go`, `market_price_repository.go`, `handler.go`)
+- `backend/migrations/003_investments.sql`, `004_investment_lots_account.sql`, `005_drop_holding_account.sql`, `007_investment_splits.sql`
+- `backend/internal/investment/` (model, validation, `holding_repository.go`, `lot_repository.go`, `split_repository.go`, `market_price_repository.go`, `handler.go`)
 - `backend/internal/sync/entity_type.go`
 - `backend/cmd/server/main.go`
 
 **Frontend:**
-- `frontend/assets/migrations/002.sql`, `003.sql`, `004.sql`
+- `frontend/assets/migrations/002.sql`, `003.sql`, `004.sql`, `005.sql`
 - `frontend/lib/src/core/db/database_helper.dart` (`_version`)
-- `frontend/lib/src/features/investments/` (whole directory, incluye `domain/portfolio_distribution.dart` y `ui/widgets/portfolio_pie_chart.dart`)
+- `frontend/lib/src/features/investments/` (whole directory, incluye `domain/portfolio_distribution.dart`, `domain/investment_split.dart`, `data/investment_split_*.dart`, `ui/widgets/portfolio_pie_chart.dart`, `ui/split_form_screen.dart`)
 - `frontend/lib/src/features/accounts/ui/accounts_route_scope.dart` (DI wiring)
 - `frontend/lib/main.dart` (sync handlers registered in `SyncService.handlers`)
-- `frontend/test/position_math_test.dart`, `frontend/test/pnl_math_test.dart`, `frontend/test/portfolio_distribution_test.dart`, `frontend/test/portfolio_pie_chart_test.dart`
+- `frontend/lib/src/features/dashboard/domain/dashboard_metrics.dart` (Fase 6 — 4 campos nuevos)
+- `frontend/lib/src/features/dashboard/data/dashboard_local_store.dart` (Fase 6 — `getYieldsValueByCurrency`)
+- `frontend/lib/src/features/dashboard/data/dashboard_repository.dart` (Fase 6 — investment stores opcionales, `_loadMarketValueByCurrency`)
+- `frontend/lib/src/features/dashboard/ui/dashboard_route_scope.dart` (Fase 6 — DI de holding/lot/market_price stores)
+- `frontend/lib/src/features/dashboard/ui/widgets/allocation_card.dart` (Fase 6 — widget público)
+- `frontend/lib/src/ui/screens/dashboard/dashboard_summary_tab.dart` (Fase 6 — uso de AllocationCard)
+- `frontend/test/position_math_test.dart`, `frontend/test/pnl_math_test.dart`, `frontend/test/current_price_resolver_test.dart`, `frontend/test/portfolio_distribution_test.dart`, `frontend/test/portfolio_pie_chart_test.dart`, `frontend/test/dashboard_repository_allocation_test.dart`, `frontend/test/allocation_card_test.dart`, `frontend/test/investment_split_test.dart`
 
 **Patterns to mirror when extending:**
 - Generator: `frontend/lib/src/features/yield_configs/data/yield_transaction_generator.dart`.

@@ -26,6 +26,23 @@ type Holding struct {
 	DeletedAt    *time.Time
 }
 
+// Split mirrors the investment_splits table. Forward splits have
+// ratio_num > ratio_den; reverse splits have ratio_num < ratio_den. The math
+// walks (lots ∪ splits) chronologically and adjusts the FIFO state in flight
+// (qty *= ratio, price /= ratio).
+type Split struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	HoldingID  uuid.UUID
+	RatioNum   float64
+	RatioDen   float64
+	OccurredAt time.Time
+	Notes      *string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	DeletedAt  *time.Time
+}
+
 // Lot mirrors the investment_lots table.
 type Lot struct {
 	ID         uuid.UUID

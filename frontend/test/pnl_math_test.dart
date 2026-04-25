@@ -1,7 +1,29 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_lot.dart';
+import 'package:pocket_pilot/src/features/investments/domain/investment_split.dart';
 import 'package:pocket_pilot/src/features/investments/domain/pnl_math.dart';
 import 'package:pocket_pilot/src/features/investments/domain/position_math.dart';
+
+InvestmentSplitModel makeSplitForPnL({
+  String id = 's1',
+  String holdingId = 'h1',
+  double ratioNum = 2,
+  double ratioDen = 1,
+  String occurredAt = '2026-02-01',
+  DateTime? createdAt,
+  DateTime? deletedAt,
+}) {
+  return InvestmentSplitModel(
+    id: id,
+    holdingId: holdingId,
+    ratioNum: ratioNum,
+    ratioDen: ratioDen,
+    occurredAt: occurredAt,
+    createdAt: createdAt ?? DateTime.utc(2026, 1, 1),
+    updatedAt: createdAt ?? DateTime.utc(2026, 1, 1),
+    deletedAt: deletedAt,
+  );
+}
 
 InvestmentLotModel makeLot({
   String id = 'l1',
@@ -280,6 +302,78 @@ void main() {
         computeUnrealizedPnL(position: p, currentPrice: 12),
         closeTo(200, 1e-9),
       );
+    });
+  });
+
+  group('computeRealizedPnL with splits', () {
+    test('sell post-split consumes lot pre-split using post-split prices', () {
+      // Buy 10 @ $100, then 2:1 split (queue: 20 @ $50), sell 5 @ $60.
+      // proceeds = 5 * 60 = 300; basis = 5 * 50 = 250; pnl = 50.
+      final r = computeRealizedPnL(
+        [
+          makeLot(
+              id: 'b1', quantity: 10, price: 100, occurredAt: '2026-01-01'),
+          makeLot(
+              id: 's1',
+              kind: 'sell',
+              quantity: 5,
+              price: 60,
+              occurredAt: '2026-03-01'),
+        ],
+        splits: [
+          makeSplitForPnL(occurredAt: '2026-02-01', ratioNum: 2, ratioDen: 1),
+        ],
+      );
+      expect(r.totalRealized, closeTo(50, 1e-9));
+      expect(r.perSellPnL, hasLength(1));
+      expect(r.perSellPnL.first.proceeds, closeTo(300, 1e-9));
+      expect(r.perSellPnL.first.costBasisConsumed, closeTo(250, 1e-9));
+      expect(r.perSellPnL.first.pnl, closeTo(50, 1e-9));
+    });
+
+    test('reverse split: sell post 1:10 reverse correctly tracks high price', () {
+      // Buy 100 @ $5, reverse 1:10 (queue: 10 @ $50), sell 4 @ $80.
+      // proceeds = 4*80 = 320; basis = 4*50 = 200; pnl = 120.
+      final r = computeRealizedPnL(
+        [
+          makeLot(
+              id: 'b1', quantity: 100, price: 5, occurredAt: '2026-01-01'),
+          makeLot(
+              id: 's1',
+              kind: 'sell',
+              quantity: 4,
+              price: 80,
+              occurredAt: '2026-03-01'),
+        ],
+        splits: [
+          makeSplitForPnL(occurredAt: '2026-02-01', ratioNum: 1, ratioDen: 10),
+        ],
+      );
+      expect(r.totalRealized, closeTo(120, 1e-9));
+    });
+
+    test('sell BEFORE the split sees the pre-split queue', () {
+      // Buy 10 @ $100, sell 5 @ $110, then 2:1 split.
+      // First sell (pre-split): proceeds=5*110=550, basis=5*100=500, pnl=50.
+      // Split happens after: doesn't affect already-realized PnL.
+      final r = computeRealizedPnL(
+        [
+          makeLot(
+              id: 'b1', quantity: 10, price: 100, occurredAt: '2026-01-01'),
+          makeLot(
+              id: 's1',
+              kind: 'sell',
+              quantity: 5,
+              price: 110,
+              occurredAt: '2026-02-01'),
+        ],
+        splits: [
+          makeSplitForPnL(occurredAt: '2026-03-01', ratioNum: 2, ratioDen: 1),
+        ],
+      );
+      expect(r.totalRealized, closeTo(50, 1e-9));
+      expect(r.perSellPnL.first.proceeds, closeTo(550, 1e-9));
+      expect(r.perSellPnL.first.costBasisConsumed, closeTo(500, 1e-9));
     });
   });
 }

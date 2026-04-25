@@ -21,6 +21,7 @@ import 'package:pocket_pilot/src/features/dashboard/domain/dashboard_metrics.dar
 import 'package:pocket_pilot/src/features/dashboard/domain/nature_spend_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/tag_spend_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_view_model.dart';
+import 'package:pocket_pilot/src/features/dashboard/ui/widgets/allocation_card.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
 
 class DashboardSummaryTab extends StatelessWidget {
@@ -46,6 +47,7 @@ class DashboardSummaryTab extends StatelessWidget {
                   if (metrics != null) ...[
                 _NetWorthCard(metrics: metrics),
                 const SizedBox(height: 12),
+                AllocationCard(metrics: metrics),
                 _MetricsGrid(metrics: metrics),
               ] else
                 _EmptyHint(

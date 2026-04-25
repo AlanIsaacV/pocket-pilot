@@ -6,9 +6,11 @@ import 'package:pocket_pilot/src/core/sync/scheduled_generation_orchestrator.dar
 import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/features/investments/data/investment_holding_repository.dart';
 import 'package:pocket_pilot/src/features/investments/data/investment_lot_repository.dart';
+import 'package:pocket_pilot/src/features/investments/data/investment_split_repository.dart';
 import 'package:pocket_pilot/src/features/investments/data/market_price_local_store.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_lot.dart';
+import 'package:pocket_pilot/src/features/investments/domain/investment_split.dart';
 import 'package:pocket_pilot/src/features/investments/domain/market_price.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
@@ -16,6 +18,7 @@ import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 class InvestmentViewModel extends ChangeNotifier {
   final InvestmentHoldingRepository _holdingRepo;
   final InvestmentLotRepository _lotRepo;
+  final InvestmentSplitRepository _splitRepo;
   final MarketPriceLocalStore _marketPriceStore;
   final TransactionLocalStore _transactionStore;
   final SyncService _syncService;
@@ -23,6 +26,7 @@ class InvestmentViewModel extends ChangeNotifier {
 
   List<InvestmentHoldingModel> _allHoldings = const [];
   final Map<String, List<InvestmentLotModel>> _lotsByHolding = {};
+  final Map<String, List<InvestmentSplitModel>> _splitsByHolding = {};
   final Map<String, MarketPriceModel?> _priceBySymbolExchange = {};
   final Map<String, List<TransactionModel>> _dividendsByHolding = {};
   DateTime? _maxFetchedAt;
@@ -36,12 +40,14 @@ class InvestmentViewModel extends ChangeNotifier {
   InvestmentViewModel({
     required InvestmentHoldingRepository holdingRepo,
     required InvestmentLotRepository lotRepo,
+    required InvestmentSplitRepository splitRepo,
     required MarketPriceLocalStore marketPriceStore,
     required TransactionLocalStore transactionStore,
     required SyncService syncService,
     required ScheduledGenerationOrchestrator orchestrator,
   }) : _holdingRepo = holdingRepo,
        _lotRepo = lotRepo,
+       _splitRepo = splitRepo,
        _marketPriceStore = marketPriceStore,
        _transactionStore = transactionStore,
        _syncService = syncService,
@@ -51,6 +57,9 @@ class InvestmentViewModel extends ChangeNotifier {
 
   List<InvestmentLotModel> lotsFor(String holdingId) =>
       _lotsByHolding[holdingId] ?? const [];
+
+  List<InvestmentSplitModel> splitsFor(String holdingId) =>
+      _splitsByHolding[holdingId] ?? const [];
 
   MarketPriceModel? priceFor(String symbol, String exchange) =>
       _priceBySymbolExchange['${symbol.toUpperCase()}:${exchange.toUpperCase()}'];
@@ -152,6 +161,11 @@ class InvestmentViewModel extends ChangeNotifier {
           } catch (_) {
             _dividendsByHolding[h.id] = const [];
           }
+          try {
+            _splitsByHolding[h.id] = await _splitRepo.getByHolding(h.id);
+          } catch (_) {
+            _splitsByHolding[h.id] = const [];
+          }
         }());
       }
       await Future.wait(futures, eagerError: false);
@@ -204,6 +218,7 @@ class InvestmentViewModel extends ChangeNotifier {
       );
       _dividendsByHolding[holdingId] =
           divRows.map(TransactionModel.fromMap).toList();
+      _splitsByHolding[holdingId] = await _splitRepo.getByHolding(holdingId);
       _errorMessage = null;
     } catch (e) {
       _errorMessage = e.toString();
@@ -236,6 +251,7 @@ class InvestmentViewModel extends ChangeNotifier {
   Future<void> archiveHolding(InvestmentHoldingModel holding) async {
     await _holdingRepo.archive(holding.id);
     _lotsByHolding.remove(holding.id);
+    _splitsByHolding.remove(holding.id);
     _dividendsByHolding.remove(holding.id);
     await loadPortfolio();
     unawaited(_orchestratorInBackground());
@@ -251,6 +267,21 @@ class InvestmentViewModel extends ChangeNotifier {
     await _lotRepo.delete(model.id);
     await loadHoldingFull(model.holdingId);
     unawaited(_orchestratorInBackground());
+  }
+
+  /// Splits do NOT generate transactions (no cash flow), so we skip the
+  /// generator orchestrator after upsert/delete. The math reads splits
+  /// directly via `splitsFor` and re-renders on `notifyListeners`.
+  Future<void> saveSplit(InvestmentSplitModel model) async {
+    await _splitRepo.upsert(model);
+    await loadHoldingFull(model.holdingId);
+    unawaited(_syncInBackground());
+  }
+
+  Future<void> deleteSplit(InvestmentSplitModel model) async {
+    await _splitRepo.delete(model.id);
+    await loadHoldingFull(model.holdingId);
+    unawaited(_syncInBackground());
   }
 
   Future<String?> lastUsedAccountId() => _lotRepo.getLastUsedAccountId();

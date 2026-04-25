@@ -45,13 +45,15 @@ _HoldingStats _buildStats(
   InvestmentViewModel vm,
 ) {
   final lots = vm.lotsFor(h.id);
+  final splits = vm.splitsFor(h.id);
   try {
-    final position = computePosition(lots);
+    final position = computePosition(lots, splits: splits);
     final price = vm.priceFor(h.symbol, h.exchange);
     final quote = resolveCurrentPrice(
       holding: h,
       marketPrice: price,
       lots: lots,
+      splits: splits,
     );
     final mv = (quote.price != null && position.netQuantity > 0)
         ? quote.price! * position.netQuantity
@@ -62,7 +64,7 @@ _HoldingStats _buildStats(
     );
     double? realized;
     try {
-      realized = computeRealizedPnL(lots).totalRealized;
+      realized = computeRealizedPnL(lots, splits: splits).totalRealized;
     } on InvestmentMathException {
       realized = null;
     }
@@ -193,6 +195,7 @@ class _HoldingsListTabState extends State<HoldingsListTab> {
       holdings: vm.allHoldings,
       lotsFor: vm.lotsFor,
       priceFor: vm.priceFor,
+      splitsFor: vm.splitsFor,
     );
     return PortfolioPieChart(distribution: distribution);
   }

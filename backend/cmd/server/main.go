@@ -73,6 +73,7 @@ func main() {
 	marketPriceRepo := investment.NewMarketPriceRepository(pool, cursorStore)
 	holdingHandler := investment.NewHoldingHandler(holdingRepo)
 	lotHandler := investment.NewLotHandler(investment.NewLotRepository(pool, cursorStore))
+	splitHandler := investment.NewSplitHandler(investment.NewSplitRepository(pool, cursorStore))
 	marketPriceHandler := investment.NewMarketPriceHandler(marketPriceRepo)
 
 	// SyncService handler (preflight GetSyncStatus).
@@ -115,6 +116,7 @@ func main() {
 	pb.RegisterUserPreferenceServiceServer(srv, userPreferenceHandler)
 	pb.RegisterInvestmentHoldingServiceServer(srv, holdingHandler)
 	pb.RegisterInvestmentLotServiceServer(srv, lotHandler)
+	pb.RegisterInvestmentSplitServiceServer(srv, splitHandler)
 	pb.RegisterMarketPriceServiceServer(srv, marketPriceHandler)
 	pb.RegisterAIAssistantServiceServer(srv, aiHandler)
 	pb.RegisterAuthServiceServer(srv, authHandler)

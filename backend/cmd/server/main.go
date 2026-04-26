@@ -109,6 +109,11 @@ func main() {
 	)
 	notificationParserHandler := notificationparser.NewHandlerWithLLM(notificationParserRepo, llmFallback)
 
+	// Retention sweeper para candidate_parsers: anonimiza sample_* después
+	// de 90 días. Corre una vez al startup y luego cada 24h. El ctx raíz
+	// del proceso garantiza shutdown limpio.
+	startCandidateRetentionSweeper(ctx, candidateRepo)
+
 	// Auth
 	keyStore := jwks.NewKeyStore()
 	verifier := jwks.NewVerifier(keyStore, cfg.GoogleClientID, cfg.AppleClientID)
@@ -200,4 +205,33 @@ func main() {
 		slog.Error("serve", "error", err)
 		os.Exit(1)
 	}
+}
+
+// startCandidateRetentionSweeper lanza una goroutine que ejecuta el sweeper
+// de retención de candidate_parsers una vez al startup y luego cada 24h.
+// Cuando el ctx se cancela (shutdown), la goroutine sale limpiamente.
+func startCandidateRetentionSweeper(ctx context.Context, repo *notificationparser.CandidateRepository) {
+	go func() {
+		runOnce := func() {
+			n, err := repo.PurgeOldSamples(ctx)
+			if err != nil {
+				slog.Error("candidate_parsers retention sweep failed", "error", err)
+				return
+			}
+			if n > 0 {
+				slog.Info("candidate_parsers retention sweep", "purged_rows", n)
+			}
+		}
+		runOnce()
+		t := time.NewTicker(24 * time.Hour)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				runOnce()
+			}
+		}
+	}()
 }

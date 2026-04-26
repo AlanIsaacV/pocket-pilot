@@ -22,7 +22,7 @@ class CapturedNotificationLocalStore {
     final db = await _db.database;
     final rows = await db.query(
       'captured_notifications',
-      where: "status IN ('received','unparseable')",
+      where: "status IN ('received','unparseable') AND purged_at IS NULL",
       orderBy: 'posted_at DESC',
       limit: limit,
     );
@@ -34,7 +34,7 @@ class CapturedNotificationLocalStore {
     final db = await _db.database;
     final rows = await db.query(
       'captured_notifications',
-      where: "status = 'received'",
+      where: "status = 'received' AND purged_at IS NULL",
       orderBy: 'posted_at ASC',
       limit: limit,
     );
@@ -123,7 +123,28 @@ class CapturedNotificationLocalStore {
     return db.update(
       'captured_notifications',
       {'status': 'received', 'pending_tx_id': null},
-      where: "status = 'unparseable'",
+      where: "status = 'unparseable' AND purged_at IS NULL",
+    );
+  }
+
+  /// Anonimiza filas con `posted_at < cutoffIso` que aún no han sido
+  /// purgadas: NULLea title/text/big_text y marca `purged_at = purgedAtIso`.
+  /// Devuelve cuántas filas se afectaron. El status del lifecycle se
+  /// preserva para que parser_feedback siga teniendo trazabilidad.
+  Future<int> purgeOlderThan({
+    required String cutoffIso,
+    required String purgedAtIso,
+  }) async {
+    final db = await _db.database;
+    return db.rawUpdate(
+      '''UPDATE captured_notifications
+            SET title = NULL,
+                text = NULL,
+                big_text = NULL,
+                purged_at = ?
+          WHERE posted_at < ?
+            AND purged_at IS NULL''',
+      [purgedAtIso, cutoffIso],
     );
   }
 }

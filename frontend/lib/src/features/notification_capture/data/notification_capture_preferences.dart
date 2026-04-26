@@ -25,6 +25,7 @@ import 'package:pocket_pilot/src/features/user_preferences/domain/user_preferenc
 
 const String kPrefShareWithLlmForParser = 'notification_capture.share_with_llm_for_parser';
 const String kPrefHelpImproveApp = 'notification_capture.help_improve_app';
+const String kPrefLastPurgeAt = 'notification_capture.last_purge_at';
 
 class NotificationCapturePreferences {
   final UserPreferenceLocalStore _store;
@@ -47,6 +48,28 @@ class NotificationCapturePreferences {
 
   Future<void> setHelpImproveApp(bool value) =>
       _setBool(kPrefHelpImproveApp, value);
+
+  /// Última vez que el sweeper de retención (90d) corrió. NULL = nunca.
+  /// El sweeper consulta este valor para evitar correr más de una vez por día.
+  Future<DateTime?> lastPurgeAt() async {
+    final pref = await _store.getByKey(kPrefLastPurgeAt);
+    final raw = pref?.prefValue;
+    if (raw == null || raw.isEmpty) return null;
+    return DateTime.tryParse(raw);
+  }
+
+  Future<void> setLastPurgeAt(DateTime value) async {
+    final now = DateTime.now().toUtc();
+    final existing = await _store.getByKey(kPrefLastPurgeAt);
+    final model = UserPreferenceModel(
+      prefKey: kPrefLastPurgeAt,
+      prefValue: value.toUtc().toIso8601String(),
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    );
+    await _store.upsert(model);
+    // device-local; no outbox.
+  }
 
   Future<void> _setBool(String key, bool value) async {
     final now = DateTime.now().toUtc();

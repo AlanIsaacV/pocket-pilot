@@ -16,6 +16,8 @@
 // Las dependencias de cada feature (LocalStore, Repository, ViewModel) viven
 // en su propio RouteScope bajo features/<feature>/ui/<feature>_route_scope.dart.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -67,6 +69,9 @@ import 'package:pocket_pilot/src/features/investments/data/market_price_local_st
 import 'package:pocket_pilot/src/features/investments/data/market_price_remote_service.dart';
 import 'package:pocket_pilot/src/features/investments/data/market_price_sync_handler.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/captured_notification_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/captured_notifications_retention_sweeper.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_preferences.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_remote_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_sync_handler.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_feedback_local_store.dart';
@@ -421,6 +426,15 @@ Future<void> main() async {
 
   // ConnectivityMonitor: lanza sync automático al recuperar conexión.
   final connectivityMonitor = ConnectivityMonitor(syncService: syncService);
+
+  // Retention sweeper para captured_notifications: NULLea PII >90d. Corre
+  // máximo una vez cada 24h gracias al gating en lastPurgeAt. unawaited
+  // para no bloquear cold start.
+  final retentionSweeper = CapturedNotificationsRetentionSweeper(
+    store: CapturedNotificationLocalStore(db: dbHelper),
+    prefs: NotificationCapturePreferences(store: userPreferenceLocalStore),
+  );
+  unawaited(retentionSweeper.sweepIfDue());
 
   runApp(
     MultiProvider(

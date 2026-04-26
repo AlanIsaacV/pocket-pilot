@@ -82,3 +82,33 @@ func nullableText(s string) any {
 	}
 	return s
 }
+
+// RetentionWindow es la edad máxima de un candidato `pending` antes de que
+// el sweeper anonimice sus sample_*. Hardcoded a 90 días en simetría con la
+// retención FE en captured_notifications.
+const RetentionWindow = 90 * 24 * time.Hour
+
+// PurgeOldSamples anonimiza candidatos `pending` con created_at más viejos
+// que RetentionWindow: NULLea sample_title/sample_text/sample_big_text,
+// marca status='purged' y setea purged_at. Devuelve cuántas filas se
+// afectaron. El proposed_regex/extracted_fields se preservan — no son PII
+// y siguen siendo útiles para análisis agregado del loop LLM.
+//
+// Idempotente: filtra por status='pending', así que repetir la llamada
+// devuelve 0 si ya se purgó todo.
+func (r *CandidateRepository) PurgeOldSamples(ctx context.Context) (int64, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE candidate_parsers
+		   SET sample_title    = NULL,
+		       sample_text     = NULL,
+		       sample_big_text = NULL,
+		       status          = 'purged',
+		       purged_at       = NOW()
+		 WHERE status = 'pending'
+		   AND created_at < $1
+	`, time.Now().Add(-RetentionWindow))
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}

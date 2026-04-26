@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+import "pocket_pilot/v1/common.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+// ParserFeedback registra una señal de calidad por cada decisión final del
+// usuario sobre un PendingTransaction (aprobar o descartar). Combina:
+//
+// - was_helpful: thumb explícito opcional (null si el usuario no tocó nada).
+// - account_changed/category_changed/amount_changed/description_changed: flags
+//   derivados al aprobar comparando los campos sugeridos por el parser vs los
+//   valores finales que eligió el usuario.
+// - was_dismissed: true si la sugerencia se descartó en lugar de aprobar.
+//
+// La trazabilidad (bank_id, pattern_id, parser_version, extraction_method)
+// permite agregar por parser/versión y guiar al admin que promueve patrones
+// desde candidate_parsers a notification_parsers.
+//
+// El cliente NUNCA hace pull de feedback (push-only). El servidor lo conserva
+// para análisis. Sin Delete RPC: el cliente no borra; soft-delete server-side
+// queda disponible para retención futura.
+message ParserFeedback {
+  string id = 1;
+
+  // ID del PendingTransaction que generó este feedback (string, generado por
+  // el cliente al insertar PendingTransactions; no es un uuid del lado server).
+  string pending_transaction_id = 2;
+
+  // ID de la captured_notification origen, si está disponible.
+  string captured_notification_id = 3;
+
+  // Snapshot de la trazabilidad del parser que produjo la sugerencia.
+  // Pueden venir vacíos si la sugerencia no provenía de un match (ej. LLM sin
+  // pattern_id concreto, o futuras rutas sin parser).
+  string bank_id = 4;
+  string pattern_id = 5;
+  int32 parser_version = 6;          // 0 = unknown
+  string extraction_method = 7;      // 'local' | 'llm' | "" = unknown
+
+  // Tri-estado: presente con valor true/false cuando el usuario tocó el thumb;
+  // ausente cuando no expresó preferencia explícita.
+  google.protobuf.BoolValue was_helpful = 8;
+
+  // Flags derivados al aprobar (comparando suggested_* vs final). Cuando
+  // was_dismissed = true, todos quedan en false (no hay "final" con qué
+  // comparar — el usuario simplemente descartó).
+  bool account_changed = 9;
+  bool category_changed = 10;
+  bool amount_changed = 11;
+  bool description_changed = 12;
+
+  bool was_dismissed = 13;
+
+  google.protobuf.Timestamp created_at = 14;
+  google.protobuf.Timestamp updated_at = 15;
+  google.protobuf.Timestamp deleted_at = 16;
+}
+
+service ParserFeedbackService {
+  rpc ListParserFeedback(ListParserFeedbackRequest) returns (ListParserFeedbackResponse);
+  rpc UpsertParserFeedback(UpsertParserFeedbackRequest) returns (UpsertParserFeedbackResponse);
+}
+
+message ListParserFeedbackRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListParserFeedbackResponse {
+  repeated ParserFeedback feedback = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertParserFeedbackRequest {
+  ParserFeedback feedback = 1;
+}
+
+message UpsertParserFeedbackResponse {
+  ParserFeedback feedback = 1;
+  bool conflict_resolved = 2;
+}

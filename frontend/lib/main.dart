@@ -69,6 +69,9 @@ import 'package:pocket_pilot/src/features/investments/data/market_price_sync_han
 import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_remote_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_sync_handler.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/parser_feedback_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/parser_feedback_remote_service.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/parser_feedback_sync_handler.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_remote_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_sync_handler.dart';
@@ -238,6 +241,11 @@ Future<void> main() async {
     remote: TransactionRuleRemoteService(),
   );
 
+  final parserFeedbackSyncHandler = ParserFeedbackSyncHandler(
+    local: ParserFeedbackLocalStore(db: dbHelper),
+    remote: ParserFeedbackRemoteService(),
+  );
+
   final syncStatusRemoteService = SyncStatusRemoteService();
 
   final syncService = SyncService(
@@ -258,6 +266,7 @@ Future<void> main() async {
       investmentSplitSyncHandler,
       marketPriceSyncHandler,
       transactionSyncHandler,
+      parserFeedbackSyncHandler,
       userPreferenceSyncHandler,
       goalSyncHandler,
       budgetSyncHandler,

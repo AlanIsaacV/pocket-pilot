@@ -94,6 +94,17 @@ class PendingTransactionModel {
         'created_at': createdAt.toIso8601String(),
       };
 
+  /// Descompone `parserId` (formato `bank_id/pattern_id`) en sus dos partes.
+  /// Si no hay `/` o el formato es distinto devuelve ambos `null`. Se usa al
+  /// persistir [ParserFeedbackModel]: el row necesita bank y pattern por
+  /// separado para agregar señales por parser/pattern.
+  static (String? bankId, String? patternId) splitParserId(String? parserId) {
+    if (parserId == null) return (null, null);
+    final slash = parserId.indexOf('/');
+    if (slash <= 0 || slash == parserId.length - 1) return (null, null);
+    return (parserId.substring(0, slash), parserId.substring(slash + 1));
+  }
+
   PendingTransactionModel copyWith({
     String? suggestedAccountId,
     String? suggestedCategoryId,

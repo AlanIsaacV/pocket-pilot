@@ -29,6 +29,8 @@ class PendingReviewSheet extends StatefulWidget {
   State<PendingReviewSheet> createState() => _PendingReviewSheetState();
 }
 
+enum _ThumbState { none, up, down }
+
 class _PendingReviewSheetState extends State<PendingReviewSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _amountController;
@@ -43,6 +45,13 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
   bool _isLoadingAccounts = true;
   bool _isLoadingCategories = true;
   bool _isSaving = false;
+  _ThumbState _thumb = _ThumbState.none;
+
+  bool? get _wasHelpful => switch (_thumb) {
+        _ThumbState.up => true,
+        _ThumbState.down => false,
+        _ThumbState.none => null,
+      };
 
   @override
   void initState() {
@@ -142,6 +151,7 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
             currencyCodeOverride: _currencyController.text.trim().toUpperCase(),
             descriptionOverride: _descriptionController.text.trim(),
             dateOverride: _occurredAt,
+            wasHelpful: _wasHelpful,
           );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -160,7 +170,7 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
     try {
       await context
           .read<NotificationInboxViewModel>()
-          .dismissPending(widget.pending);
+          .dismissPending(widget.pending, wasHelpful: _wasHelpful);
       if (!mounted) return;
       Navigator.of(context).pop(false);
     } finally {
@@ -226,6 +236,47 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
                     ),
                   ),
                 ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    Text(
+                      '¿El parser acertó?',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton.filledTonal(
+                      tooltip: 'Útil',
+                      isSelected: _thumb == _ThumbState.up,
+                      selectedIcon: const Icon(Icons.thumb_up_rounded),
+                      icon: const Icon(Icons.thumb_up_outlined),
+                      onPressed: _isSaving
+                          ? null
+                          : () => setState(() {
+                                _thumb = _thumb == _ThumbState.up
+                                    ? _ThumbState.none
+                                    : _ThumbState.up;
+                              }),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      tooltip: 'No útil',
+                      isSelected: _thumb == _ThumbState.down,
+                      selectedIcon: const Icon(Icons.thumb_down_rounded),
+                      icon: const Icon(Icons.thumb_down_outlined),
+                      onPressed: _isSaving
+                          ? null
+                          : () => setState(() {
+                                _thumb = _thumb == _ThumbState.down
+                                    ? _ThumbState.none
+                                    : _ThumbState.down;
+                              }),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
               _SectionLabel('Monto'),

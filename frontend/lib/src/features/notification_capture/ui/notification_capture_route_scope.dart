@@ -14,6 +14,7 @@ import 'package:pocket_pilot/src/features/notification_capture/data/captured_not
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_preferences.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_repository.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_permission_service.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/parser_feedback_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_remote_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/pending_transaction_local_store.dart';
@@ -55,6 +56,9 @@ class NotificationCaptureRouteScope extends StatelessWidget {
         Provider<TransactionRuleLocalStore>(
           create: (_) => TransactionRuleLocalStore(db: db),
         ),
+        Provider<ParserFeedbackLocalStore>(
+          create: (_) => ParserFeedbackLocalStore(db: db),
+        ),
         Provider<TransactionRepository>(
           create: (_) => TransactionRepository(
             local: TransactionLocalStore(db: db),
@@ -77,6 +81,7 @@ class NotificationCaptureRouteScope extends StatelessWidget {
             accounts: ctx.read<AccountLocalStore>(),
             cardMappings: ctx.read<AccountCardMappingLocalStore>(),
             rules: ctx.read<TransactionRuleLocalStore>(),
+            feedback: ctx.read<ParserFeedbackLocalStore>(),
             transactions: ctx.read<TransactionRepository>(),
             outbox: outbox,
             parserRemote: ctx.read<ParserRemoteService>(),

@@ -94,8 +94,11 @@ class NotificationInboxViewModel extends ChangeNotifier {
     _safeNotify();
   }
 
-  Future<void> dismissPending(PendingTransactionModel pending) async {
-    await _repository.dismiss(pending);
+  Future<void> dismissPending(
+    PendingTransactionModel pending, {
+    bool? wasHelpful,
+  }) async {
+    await _repository.dismiss(pending, wasHelpful: wasHelpful);
     pendingTransactions =
         pendingTransactions.where((p) => p.id != pending.id).toList();
     _safeNotify();
@@ -110,30 +113,24 @@ class NotificationInboxViewModel extends ChangeNotifier {
     String? currencyCodeOverride,
     String? descriptionOverride,
     DateTime? dateOverride,
+    bool? wasHelpful,
   }) async {
+    final (resolvedBankId, _) =
+        PendingTransactionModel.splitParserId(pending.parserId);
     await _repository.approve(
       pending: pending,
       accountId: accountId,
-      bankId: bankId ?? _bankIdFromParserId(pending.parserId),
+      bankId: bankId ?? resolvedBankId,
       categoryId: categoryId,
       amountCentsOverride: amountCentsOverride,
       currencyCodeOverride: currencyCodeOverride,
       descriptionOverride: descriptionOverride,
       dateOverride: dateOverride,
+      wasHelpful: wasHelpful,
     );
     pendingTransactions =
         pendingTransactions.where((p) => p.id != pending.id).toList();
     _safeNotify();
-  }
-
-  /// El parser_id se persiste como "bbva_mx/purchase_card"; el bank_id es la
-  /// parte antes del slash. Si por alguna razón no viene, devolvemos null y
-  /// el aprendizaje de mappings se salta para esa aprobación.
-  String? _bankIdFromParserId(String? parserId) {
-    if (parserId == null) return null;
-    final slash = parserId.indexOf('/');
-    if (slash <= 0) return null;
-    return parserId.substring(0, slash);
   }
 
   @override

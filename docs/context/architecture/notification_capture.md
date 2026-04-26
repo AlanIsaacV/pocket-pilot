@@ -221,7 +221,8 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 | 0.5/0.6 | done | `account_card_mappings` and `transaction_rules` entities (proto + BE module + sync handlers + FE feature) |
 | 3 | done | `notification_parsers` global table (BE mig 012), `internal/notificationparser/` module, `ListNotificationParsers` RPC, FE `ParserSyncHandler` pull-only at syncOrder=4, NLS `onListenerConnected` backfill |
 | 3.5 | done | Real BBVA MX fixtures (8 captured notifications), parser bumped to v2 (4 patterns: `purchase_tdc`, `account_charge`, `card_payment_credit`, `account_credit`), test rewritten to load fixtures, "Reintentar no parseables" UX, repair mig FE 012 for `pending_transactions.suggested_category_id` schema drift |
-| 4 | done | `ParseNotification` RPC + `internal/notificationparser/llm_fallback.go` (Gemini reused) + `prompt.go` (few-shot ECMAScript constraint) + `regex_validator.go` (rejects `(?P<...>)`/backref/nested quantifier/>200ch + Go RE2 compile probe) + `candidate_repo.go` (anonymous, no user_id). `aiassistant.RateLimiter` extended with `feature` on `ai_usage` (BE mig 013, separate `chat` and `notification_parser` instances). FE: trazabilidad en `captured_notifications` (FE mig 013: `matched_parser_version`, `matched_pattern_id`, `extraction_method`); `processInbox()` intenta LLM tras fallo local (errores no-bloqueantes); device-local toggles `share_with_llm_for_parser` (opt-in) y `help_improve_app` (opt-out, gates persistencia de samples) en `NotificationCapturePreferences`; pantalla `/settings/notification-capture` con dos `SwitchListTile`; `OnboardingPermissionScreen` actualizada. **No implementado en MVP (queda como roadmap):** UI de feedback de parser por usuario, cross-validation con segundo LLM, retención 90-day, `parser_match_failures`. |
+| 4 | done | `ParseNotification` RPC + `internal/notificationparser/llm_fallback.go` (Gemini reused) + `prompt.go` (few-shot ECMAScript constraint) + `regex_validator.go` (rejects `(?P<...>)`/backref/nested quantifier/>200ch + Go RE2 compile probe) + `candidate_repo.go` (anonymous, no user_id). `aiassistant.RateLimiter` extended with `feature` on `ai_usage` (BE mig 013, separate `chat` and `notification_parser` instances). FE: trazabilidad en `captured_notifications` (FE mig 013: `matched_parser_version`, `matched_pattern_id`, `extraction_method`); `processInbox()` intenta LLM tras fallo local (errores no-bloqueantes); device-local toggles `share_with_llm_for_parser` (opt-in) y `help_improve_app` (opt-out, gates persistencia de samples) en `NotificationCapturePreferences`; pantalla `/settings/notification-capture` con dos `SwitchListTile`; `OnboardingPermissionScreen` actualizada. **No implementado en MVP (queda como roadmap):** cross-validation con segundo LLM, retención 90-day, `parser_match_failures`. |
+| 5 | done | `parser_feedback` push-only (BE mig 015 + módulo `internal/parserfeedback/` + proto `parser_feedback_service.proto` con `Upsert`/`List`, sin `Delete`). FE mig 014 + `domain/parser_feedback.dart` + `data/parser_feedback_*.dart` (local store, remote service, sync handler push-only `syncOrder=7`). Cada decisión final en `PendingReviewSheet` (Aprobar O Descartar) inserta una fila con: thumb opcional `was_helpful` tri-estado (`google.protobuf.BoolValue` en wire, `INTEGER 0\|1\|NULL` en SQLite), 4 flags derivados (`account_changed`, `category_changed`, `amount_changed`, `description_changed`) calculados al aprobar comparando `suggested_*` vs final, `was_dismissed`, y trazabilidad completa (bank_id, pattern_id, parser_version, extraction_method). UI: dos `IconButton.filledTonal` (thumb_up/thumb_down) inmediatamente después del header del sheet — opcional, tap segundo vuelve a none. Helper `PendingTransactionModel.splitParserId` extraído del view model. `_descriptionChanged` con normalización conservadora (trim + lowercase + colapso de whitespace) — un usuario que solo limpia trailing spaces NO dispara el flag. UNIQUE server-side `(user_id, pending_transaction_id)` como salvaguarda; LWW resuelto por `id` (mismo patrón que cardmapping). 13 tests unitarios en `frontend/test/parser_feedback_helpers_test.dart`; 3 tests de cursor en `backend/internal/parserfeedback/cursor_integration_test.go`. Sin toggle (feedback no incluye texto crudo, solo IDs/flags). |
 
 ## Operational tooling
 
@@ -235,6 +236,7 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 - `proto/pocket_pilot/v1/account_card_mapping_service.proto`
 - `proto/pocket_pilot/v1/transaction_rule_service.proto`
 - `proto/pocket_pilot/v1/notification_parser_service.proto`
+- `proto/pocket_pilot/v1/parser_feedback_service.proto` (Fase 5)
 
 **Backend:**
 - `backend/internal/cardmapping/cardmapping.go` (model + repo + handler)
@@ -252,6 +254,9 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 - `backend/migrations/012_notification_parsers.sql` (table + BBVA MX seed v1; current row in DB is v2 via UPDATE SQL)
 - `backend/migrations/013_ai_usage_feature.sql` (Fase 4: `ai_usage.feature` column + index)
 - `backend/migrations/014_candidate_parsers.sql` (Fase 4: tabla anónima de propuestas LLM)
+- `backend/migrations/015_parser_feedback.sql` (Fase 5: señal de calidad por sugerencia)
+- `backend/internal/parserfeedback/parserfeedback.go` (Fase 5: módulo Modelo + Repository + Handler)
+- `backend/internal/parserfeedback/cursor_integration_test.go` (Fase 5: tests cursor + LWW)
 - `backend/cmd/server/main.go` — DI: `notificationParserLimiter` con feature_key, `candidateRepo`, `notificationparser.NewHandlerWithLLM(...)`
 
 **Frontend Flutter:**
@@ -264,6 +269,11 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 - `assets/migrations/008.sql` — original schema (no `suggested_category_id`)
 - `assets/migrations/012.sql` — `ALTER TABLE pending_transactions ADD COLUMN suggested_category_id TEXT`
 - `assets/migrations/013.sql` — Fase 4: trazabilidad `matched_parser_version`/`matched_pattern_id`/`extraction_method` en `captured_notifications`. `database_helper.dart::_version = 13`.
+- `assets/migrations/014.sql` — Fase 5: tabla local `parser_feedback` mirror del schema BE. `database_helper.dart::_version = 14`.
+- `lib/src/features/notification_capture/domain/parser_feedback.dart` — Fase 5: `ParserFeedbackModel` con conversión `BoolValue`↔`bool?` y `INTEGER`↔`bool` para SQLite.
+- `lib/src/features/notification_capture/data/parser_feedback_local_store.dart` — Fase 5: `upsert`, `upsertRow`, `findByPendingTransactionId`.
+- `lib/src/features/notification_capture/data/parser_feedback_remote_service.dart` — Fase 5: `upsertFeedback(map)` (push-only, no `list`).
+- `lib/src/features/notification_capture/data/parser_feedback_sync_handler.dart` — Fase 5: push-only, `syncOrder=7`, `pull` retorna lista vacía.
 
 **Android native:**
 - `frontend/android/app/src/main/kotlin/app/pocketpilot/notifications/` — entire native module

@@ -31,11 +31,13 @@ import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/captured_notification_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_preferences.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/parser_feedback_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_remote_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/pending_transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/account_card_mapping.dart';
+import 'package:pocket_pilot/src/features/notification_capture/domain/parser_feedback.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/pending_transaction.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/transaction_rule.dart';
 import 'package:pocket_pilot/src/features/notification_capture/engine/parser_engine.dart';
@@ -50,6 +52,7 @@ class NotificationCaptureRepository {
   final AccountLocalStore _accounts;
   final AccountCardMappingLocalStore _cardMappings;
   final TransactionRuleLocalStore _rules;
+  final ParserFeedbackLocalStore? _feedback;
   final TransactionRepository _transactions;
   final SyncOutbox _outbox;
   final ParserEngine _engine;
@@ -65,6 +68,7 @@ class NotificationCaptureRepository {
     required TransactionRuleLocalStore rules,
     required TransactionRepository transactions,
     required SyncOutbox outbox,
+    ParserFeedbackLocalStore? feedback,
     ParserEngine? engine,
     ParserRemoteService? parserRemote,
     NotificationCapturePreferences? preferences,
@@ -74,6 +78,7 @@ class NotificationCaptureRepository {
         _accounts = accounts,
         _cardMappings = cardMappings,
         _rules = rules,
+        _feedback = feedback,
         _transactions = transactions,
         _outbox = outbox,
         _engine = engine ?? ParserEngine(),
@@ -286,6 +291,7 @@ class NotificationCaptureRepository {
     String? currencyCodeOverride,
     String? descriptionOverride,
     DateTime? dateOverride,
+    bool? wasHelpful,
   }) async {
     final amount = amountCentsOverride ?? pending.amountCents;
     final currency = currencyCodeOverride ?? pending.currencyCode;
@@ -326,9 +332,23 @@ class NotificationCaptureRepository {
       merchantDescription: pending.merchantDescription,
       categoryId: categoryId,
     );
+
+    // Señal de calidad ───────────────────────────────────────────────────
+    await _persistFeedback(
+      pending: pending,
+      wasDismissed: false,
+      wasHelpful: wasHelpful,
+      finalAccountId: accountId,
+      finalCategoryId: categoryId,
+      finalAmountCents: amount,
+      finalDescription: description,
+    );
   }
 
-  Future<void> dismiss(PendingTransactionModel pending) async {
+  Future<void> dismiss(
+    PendingTransactionModel pending, {
+    bool? wasHelpful,
+  }) async {
     await _pending.updateStatus(pending.id, 'dismissed');
     if (pending.capturedNotificationId != null) {
       await _captured.updateStatus(
@@ -336,6 +356,88 @@ class NotificationCaptureRepository {
         'ignored',
       );
     }
+    await _persistFeedback(
+      pending: pending,
+      wasDismissed: true,
+      wasHelpful: wasHelpful,
+    );
+  }
+
+  /// Persiste señal de calidad sobre la sugerencia. Push-only vía outbox; el
+  /// store local se mantiene para idempotencia y para el conflict resolution
+  /// cuando el server gana en LWW.
+  ///
+  /// Cuando [wasDismissed] es true, todos los `*_changed` se setean a false
+  /// porque no hay "final" con qué comparar (el usuario simplemente descartó).
+  Future<void> _persistFeedback({
+    required PendingTransactionModel pending,
+    required bool wasDismissed,
+    bool? wasHelpful,
+    String? finalAccountId,
+    String? finalCategoryId,
+    int? finalAmountCents,
+    String? finalDescription,
+  }) async {
+    final feedback = _feedback;
+    if (feedback == null) return; // legacy/test sin DI
+
+    final (bankId, patternId) =
+        PendingTransactionModel.splitParserId(pending.parserId);
+    final extractionMethod = switch (pending.source) {
+      'parser_local' => 'local',
+      'llm' || 'parser_llm' => 'llm',
+      _ => null,
+    };
+
+    final accountChanged = wasDismissed
+        ? false
+        : (finalAccountId != pending.suggestedAccountId);
+    final categoryChanged = wasDismissed
+        ? false
+        : (finalCategoryId != pending.suggestedCategoryId);
+    final amountChanged = wasDismissed
+        ? false
+        : (finalAmountCents != null && finalAmountCents != pending.amountCents);
+    final descriptionChanged = wasDismissed
+        ? false
+        : _descriptionChanged(pending.merchantDescription, finalDescription);
+
+    final now = DateTime.now().toUtc();
+    final model = ParserFeedbackModel(
+      id: _uuid.v4(),
+      pendingTransactionId: pending.id,
+      capturedNotificationId: pending.capturedNotificationId,
+      bankId: bankId,
+      patternId: patternId,
+      parserVersion: pending.parserVersion,
+      extractionMethod: extractionMethod,
+      wasHelpful: wasHelpful,
+      accountChanged: accountChanged,
+      categoryChanged: categoryChanged,
+      amountChanged: amountChanged,
+      descriptionChanged: descriptionChanged,
+      wasDismissed: wasDismissed,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await feedback.upsert(model);
+    await _outbox.enqueue(
+      entityType: 'parser_feedback',
+      entityId: model.id,
+      operation: 'upsert',
+      payload: jsonEncode(model.toServerMap()),
+    );
+  }
+
+  /// Comparación de descriptions tolerante a diferencias triviales: trim +
+  /// lowercase + colapso de whitespace. BBVA emite descriptions con trailing
+  /// spaces y casing inconsistente; el usuario que solo limpie espacios no
+  /// debería disparar `description_changed`.
+  bool _descriptionChanged(String? suggested, String? finalText) {
+    String norm(String? s) =>
+        (s ?? '').trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    return norm(suggested) != norm(finalText);
   }
 
   /// Reintenta el match local sobre todas las notificaciones que previamente

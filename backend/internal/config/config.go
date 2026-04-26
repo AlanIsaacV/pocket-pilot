@@ -12,9 +12,16 @@ type Config struct {
 	GeminiAPIKey        string
 	AIDailyRequestLimit int
 	AIMonthlyTokenLimit int
-	GoogleClientID      string
-	AppleClientID       string
-	JWTSecret           string
+
+	// Cuota independiente para el LLM fallback de notification_capture.
+	// El feature compite por capacidad/cuotas distintas a las del chat
+	// porque las notis son cortas y se invocan sin acción explícita.
+	NotificationParserDailyLimit        int
+	NotificationParserMonthlyTokenLimit int
+
+	GoogleClientID string
+	AppleClientID  string
+	JWTSecret      string
 
 	// Market price cron (Fase 4 of investments).
 	MarketPriceEnabled    bool
@@ -58,24 +65,40 @@ func Load() (Config, error) {
 		}
 	}
 
+	notiDailyLimit := 50
+	if v := os.Getenv("NOTIFICATION_PARSER_DAILY_LIMIT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			notiDailyLimit = n
+		}
+	}
+
+	notiMonthlyTokens := 200_000
+	if v := os.Getenv("NOTIFICATION_PARSER_MONTHLY_TOKEN_LIMIT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			notiMonthlyTokens = n
+		}
+	}
+
 	marketProvider := os.Getenv("MARKETPRICE_PROVIDER")
 	if marketProvider == "" {
 		marketProvider = "yahoo"
 	}
 
 	return Config{
-		DatabaseURL:           dbURL,
-		GRPCPort:              port,
-		GeminiAPIKey:          geminiKey,
-		AIDailyRequestLimit:   dailyLimit,
-		AIMonthlyTokenLimit:   monthlyTokenLimit,
-		GoogleClientID:        os.Getenv("GOOGLE_CLIENT_ID"),
-		AppleClientID:         os.Getenv("APPLE_CLIENT_ID"),
-		JWTSecret:             jwtSecret,
-		MarketPriceEnabled:    parseBoolEnv("MARKETPRICE_ENABLED", false),
-		MarketPriceRunOnBoot:  parseBoolEnv("MARKETPRICE_RUN_ON_BOOT", false),
-		MarketPriceProvider:   marketProvider,
-		MarketPriceAdminToken: os.Getenv("MARKETPRICE_ADMIN_TOKEN"),
+		DatabaseURL:                         dbURL,
+		GRPCPort:                            port,
+		GeminiAPIKey:                        geminiKey,
+		AIDailyRequestLimit:                 dailyLimit,
+		AIMonthlyTokenLimit:                 monthlyTokenLimit,
+		NotificationParserDailyLimit:        notiDailyLimit,
+		NotificationParserMonthlyTokenLimit: notiMonthlyTokens,
+		GoogleClientID:                      os.Getenv("GOOGLE_CLIENT_ID"),
+		AppleClientID:                       os.Getenv("APPLE_CLIENT_ID"),
+		JWTSecret:                           jwtSecret,
+		MarketPriceEnabled:                  parseBoolEnv("MARKETPRICE_ENABLED", false),
+		MarketPriceRunOnBoot:                parseBoolEnv("MARKETPRICE_RUN_ON_BOOT", false),
+		MarketPriceProvider:                 marketProvider,
+		MarketPriceAdminToken:               os.Getenv("MARKETPRICE_ADMIN_TOKEN"),
 	}, nil
 }
 

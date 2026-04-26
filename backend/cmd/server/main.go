@@ -70,7 +70,7 @@ func main() {
 	userPreferenceHandler := userpreference.NewHandler(userpreference.NewRepository(pool, cursorStore))
 	cardMappingHandler := cardmapping.NewHandler(cardmapping.NewRepository(pool, cursorStore))
 	txRuleHandler := txrule.NewHandler(txrule.NewRepository(pool, cursorStore))
-	notificationParserHandler := notificationparser.NewHandler(notificationparser.NewRepository(pool, cursorStore))
+	notificationParserRepo := notificationparser.NewRepository(pool, cursorStore)
 
 	// Investments: renta variable (acciones, ETFs). Repositories extracted
 	// to variables so the market price scheduler and admin handler share
@@ -88,8 +88,24 @@ func main() {
 	// AI Assistant
 	geminiProvider := aiassistant.NewGeminiProvider(cfg.GeminiAPIKey)
 	aiRepo := aiassistant.NewRepository(pool)
-	aiRateLimiter := aiassistant.NewRateLimiter(aiRepo, cfg.AIDailyRequestLimit, cfg.AIMonthlyTokenLimit)
+	aiRateLimiter := aiassistant.NewRateLimiter(aiRepo, aiassistant.FeatureChat, cfg.AIDailyRequestLimit, cfg.AIMonthlyTokenLimit)
 	aiHandler := aiassistant.NewHandler(geminiProvider, aiRateLimiter, aiRepo)
+
+	// Notification parser LLM fallback (Fase 4). Reusa el mismo Gemini
+	// provider que el chat pero con cuota independiente (feature_key) y un
+	// repositorio aparte para los candidatos generados.
+	notiParserLimiter := aiassistant.NewRateLimiter(
+		aiRepo,
+		aiassistant.FeatureNotificationParser,
+		cfg.NotificationParserDailyLimit,
+		cfg.NotificationParserMonthlyTokenLimit,
+	)
+	candidateRepo := notificationparser.NewCandidateRepository(pool)
+	llmFallback := notificationparser.NewLLMFallback(
+		geminiProvider, notiParserLimiter, aiRepo, candidateRepo,
+		"gemini-3.1-flash-lite-preview",
+	)
+	notificationParserHandler := notificationparser.NewHandlerWithLLM(notificationParserRepo, llmFallback)
 
 	// Auth
 	keyStore := jwks.NewKeyStore()

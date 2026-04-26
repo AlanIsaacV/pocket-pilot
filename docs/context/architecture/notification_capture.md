@@ -221,7 +221,7 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 | 0.5/0.6 | done | `account_card_mappings` and `transaction_rules` entities (proto + BE module + sync handlers + FE feature) |
 | 3 | done | `notification_parsers` global table (BE mig 012), `internal/notificationparser/` module, `ListNotificationParsers` RPC, FE `ParserSyncHandler` pull-only at syncOrder=4, NLS `onListenerConnected` backfill |
 | 3.5 | done | Real BBVA MX fixtures (8 captured notifications), parser bumped to v2 (4 patterns: `purchase_tdc`, `account_charge`, `card_payment_credit`, `account_credit`), test rewritten to load fixtures, "Reintentar no parseables" UX, repair mig FE 012 for `pending_transactions.suggested_category_id` schema drift |
-| 4 | pending | Server-side `ParseNotification` RPC, Gemini fallback, `candidate_parsers` + `parser_match_failures` tables (BE mig 014), ReDoS regex validator (`(?P<...>)` rejected, backref/nested quantifier/>200ch rejected, 50ms exec timeout), `aiassistant.RateLimiter` extended with `feature_key` column on `ai_usage` (BE mig 013), 90-day retention on raw_notification, privacy toggle `share_with_llm_for_parser` in Settings, disclosure in OnboardingPermissionScreen |
+| 4 | done | `ParseNotification` RPC + `internal/notificationparser/llm_fallback.go` (Gemini reused) + `prompt.go` (few-shot ECMAScript constraint) + `regex_validator.go` (rejects `(?P<...>)`/backref/nested quantifier/>200ch + Go RE2 compile probe) + `candidate_repo.go` (anonymous, no user_id). `aiassistant.RateLimiter` extended with `feature` on `ai_usage` (BE mig 013, separate `chat` and `notification_parser` instances). FE: trazabilidad en `captured_notifications` (FE mig 013: `matched_parser_version`, `matched_pattern_id`, `extraction_method`); `processInbox()` intenta LLM tras fallo local (errores no-bloqueantes); device-local toggles `share_with_llm_for_parser` (opt-in) y `help_improve_app` (opt-out, gates persistencia de samples) en `NotificationCapturePreferences`; pantalla `/settings/notification-capture` con dos `SwitchListTile`; `OnboardingPermissionScreen` actualizada. **No implementado en MVP (queda como roadmap):** UI de feedback de parser por usuario, cross-validation con segundo LLM, retención 90-day, `parser_match_failures`. |
 
 ## Operational tooling
 
@@ -240,19 +240,30 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 - `backend/internal/cardmapping/cardmapping.go` (model + repo + handler)
 - `backend/internal/txrule/txrule.go` (model + repo + handler)
 - `backend/internal/notificationparser/notificationparser.go` (model + repo + handler — global table, pull-only client API)
+- `backend/internal/notificationparser/llm_fallback.go` (Fase 4: handler `ParseNotification`)
+- `backend/internal/notificationparser/prompt.go` (few-shot prompt + `ParseLLMResponse`)
+- `backend/internal/notificationparser/regex_validator.go` (ReDoS guard + sintaxis Dart-compatible)
+- `backend/internal/notificationparser/candidate_repo.go` (Insert-only para `candidate_parsers`)
+- `backend/internal/aiassistant/repository.go` (acepta `feature` en RecordUsage/GetUsageStats)
+- `backend/internal/aiassistant/rate_limiter.go` (constructor recibe `feature`; instancias separadas para `chat` y `notification_parser`)
 - `backend/internal/sync/entity_type.go` — `EntityAccountCardMapping`, `EntityTransactionRule`, `EntityNotificationParser`
 - `backend/migrations/010_account_card_mappings.sql`
 - `backend/migrations/011_transaction_rules.sql`
 - `backend/migrations/012_notification_parsers.sql` (table + BBVA MX seed v1; current row in DB is v2 via UPDATE SQL)
-- `backend/cmd/server/main.go` — `notificationParserHandler` DI
+- `backend/migrations/013_ai_usage_feature.sql` (Fase 4: `ai_usage.feature` column + index)
+- `backend/migrations/014_candidate_parsers.sql` (Fase 4: tabla anónima de propuestas LLM)
+- `backend/cmd/server/main.go` — DI: `notificationParserLimiter` con feature_key, `candidateRepo`, `notificationparser.NewHandlerWithLLM(...)`
 
 **Frontend Flutter:**
-- `lib/src/features/notification_capture/` — entire feature module, including `data/parser_remote_service.dart`, `data/parser_sync_handler.dart`, and `data/parser_local_store.dart` (`upsertFromSync`)
+- `lib/src/features/notification_capture/` — entire feature module, including `data/parser_remote_service.dart` (Fase 4: agrega `parseNotification` + `ParserQuotaExceededException`), `data/parser_sync_handler.dart`, `data/parser_local_store.dart` (`upsertFromSync`), `data/notification_capture_preferences.dart` (Fase 4: toggles device-local), `ui/notification_capture_settings_screen.dart` (Fase 4)
 - `lib/src/features/accounts/data/account_local_store.dart` — no longer has `findByCardLastDigits` (removed during pivot)
 - `lib/main.dart` — `parserSyncHandler` (syncOrder=4), `accountCardMappingSyncHandler`, `transactionRuleSyncHandler` registration
+- `lib/src/ui/router.dart` — Fase 4: route `/settings/notification-capture`
+- `lib/src/ui/screens/settings/settings_screen.dart` — Fase 4: el item "Captura de notificaciones" ahora va a `/settings/notification-capture` (la bandeja sigue accesible vía link interno)
 - `assets/parsers/bbva_mx.json` — v2 (4 patterns), single source of truth shared with the BE seed
 - `assets/migrations/008.sql` — original schema (no `suggested_category_id`)
 - `assets/migrations/012.sql` — `ALTER TABLE pending_transactions ADD COLUMN suggested_category_id TEXT`
+- `assets/migrations/013.sql` — Fase 4: trazabilidad `matched_parser_version`/`matched_pattern_id`/`extraction_method` en `captured_notifications`. `database_helper.dart::_version = 13`.
 
 **Android native:**
 - `frontend/android/app/src/main/kotlin/app/pocketpilot/notifications/` — entire native module
@@ -262,6 +273,9 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 **Tests + fixtures:**
 - `frontend/test/notification_parser_engine_test.dart` — fixture-driven positives + inline negatives
 - `frontend/test_data/bbva_mx_real_notifications.json` — 8 real BBVA MX notifications with `expected` blocks (curated from `captured_raw.json`)
+- `backend/internal/notificationparser/regex_validator_test.go` — Fase 4: tabla con 10 casos (Python named group, backref, nested quantifier, longitud, sintaxis) + sanity check con regex BBVA reales
+- `backend/internal/notificationparser/prompt_test.go` — Fase 4: `ParseLLMResponse` (matched, no-match, markdown fences, JSON inválido, validación amount+type, clamp confidence) + `BuildMessages` (system/user roles, ECMAScript constraint en system prompt)
+- `backend/internal/aiassistant/rate_limiter_test.go` — Fase 4: integration (skip sin `TEST_DATABASE_URL`) que verifica que cuotas `chat` y `notification_parser` son aisladas — agotar una no afecta la otra
 
 **Scripts:**
 - `scripts/dump_captured_notifications.sh` — adb + sqlite3 extractor

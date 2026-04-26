@@ -70,6 +70,7 @@ import 'package:pocket_pilot/src/features/cashflow/ui/cashflow_route_scope.dart'
 import 'package:pocket_pilot/src/features/cashflow/ui/cashflow_tab.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_route_scope.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/notification_capture_route_scope.dart';
+import 'package:pocket_pilot/src/features/notification_capture/ui/notification_capture_settings_screen.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/onboarding_permission_screen.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/pending_inbox_screen.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.dart';
@@ -527,6 +528,12 @@ GoRouter buildRouter(AuthProvider authProvider) {
         path: '/inbox',
         builder: (context, state) => const NotificationCaptureRouteScope(
           child: PendingInboxScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/settings/notification-capture',
+        builder: (context, state) => const NotificationCaptureRouteScope(
+          child: NotificationCaptureSettingsScreen(),
         ),
       ),
       GoRoute(

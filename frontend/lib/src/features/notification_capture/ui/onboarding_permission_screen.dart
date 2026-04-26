@@ -90,8 +90,8 @@ class _OnboardingPermissionScreenState
             _BulletPoint(
               icon: Icons.cloud_upload_outlined,
               text:
-                  'Si no hace match, se envía al backend para que un LLM la parsee y '
-                  'mejore los parsers para todos. Puedes desactivar este envío en Ajustes.',
+                  'Si no hace match, puedes activar (opcional) el parseo asistido por IA '
+                  'en Ajustes → Captura de notificaciones. Está desactivado por defecto.',
             ),
             _BulletPoint(
               icon: Icons.verified_user_outlined,

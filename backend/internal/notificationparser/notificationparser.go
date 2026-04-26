@@ -223,15 +223,29 @@ func (r *Repository) bumpAllUsers(ctx context.Context, tx pgx.Tx, at time.Time) 
 
 // Handler ────────────────────────────────────────────────────────────────────
 
-// Handler expone solo ListNotificationParsers. La autenticación se requiere
-// pero el filtro por user no aplica (tabla global).
+// Handler expone ListNotificationParsers (catálogo global, pull-only) y
+// ParseNotification (Fase 4: fallback al LLM cuando el cliente no encontró
+// un match local). La autenticación se requiere en ambos métodos pero el
+// filtro por user no aplica para List (tabla global). ParseNotification sí
+// usa el userID para rate-limit por feature='notification_parser'.
 type Handler struct {
 	pb.UnimplementedNotificationParserServiceServer
-	repo *Repository
+	repo          *Repository
+	llmFallback   *LLMFallback // nil si no se configuró Fase 4 (deshabilitado)
 }
 
+// NewHandler construye el handler en su forma minimal (solo List). Para el
+// fallback al LLM usar NewHandlerWithLLM.
 func NewHandler(repo *Repository) *Handler {
 	return &Handler{repo: repo}
+}
+
+// NewHandlerWithLLM extiende NewHandler con la dependencia opcional para
+// procesar ParseNotification. Si llm es nil, ParseNotification devolverá
+// Unimplemented y el cliente caerá al manejo de errores del Fase 3.5
+// existente (la noti queda unparseable).
+func NewHandlerWithLLM(repo *Repository, llm *LLMFallback) *Handler {
+	return &Handler{repo: repo, llmFallback: llm}
 }
 
 func parsePage(req *pb.PageRequest) (limit, offset int) {

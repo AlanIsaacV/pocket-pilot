@@ -57,11 +57,23 @@ class CapturedNotificationLocalStore {
     String id,
     String status, {
     String? pendingTxId,
+    int? matchedParserVersion,
+    String? matchedPatternId,
+    String? extractionMethod,
   }) async {
     final db = await _db.database;
     final values = <String, Object?>{'status': status};
     if (pendingTxId != null) {
       values['pending_tx_id'] = pendingTxId;
+    }
+    if (matchedParserVersion != null) {
+      values['matched_parser_version'] = matchedParserVersion;
+    }
+    if (matchedPatternId != null) {
+      values['matched_pattern_id'] = matchedPatternId;
+    }
+    if (extractionMethod != null) {
+      values['extraction_method'] = extractionMethod;
     }
     await db.update(
       'captured_notifications',

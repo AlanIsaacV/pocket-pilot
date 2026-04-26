@@ -11,14 +11,17 @@ import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/captured_notification_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_preferences.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_repository.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_permission_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/parser_remote_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/pending_transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/notification_inbox_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
 
 class NotificationCaptureRouteScope extends StatelessWidget {
   final Widget child;
@@ -58,6 +61,14 @@ class NotificationCaptureRouteScope extends StatelessWidget {
             outbox: outbox,
           ),
         ),
+        Provider<ParserRemoteService>(
+          create: (_) => ParserRemoteService(),
+        ),
+        Provider<NotificationCapturePreferences>(
+          create: (_) => NotificationCapturePreferences(
+            store: UserPreferenceLocalStore(db: db),
+          ),
+        ),
         Provider<NotificationCaptureRepository>(
           create: (ctx) => NotificationCaptureRepository(
             captured: ctx.read<CapturedNotificationLocalStore>(),
@@ -68,6 +79,8 @@ class NotificationCaptureRouteScope extends StatelessWidget {
             rules: ctx.read<TransactionRuleLocalStore>(),
             transactions: ctx.read<TransactionRepository>(),
             outbox: outbox,
+            parserRemote: ctx.read<ParserRemoteService>(),
+            preferences: ctx.read<NotificationCapturePreferences>(),
           ),
         ),
         Provider<NotificationPermissionService>(

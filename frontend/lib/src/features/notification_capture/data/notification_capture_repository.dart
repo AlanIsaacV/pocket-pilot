@@ -21,6 +21,7 @@
 // Toda la persistencia pasa por el outbox para sincronizar entre dispositivos.
 
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:uuid/uuid.dart';
 
@@ -29,7 +30,9 @@ import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/captured_notification_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_preferences.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/parser_remote_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/pending_transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/account_card_mapping.dart';
@@ -50,6 +53,8 @@ class NotificationCaptureRepository {
   final TransactionRepository _transactions;
   final SyncOutbox _outbox;
   final ParserEngine _engine;
+  final ParserRemoteService? _parserRemote;
+  final NotificationCapturePreferences? _preferences;
 
   NotificationCaptureRepository({
     required CapturedNotificationLocalStore captured,
@@ -61,6 +66,8 @@ class NotificationCaptureRepository {
     required TransactionRepository transactions,
     required SyncOutbox outbox,
     ParserEngine? engine,
+    ParserRemoteService? parserRemote,
+    NotificationCapturePreferences? preferences,
   })  : _captured = captured,
         _pending = pending,
         _parsers = parsers,
@@ -69,39 +76,141 @@ class NotificationCaptureRepository {
         _rules = rules,
         _transactions = transactions,
         _outbox = outbox,
-        _engine = engine ?? ParserEngine();
+        _engine = engine ?? ParserEngine(),
+        _parserRemote = parserRemote,
+        _preferences = preferences;
 
   /// Procesa cada notificación pendiente:
   ///   - intenta match con parsers locales
+  ///   - si toggle ON, fallback al LLM server-side (Fase 4)
   ///   - resuelve account_id/category_id desde mappings/rules aprendidos
-  ///   - si match → crea PendingTransaction y marca status='matched_local'
-  ///   - si no match → status='unparseable' (Fase 4 lo eleva al servidor)
+  ///   - persiste extraction_method/parser_version/pattern_id para trazabilidad
   Future<int> processInbox() async {
     final pending = await _captured.listPendingProcessing();
     if (pending.isEmpty) return 0;
 
     final parsers = await _parsers.listActive();
-    if (parsers.isEmpty) return 0;
+
+    // Lee el toggle UNA vez por batch para evitar I/O por noti.
+    bool llmEnabled = false;
+    bool helpImprove = true;
+    final preferences = _preferences;
+    if (_parserRemote != null && preferences != null) {
+      llmEnabled = await preferences.shareWithLlmForParser();
+      helpImprove = await preferences.helpImproveApp();
+    }
 
     int processed = 0;
+    bool quotaExhausted = false;
+
     for (final notification in pending) {
+      // 1. Match local primero. Si lo hay, gana sin tocar la red.
       ParserMatch? match;
       for (final parser in parsers) {
         match = _engine.tryMatch(notification, parser);
         if (match != null) break;
       }
 
-      if (match == null) {
-        await _captured.updateStatus(notification.id, 'unparseable');
+      if (match != null) {
+        final pendingTx = await _createPendingFromLocalMatch(notification, match);
+        await _captured.updateStatus(
+          notification.id,
+          'matched_local',
+          pendingTxId: pendingTx.id,
+          matchedParserVersion: match.parser.version,
+          matchedPatternId: match.pattern.id,
+          extractionMethod: 'local',
+        );
+        processed++;
         continue;
       }
 
-      final accountId = await _resolveAccount(
-        bankId: match.parser.bankId,
-        cardLastDigits: match.cardLastDigits,
+      // 2. Fallback al LLM si el toggle está ON y no hemos topado cuota
+      // en este batch (evitamos N llamadas perdedoras).
+      if (llmEnabled && !quotaExhausted) {
+        final llmPending = await _tryLlmFallback(notification, helpImprove);
+        if (llmPending == _LlmOutcome.matched) {
+          processed++;
+          continue;
+        }
+        if (llmPending == _LlmOutcome.quotaExceeded) {
+          quotaExhausted = true;
+        }
+      }
+
+      // 3. Sin match local ni LLM → unparseable.
+      await _captured.updateStatus(notification.id, 'unparseable');
+    }
+    return processed;
+  }
+
+  Future<PendingTransactionModel> _createPendingFromLocalMatch(
+    dynamic notification,
+    ParserMatch match,
+  ) async {
+    final accountId = await _resolveAccount(
+      bankId: match.parser.bankId,
+      cardLastDigits: match.cardLastDigits,
+    );
+    final categoryId = match.merchantDescription != null
+        ? await _resolveCategory(match.merchantDescription!)
+        : null;
+
+    final pendingTx = PendingTransactionModel(
+      id: _uuid.v4(),
+      capturedNotificationId: notification.id,
+      suggestedAccountId: accountId,
+      suggestedCategoryId: categoryId,
+      amountCents: match.amountCents,
+      currencyCode: match.currencyCode,
+      merchantDescription: match.merchantDescription,
+      cardLastDigits: match.cardLastDigits,
+      transactionType: match.transactionType,
+      occurredAt: notification.postedAt,
+      source: 'parser_local',
+      parserId: '${match.parser.bankId}/${match.pattern.id}',
+      parserVersion: match.parser.version,
+      confidence: 1.0,
+      status: 'pending',
+      createdAt: DateTime.now().toUtc(),
+    );
+
+    await _pending.insert(pendingTx);
+    return pendingTx;
+  }
+
+  Future<_LlmOutcome> _tryLlmFallback(
+    dynamic notification,
+    bool helpImprove,
+  ) async {
+    final remote = _parserRemote;
+    if (remote == null) return _LlmOutcome.skipped;
+
+    try {
+      final outcome = await remote.parseNotification(
+        packageName: notification.packageName as String,
+        title: (notification.title as String?) ?? '',
+        text: (notification.text as String?) ?? '',
+        bigText: (notification.bigText as String?) ?? '',
+        helpImproveApp: helpImprove,
       );
-      final categoryId = match.merchantDescription != null
-          ? await _resolveCategory(match.merchantDescription!)
+
+      if (!outcome.matched) {
+        // El LLM tampoco la reconoció: tratar como unparseable.
+        return _LlmOutcome.notMatched;
+      }
+
+      // El LLM no resuelve account ni category — los buscamos con la misma
+      // lógica que para parsers locales (mappings y rules aprendidas).
+      final bankId = _bankIdForPackage(notification.packageName as String);
+      final accountId = outcome.cardLastDigits.isNotEmpty
+          ? await _resolveAccount(
+              bankId: bankId,
+              cardLastDigits: outcome.cardLastDigits,
+            )
+          : null;
+      final categoryId = outcome.merchantDescription.isNotEmpty
+          ? await _resolveCategory(outcome.merchantDescription)
           : null;
 
       final pendingTx = PendingTransactionModel(
@@ -109,16 +218,22 @@ class NotificationCaptureRepository {
         capturedNotificationId: notification.id,
         suggestedAccountId: accountId,
         suggestedCategoryId: categoryId,
-        amountCents: match.amountCents,
-        currencyCode: match.currencyCode,
-        merchantDescription: match.merchantDescription,
-        cardLastDigits: match.cardLastDigits,
-        transactionType: match.transactionType,
+        amountCents: outcome.amountCents,
+        currencyCode: outcome.currencyCode,
+        merchantDescription: outcome.merchantDescription.isEmpty
+            ? null
+            : outcome.merchantDescription,
+        cardLastDigits: outcome.cardLastDigits.isEmpty
+            ? null
+            : outcome.cardLastDigits,
+        transactionType: outcome.transactionType,
         occurredAt: notification.postedAt,
-        source: 'parser_local',
-        parserId: '${match.parser.bankId}/${match.pattern.id}',
-        parserVersion: match.parser.version,
-        confidence: 1.0,
+        source: 'parser_llm',
+        parserId: outcome.proposedPatternId.isEmpty
+            ? null
+            : 'llm/${outcome.proposedPatternId}',
+        parserVersion: null,
+        confidence: 0.7,
         status: 'pending',
         createdAt: DateTime.now().toUtc(),
       );
@@ -126,12 +241,38 @@ class NotificationCaptureRepository {
       await _pending.insert(pendingTx);
       await _captured.updateStatus(
         notification.id,
-        'matched_local',
+        'llm_used',
         pendingTxId: pendingTx.id,
+        matchedPatternId: outcome.proposedPatternId.isEmpty
+            ? null
+            : outcome.proposedPatternId,
+        extractionMethod: 'llm',
       );
-      processed++;
+      return _LlmOutcome.matched;
+    } on ParserQuotaExceededException catch (e) {
+      developer.log('LLM quota exceeded: ${e.message}',
+          name: 'NotificationCapture');
+      return _LlmOutcome.quotaExceeded;
+    } catch (e, st) {
+      // Red, 5xx, parsing — no bloquea el inbox. La noti queda unparseable
+      // y el botón "Reintentar no parseables" volverá a intentar.
+      developer.log('LLM fallback failed: $e',
+          name: 'NotificationCapture', error: e, stackTrace: st);
+      return _LlmOutcome.error;
     }
-    return processed;
+  }
+
+  /// Mapeo trivial package_name → bank_id. Sirve para el lookup de
+  /// account_card_mappings cuando viene una sugerencia LLM (que no incluye
+  /// bank_id explícitamente). Lista corta — agregar cuando se soporten más
+  /// bancos. Si no hay match, devuelve 'unknown' y el lookup fallará en
+  /// silencio (no se preasigna cuenta, el usuario elige).
+  String _bankIdForPackage(String packageName) {
+    if (packageName == 'com.bbva.bancomermovil' ||
+        packageName == 'com.bancomer.mbanking') {
+      return 'bbva_mx';
+    }
+    return 'unknown';
   }
 
   /// Aprueba una sugerencia → crea Transaction real (que sincroniza vía outbox)
@@ -334,4 +475,12 @@ class NotificationCaptureRepository {
     final d = date.day.toString().padLeft(2, '0');
     return '${date.year}-$m-$d';
   }
+}
+
+enum _LlmOutcome {
+  matched,        // PendingTransaction creada — seguir al siguiente
+  notMatched,     // LLM dijo "no es transacción" → unparseable
+  quotaExceeded,  // cuota agotada — abortar el resto del batch
+  error,          // red/5xx/parse → unparseable, log
+  skipped,        // dependencias no inyectadas (tests/legacy callers)
 }

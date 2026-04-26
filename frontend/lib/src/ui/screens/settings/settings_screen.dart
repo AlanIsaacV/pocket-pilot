@@ -139,7 +139,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _SettingsItem(
                 icon: Icons.notifications_active_outlined,
                 label: 'Captura de notificaciones',
-                onTap: () => context.push('/inbox'),
+                onTap: () => context.push('/settings/notification-capture'),
               ),
               _SettingsItem(
                 icon: Icons.sync_rounded,

@@ -37,6 +37,17 @@ service NotificationParserService {
   // Lista los parsers con semántica delta-pull. Los clientes nunca empujan;
   // los updates server-side se hacen vía SQL directo o admin path (Fase 4).
   rpc ListNotificationParsers(ListNotificationParsersRequest) returns (ListNotificationParsersResponse);
+
+  // ParseNotification es el fallback para notificaciones que ningún parser
+  // local reconoce. El backend invoca un LLM (Gemini) que extrae los campos
+  // de transacción y opcionalmente propone un regex. La extracción se
+  // devuelve al cliente para crear la sugerencia inmediatamente; el regex
+  // propuesto y el sample se persisten en `candidate_parsers` (cuando
+  // `help_improve_app=true`) para revisión humano-in-the-loop. La cuota es
+  // independiente de la del chat (feature='notification_parser' en
+  // ai_usage). RESOURCE_EXHAUSTED indica que la cuota diaria/mensual del
+  // usuario para este feature se agotó.
+  rpc ParseNotification(ParseNotificationRequest) returns (ParseNotificationResponse);
 }
 
 message ListNotificationParsersRequest {
@@ -48,4 +59,37 @@ message ListNotificationParsersResponse {
   repeated NotificationParser parsers = 1;
   PageResponse page = 2;
   google.protobuf.Timestamp synced_at = 3;
+}
+
+message ParseNotificationRequest {
+  string package_name = 1;
+  string title        = 2;
+  string text         = 3;
+  string big_text     = 4;
+
+  // Si true, el sample y la propuesta del LLM se persisten en
+  // candidate_parsers para que un admin pueda revisar y promover el regex
+  // a parser global. Si false, el LLM se invoca para resolver la noti del
+  // usuario pero no queda traza server-side. Mapea al toggle
+  // `help_improve_app` del cliente (default ON, opt-out).
+  bool help_improve_app = 5;
+}
+
+message ParseNotificationResponse {
+  // True cuando el LLM identificó los campos esenciales (al menos amount y
+  // transaction_type). Si false, el cliente debe marcar la noti como
+  // unparseable.
+  bool matched = 1;
+
+  // Campos extraídos. Solo válidos si matched=true.
+  int64  amount_cents         = 2;
+  string currency_code        = 3;
+  string merchant_description = 4;
+  string card_last_digits     = 5;
+  string transaction_type     = 6;  // expense | income | transfer
+
+  // Trazabilidad: el cliente persiste estos en captured_notifications
+  // (matched_pattern_id, extraction_method='llm') para habilitar el
+  // feedback futuro y métricas.
+  string proposed_pattern_id  = 7;
 }

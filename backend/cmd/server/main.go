@@ -87,15 +87,19 @@ func main() {
 	// SyncService handler (preflight GetSyncStatus).
 	syncHandler := sync.NewHandler(cursorStore)
 
-	// AI Assistant
-	geminiProvider := aiassistant.NewGeminiProvider(cfg.GeminiAPIKey)
+	// AI Assistant. El chat y el notification_parser usan providers Gemini
+	// independientes para que cada feature pueda configurar su propio modelo
+	// (AI_CHAT_MODEL vs NOTIFICATION_PARSER_MODEL). Comparten el Repository
+	// y la tabla ai_usage; el RateLimiter de cada feature filtra por la
+	// columna `feature` y el modelo efectivo se persiste en `ai_usage.model`.
+	chatProvider := aiassistant.NewGeminiProvider(cfg.GeminiAPIKey, cfg.AIChatModel)
 	aiRepo := aiassistant.NewRepository(pool)
 	aiRateLimiter := aiassistant.NewRateLimiter(aiRepo, aiassistant.FeatureChat, cfg.AIDailyRequestLimit, cfg.AIMonthlyTokenLimit)
-	aiHandler := aiassistant.NewHandler(geminiProvider, aiRateLimiter, aiRepo)
+	aiHandler := aiassistant.NewHandler(chatProvider, aiRateLimiter, aiRepo)
 
-	// Notification parser LLM fallback (Fase 4). Reusa el mismo Gemini
-	// provider que el chat pero con cuota independiente (feature_key) y un
-	// repositorio aparte para los candidatos generados.
+	// Notification parser LLM fallback (Fase 4). Provider Gemini propio con
+	// modelo configurable; el rate limiter es independiente del chat.
+	parserProvider := aiassistant.NewGeminiProvider(cfg.GeminiAPIKey, cfg.NotificationParserModel)
 	notiParserLimiter := aiassistant.NewRateLimiter(
 		aiRepo,
 		aiassistant.FeatureNotificationParser,
@@ -104,8 +108,7 @@ func main() {
 	)
 	candidateRepo := notificationparser.NewCandidateRepository(pool)
 	llmFallback := notificationparser.NewLLMFallback(
-		geminiProvider, notiParserLimiter, aiRepo, candidateRepo,
-		"gemini-3.1-flash-lite-preview",
+		parserProvider, notiParserLimiter, aiRepo, candidateRepo,
 	)
 	notificationParserHandler := notificationparser.NewHandlerWithLLM(notificationParserRepo, llmFallback)
 

@@ -26,12 +26,14 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 // RecordUsage inserts a new usage entry after a successful LLM call. El
 // `feature` segmenta la cuota por funcionalidad (chat, notification_parser, ...)
 // para que rate limits independientes puedan coexistir sobre la misma tabla.
-func (r *Repository) RecordUsage(ctx context.Context, userID uuid.UUID, feature string, prompt, completion int) error {
+// `model` es el identificador del modelo Gemini efectivo (mig 017) para
+// análisis de costos a posteriori (cada modelo tiene tarifas distintas).
+func (r *Repository) RecordUsage(ctx context.Context, userID uuid.UUID, feature, model string, prompt, completion int) error {
 	total := prompt + completion
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO ai_usage (id, user_id, feature, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-	`, uuid.New(), userID, feature, prompt, completion, total)
+		INSERT INTO ai_usage (id, user_id, feature, model, prompt_tokens, completion_tokens, total_tokens, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+	`, uuid.New(), userID, feature, model, prompt, completion, total)
 	return err
 }
 

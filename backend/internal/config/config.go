@@ -13,6 +13,15 @@ type Config struct {
 	AIDailyRequestLimit int
 	AIMonthlyTokenLimit int
 
+	// Modelo Gemini que usa cada feature. Se permiten distintos por feature
+	// porque el chat suele beneficiarse de modelos rápidos/baratos
+	// (gemini-3.1-flash) mientras que el notification_parser puede pedir
+	// uno más capaz (p.ej. gemini-3.1-pro) para que el regex propuesto sea
+	// más limpio. Default: gemini-3.1-flash-lite-preview en ambos para no
+	// cambiar comportamiento al deployar mig 017.
+	AIChatModel             string
+	NotificationParserModel string
+
 	// Cuota independiente para el LLM fallback de notification_capture.
 	// El feature compite por capacidad/cuotas distintas a las del chat
 	// porque las notis son cortas y se invocan sin acción explícita.
@@ -79,6 +88,19 @@ func Load() (Config, error) {
 		}
 	}
 
+	// Default explícito para preservar comportamiento previo a esta config:
+	// hasta antes de mig 017, el modelo era una constante hardcoded en el
+	// provider. El default mantiene ese mismo modelo en ambos features.
+	const defaultGeminiModel = "gemini-3.1-flash-lite-preview"
+	chatModel := os.Getenv("AI_CHAT_MODEL")
+	if chatModel == "" {
+		chatModel = defaultGeminiModel
+	}
+	notiModel := os.Getenv("NOTIFICATION_PARSER_MODEL")
+	if notiModel == "" {
+		notiModel = defaultGeminiModel
+	}
+
 	marketProvider := os.Getenv("MARKETPRICE_PROVIDER")
 	if marketProvider == "" {
 		marketProvider = "yahoo"
@@ -90,6 +112,8 @@ func Load() (Config, error) {
 		GeminiAPIKey:                        geminiKey,
 		AIDailyRequestLimit:                 dailyLimit,
 		AIMonthlyTokenLimit:                 monthlyTokenLimit,
+		AIChatModel:                         chatModel,
+		NotificationParserModel:             notiModel,
 		NotificationParserDailyLimit:        notiDailyLimit,
 		NotificationParserMonthlyTokenLimit: notiMonthlyTokens,
 		GoogleClientID:                      os.Getenv("GOOGLE_CLIENT_ID"),

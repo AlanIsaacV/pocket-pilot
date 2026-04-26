@@ -19,12 +19,15 @@ import (
 // registrar tokens, y el repo de candidatos para persistir samples cuando el
 // usuario optó por "ayudar a mejorar la app". Su lifecycle se resuelve en
 // cmd/server/main.go.
+//
+// El identificador del modelo no se almacena aquí: viene de `llm.Model()`
+// para que `ai_usage.model` y `candidate_parsers.llm_model_version` siempre
+// coincidan con el provider efectivo (single source of truth).
 type LLMFallback struct {
 	llm           aiassistant.LLMProvider
 	limiter       *aiassistant.RateLimiter
 	usageRepo     *aiassistant.Repository
 	candidateRepo *CandidateRepository
-	modelVersion  string // para etiquetar candidate_parsers.llm_model_version
 }
 
 func NewLLMFallback(
@@ -32,14 +35,12 @@ func NewLLMFallback(
 	limiter *aiassistant.RateLimiter,
 	usageRepo *aiassistant.Repository,
 	candidateRepo *CandidateRepository,
-	modelVersion string,
 ) *LLMFallback {
 	return &LLMFallback{
 		llm:           llm,
 		limiter:       limiter,
 		usageRepo:     usageRepo,
 		candidateRepo: candidateRepo,
-		modelVersion:  modelVersion,
 	}
 }
 
@@ -85,7 +86,7 @@ func (h *Handler) ParseNotification(ctx context.Context, req *pb.ParseNotificati
 	// Registrar uso ANTES de parsear — la cuota debe contabilizarse incluso
 	// si el LLM devolvió texto inválido (gastó tokens igual).
 	if err := h.llmFallback.usageRepo.RecordUsage(
-		ctx, userID, aiassistant.FeatureNotificationParser,
+		ctx, userID, aiassistant.FeatureNotificationParser, h.llmFallback.llm.Model(),
 		llmResp.Usage.PromptTokens, llmResp.Usage.CompletionTokens,
 	); err != nil {
 		slog.Error("notificationparser: failed to record usage", "user_id", userID, "error", err)
@@ -145,7 +146,7 @@ func (h *Handler) ParseNotification(ctx context.Context, req *pb.ParseNotificati
 				ProposedCurrency:  parsed.CurrencyCode,
 				ExtractedFields:   fieldsJSON,
 				LLMProvider:       "gemini",
-				LLMModelVersion:   h.llmFallback.modelVersion,
+				LLMModelVersion:   h.llmFallback.llm.Model(),
 				LLMConfidence:     parsed.Confidence,
 			})
 			if insErr != nil {

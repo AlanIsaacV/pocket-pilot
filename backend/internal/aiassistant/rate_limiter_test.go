@@ -31,7 +31,7 @@ func TestRateLimiter_FeaturesIsolated(t *testing.T) {
 
 	// 2 requests al chat — saturan el limiter de chat pero no el otro.
 	for i := 0; i < 2; i++ {
-		if err := repo.RecordUsage(ctx, user, aiassistant.FeatureChat, 100, 100); err != nil {
+		if err := repo.RecordUsage(ctx, user, aiassistant.FeatureChat, "gemini-3.1-flash-lite-preview", 100, 100); err != nil {
 			t.Fatalf("record chat usage: %v", err)
 		}
 	}
@@ -53,7 +53,7 @@ func TestRateLimiter_FeaturesIsolated(t *testing.T) {
 	// Cargar al limit de notification_parser y verificar que el de chat sigue
 	// rechazando (sin cambio) y el de noti rechaza también.
 	for i := 0; i < 2; i++ {
-		if err := repo.RecordUsage(ctx, user, aiassistant.FeatureNotificationParser, 50, 50); err != nil {
+		if err := repo.RecordUsage(ctx, user, aiassistant.FeatureNotificationParser, "gemini-3.1-flash-lite-preview", 50, 50); err != nil {
 			t.Fatalf("record noti usage: %v", err)
 		}
 	}

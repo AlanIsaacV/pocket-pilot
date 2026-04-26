@@ -81,7 +81,7 @@ func (h *Handler) Chat(ctx context.Context, req *pb.AIChatRequest) (*pb.AIChatRe
 		return nil, status.Errorf(codes.Internal, "llm error: %v", err)
 	}
 
-	if err := h.repo.RecordUsage(ctx, userID, FeatureChat, llmResp.Usage.PromptTokens, llmResp.Usage.CompletionTokens); err != nil {
+	if err := h.repo.RecordUsage(ctx, userID, FeatureChat, h.provider.Model(), llmResp.Usage.PromptTokens, llmResp.Usage.CompletionTokens); err != nil {
 		slog.Error("aiassistant: failed to record usage", "user_id", userID, "error", err)
 	}
 

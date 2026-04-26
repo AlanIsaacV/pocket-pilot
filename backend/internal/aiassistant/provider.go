@@ -10,9 +10,15 @@ import (
 	"google.golang.org/genai"
 )
 
-// LLMProvider is the interface for any LLM backend.
+// LLMProvider is the interface for any LLM backend. Model() devuelve el
+// identificador del modelo concreto que el provider invoca en cada Chat;
+// los handlers lo usan para etiquetar `ai_usage.model` y, en el caso del
+// notification_parser, `candidate_parsers.llm_model_version`. Mantener el
+// nombre como single source of truth aquí evita la deriva con strings
+// duplicados en otros módulos.
 type LLMProvider interface {
 	Chat(ctx context.Context, messages []*AIMessageInput, tools []*AIToolInput) (*LLMResponse, error)
+	Model() string
 }
 
 // AIMessageInput is the provider-agnostic input message.
@@ -30,13 +36,16 @@ type AIToolInput struct {
 	ParametersSchema string // JSON Schema string
 }
 
-const geminiModel = "gemini-3.1-flash-lite-preview"
-
 type GeminiProvider struct {
 	client *genai.Client
+	model  string
 }
 
-func NewGeminiProvider(apiKey string) *GeminiProvider {
+// NewGeminiProvider construye un provider para un modelo Gemini concreto.
+// El modelo viene de config (AI_CHAT_MODEL / NOTIFICATION_PARSER_MODEL) y
+// se pasa tal cual al SDK; cualquier string que Gemini acepte como ID es
+// válido.
+func NewGeminiProvider(apiKey, model string) *GeminiProvider {
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  apiKey,
@@ -45,8 +54,11 @@ func NewGeminiProvider(apiKey string) *GeminiProvider {
 	if err != nil {
 		panic(fmt.Sprintf("genai.NewClient: %v", err))
 	}
-	return &GeminiProvider{client: client}
+	return &GeminiProvider{client: client, model: model}
 }
+
+// Model devuelve el identificador del modelo configurado.
+func (g *GeminiProvider) Model() string { return g.model }
 
 func (g *GeminiProvider) Chat(ctx context.Context, messages []*AIMessageInput, tools []*AIToolInput) (*LLMResponse, error) {
 	contents, systemInstruction := g.buildContents(messages)
@@ -72,7 +84,7 @@ func (g *GeminiProvider) Chat(ctx context.Context, messages []*AIMessageInput, t
 		}
 	}
 
-	resp, err := g.client.Models.GenerateContent(ctx, geminiModel, contents, config)
+	resp, err := g.client.Models.GenerateContent(ctx, g.model, contents, config)
 	if err != nil {
 		slog.Error("gemini GenerateContent failed", "error", err)
 		return nil, fmt.Errorf("gemini generate: %w", err)

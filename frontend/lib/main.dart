@@ -66,6 +66,12 @@ import 'package:pocket_pilot/src/features/investments/data/investment_transactio
 import 'package:pocket_pilot/src/features/investments/data/market_price_local_store.dart';
 import 'package:pocket_pilot/src/features/investments/data/market_price_remote_service.dart';
 import 'package:pocket_pilot/src/features/investments/data/market_price_sync_handler.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_remote_service.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_sync_handler.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_remote_service.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_sync_handler.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_remote_service.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_sync_handler.dart';
@@ -214,6 +220,16 @@ Future<void> main() async {
     remote: MarketPriceRemoteService(),
   );
 
+  final accountCardMappingSyncHandler = AccountCardMappingSyncHandler(
+    local: AccountCardMappingLocalStore(db: dbHelper),
+    remote: AccountCardMappingRemoteService(),
+  );
+
+  final transactionRuleSyncHandler = TransactionRuleSyncHandler(
+    local: TransactionRuleLocalStore(db: dbHelper),
+    remote: TransactionRuleRemoteService(),
+  );
+
   final syncStatusRemoteService = SyncStatusRemoteService();
 
   final syncService = SyncService(
@@ -226,6 +242,8 @@ Future<void> main() async {
       tagSyncHandler,
       transactionTemplateSyncHandler,
       yieldConfigSyncHandler,
+      accountCardMappingSyncHandler,
+      transactionRuleSyncHandler,
       investmentHoldingSyncHandler,
       investmentLotSyncHandler,
       investmentSplitSyncHandler,

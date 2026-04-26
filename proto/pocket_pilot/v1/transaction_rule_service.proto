@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+// TransactionRule define una asociación implícita entre un fragmento de texto
+// (típicamente el nombre de un comercio extraído por un parser de
+// notificaciones) y una categoría del usuario. Aplica a la creación de
+// transacciones desde notificaciones, CSV import y la AI assistant tool.
+//
+// Match: case-insensitive substring de `match_text` dentro de la descripción
+// de la transacción candidata. Si varias reglas matchean, gana la de mayor
+// `priority`; en empate, la insertada más recientemente.
+//
+// Las reglas se aprenden en background al aprobar PendingTransactions desde
+// notificaciones (no hay UI de gestión por ahora — se puede agregar después).
+message TransactionRule {
+  string id = 1;
+
+  // Substring buscada en la description (case-insensitive). Ej: "STARBUCKS",
+  // "AMAZON A MESES". Se deriva como primera palabra del comercio extraído
+  // por el parser de notificaciones.
+  string match_text = 2;
+
+  // Categoría que la regla asigna cuando matchea.
+  string category_id = 3;
+
+  // Empate-breaker para reglas que matchean simultáneamente. Default 0.
+  int32 priority = 4;
+
+  // Telemetría: cuántas veces se aplicó la regla. No se usa para decisiones
+  // de matching, solo para mostrar uso al usuario en el futuro.
+  int32 match_count = 5;
+
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp deleted_at = 8;
+}
+
+service TransactionRuleService {
+  rpc ListTransactionRules(ListTransactionRulesRequest) returns (ListTransactionRulesResponse);
+  rpc UpsertTransactionRule(UpsertTransactionRuleRequest) returns (UpsertTransactionRuleResponse);
+  rpc DeleteTransactionRule(DeleteTransactionRuleRequest) returns (google.protobuf.Empty);
+}
+
+message ListTransactionRulesRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListTransactionRulesResponse {
+  repeated TransactionRule rules = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertTransactionRuleRequest {
+  TransactionRule rule = 1;
+}
+
+message UpsertTransactionRuleResponse {
+  TransactionRule rule = 1;
+  bool conflict_resolved = 2;
+}
+
+message DeleteTransactionRuleRequest {
+  string id = 1;
+  google.protobuf.Timestamp deleted_at = 2;
+}

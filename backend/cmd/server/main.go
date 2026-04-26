@@ -18,6 +18,7 @@ import (
 	"github.com/AlanIsaacV/pocket-pilot/internal/aiassistant"
 	"github.com/AlanIsaacV/pocket-pilot/internal/auth"
 	"github.com/AlanIsaacV/pocket-pilot/internal/budget"
+	"github.com/AlanIsaacV/pocket-pilot/internal/cardmapping"
 	"github.com/AlanIsaacV/pocket-pilot/internal/category"
 	"github.com/AlanIsaacV/pocket-pilot/internal/config"
 	"github.com/AlanIsaacV/pocket-pilot/internal/database"
@@ -31,6 +32,7 @@ import (
 	"github.com/AlanIsaacV/pocket-pilot/internal/tag"
 	"github.com/AlanIsaacV/pocket-pilot/internal/transaction"
 	"github.com/AlanIsaacV/pocket-pilot/internal/transactiontemplate"
+	"github.com/AlanIsaacV/pocket-pilot/internal/txrule"
 	"github.com/AlanIsaacV/pocket-pilot/internal/userpreference"
 	"github.com/AlanIsaacV/pocket-pilot/internal/yieldconfig"
 )
@@ -65,6 +67,8 @@ func main() {
 	budgetHandler := budget.NewHandler(budget.NewRepository(pool, cursorStore))
 	tagHandler := tag.NewHandler(tag.NewRepository(pool, cursorStore))
 	userPreferenceHandler := userpreference.NewHandler(userpreference.NewRepository(pool, cursorStore))
+	cardMappingHandler := cardmapping.NewHandler(cardmapping.NewRepository(pool, cursorStore))
+	txRuleHandler := txrule.NewHandler(txrule.NewRepository(pool, cursorStore))
 
 	// Investments: renta variable (acciones, ETFs). Repositories extracted
 	// to variables so the market price scheduler and admin handler share
@@ -121,6 +125,8 @@ func main() {
 	pb.RegisterAIAssistantServiceServer(srv, aiHandler)
 	pb.RegisterAuthServiceServer(srv, authHandler)
 	pb.RegisterSyncServiceServer(srv, syncHandler)
+	pb.RegisterAccountCardMappingServiceServer(srv, cardMappingHandler)
+	pb.RegisterTransactionRuleServiceServer(srv, txRuleHandler)
 
 	// Market price cron — gated by MARKETPRICE_ENABLED so dev machines do
 	// not hit Yahoo on boot unless explicitly asked.

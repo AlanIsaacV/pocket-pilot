@@ -19,6 +19,8 @@ const (
 	EntityInvestmentLot       EntityType = "investment_lot"
 	EntityInvestmentSplit     EntityType = "investment_split"
 	EntityMarketPrice         EntityType = "market_price"
+	EntityAccountCardMapping  EntityType = "account_card_mapping"
+	EntityTransactionRule     EntityType = "transaction_rule"
 )
 
 // AllEntityTypes returns every entity type a client may ask about.
@@ -39,5 +41,7 @@ func AllEntityTypes() []EntityType {
 		EntityInvestmentLot,
 		EntityInvestmentSplit,
 		EntityMarketPrice,
+		EntityAccountCardMapping,
+		EntityTransactionRule,
 	}
 }

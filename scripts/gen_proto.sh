@@ -48,7 +48,9 @@ protoc \
     pocket_pilot/v1/investment_lot_service.proto \
     pocket_pilot/v1/investment_split_service.proto \
     pocket_pilot/v1/market_price_service.proto \
-    pocket_pilot/v1/market_price_admin_service.proto
+    pocket_pilot/v1/market_price_admin_service.proto \
+    pocket_pilot/v1/account_card_mapping_service.proto \
+    pocket_pilot/v1/transaction_rule_service.proto
 
 echo "→ Generating Dart code..."
 # --dart_out=grpc:<dir>  : "grpc" is a plugin option that tells protoc_plugin
@@ -76,7 +78,9 @@ protoc \
     pocket_pilot/v1/investment_lot_service.proto \
     pocket_pilot/v1/investment_split_service.proto \
     pocket_pilot/v1/market_price_service.proto \
-    pocket_pilot/v1/market_price_admin_service.proto
+    pocket_pilot/v1/market_price_admin_service.proto \
+    pocket_pilot/v1/account_card_mapping_service.proto \
+    pocket_pilot/v1/transaction_rule_service.proto
 
 echo "✓ Done. Generated files:"
 echo "  Go   → ${GO_OUT}"

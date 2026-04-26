@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+// AccountCardMapping registra que cuando una notificación del banco `bank_id`
+// menciona la tarjeta terminada en `last_digits`, debe asociarse a `account_id`.
+//
+// El mapeo se aprende en background al aprobar PendingTransactions: no hay UI
+// dedicada para crearlos. Si el usuario aprueba y elige una cuenta distinta a
+// la mapeada actualmente, se inserta una entrada nueva (la resolución toma la
+// más reciente por updated_at). El usuario nunca configura nada manual.
+message AccountCardMapping {
+  string id = 1;
+
+  // Identificador del banco según los parsers (ej. "bbva_mx").
+  string bank_id = 2;
+
+  // Últimos 4 dígitos de la tarjeta tal como aparecen en la notificación.
+  string last_digits = 3;
+
+  // Cuenta a la que se asocia esta tarjeta.
+  string account_id = 4;
+
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  google.protobuf.Timestamp deleted_at = 7;
+}
+
+service AccountCardMappingService {
+  rpc ListAccountCardMappings(ListAccountCardMappingsRequest) returns (ListAccountCardMappingsResponse);
+  rpc UpsertAccountCardMapping(UpsertAccountCardMappingRequest) returns (UpsertAccountCardMappingResponse);
+  rpc DeleteAccountCardMapping(DeleteAccountCardMappingRequest) returns (google.protobuf.Empty);
+}
+
+message ListAccountCardMappingsRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListAccountCardMappingsResponse {
+  repeated AccountCardMapping mappings = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertAccountCardMappingRequest {
+  AccountCardMapping mapping = 1;
+}
+
+message UpsertAccountCardMappingResponse {
+  AccountCardMapping mapping = 1;
+  bool conflict_resolved = 2;
+}
+
+message DeleteAccountCardMappingRequest {
+  string id = 1;
+  google.protobuf.Timestamp deleted_at = 2;
+}

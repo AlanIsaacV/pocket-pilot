@@ -102,3 +102,4 @@ flutter:
   assets:
     - assets/migrations/
     - assets/categories/
+    - assets/parsers/

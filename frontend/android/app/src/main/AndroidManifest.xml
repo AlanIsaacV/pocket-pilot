@@ -36,6 +36,30 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- Captura de notificaciones bancarias (BBVA MX en v1).
+             Se activa cuando el usuario concede el permiso especial en
+             Ajustes → Acceso a notificaciones. La allowlist de paquetes vive
+             en BankNotificationListenerService.kt. -->
+        <service
+            android:name="app.pocketpilot.notifications.BankNotificationListenerService"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Re-bindea el NLS tras reboot en OEM agresivos. -->
+        <receiver
+            android:name="app.pocketpilot.notifications.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

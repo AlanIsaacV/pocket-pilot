@@ -12,13 +12,17 @@ class CapturedNotificationLocalStore {
 
   CapturedNotificationLocalStore({required DatabaseHelper db}) : _db = db;
 
-  /// Lista las notificaciones más recientes que no han sido consumidas.
-  /// `consumed` se filtra para que la bandeja muestre solo lo accionable.
+  /// Lista las notificaciones que aún requieren atención del usuario en la
+  /// sección "Sin procesar" de la bandeja: solo las que no produjeron una
+  /// PendingTransaction (status='received' aún sin correr el engine, o
+  /// 'unparseable' que el motor descartó). Las que sí matchearon
+  /// (matched_local/matched_server/llm_used) ya se ven en la sección
+  /// "Sugerencias" — duplicarlas aquí confunde al usuario.
   Future<List<CapturedNotificationModel>> listInbox({int limit = 100}) async {
     final db = await _db.database;
     final rows = await db.query(
       'captured_notifications',
-      where: "status != 'consumed' AND status != 'ignored'",
+      where: "status IN ('received','unparseable')",
       orderBy: 'posted_at DESC',
       limit: limit,
     );
@@ -94,6 +98,20 @@ class CapturedNotificationLocalStore {
       'captured_notifications',
       where: 'id = ?',
       whereArgs: [id],
+    );
+  }
+
+  /// Reabre las notificaciones que el engine local marcó previamente como
+  /// no parseables. Útil cuando el parser se actualiza con nuevos patrones
+  /// (Fase 3: bump server-side; Fase 4: LLM fallback): las notis viejas
+  /// pueden ser interpretables por el motor actualizado.
+  /// Devuelve cuántas filas se reabrieron.
+  Future<int> resetUnparseableToReceived() async {
+    final db = await _db.database;
+    return db.update(
+      'captured_notifications',
+      {'status': 'received', 'pending_tx_id': null},
+      where: "status = 'unparseable'",
     );
   }
 }

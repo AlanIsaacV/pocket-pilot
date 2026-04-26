@@ -197,6 +197,18 @@ class NotificationCaptureRepository {
     }
   }
 
+  /// Reintenta el match local sobre todas las notificaciones que previamente
+  /// quedaron en `unparseable`. Pensado para cuando el parser cambia de
+  /// versión (bump server-side) y queremos que el motor actualizado tenga
+  /// otra oportunidad. Devuelve cuántas se reabrieron y, de esas, cuántas
+  /// produjeron un PendingTransaction nuevo.
+  Future<({int reopened, int matched})> reprocessUnparseable() async {
+    final reopened = await _captured.resetUnparseableToReceived();
+    if (reopened == 0) return (reopened: 0, matched: 0);
+    final matched = await processInbox();
+    return (reopened: reopened, matched: matched);
+  }
+
   /// Lee la fila activa más reciente de account_card_mappings.
   /// Si hay match único → asigna; si no → null y la UI obliga a elegir.
   Future<String?> _resolveAccount({

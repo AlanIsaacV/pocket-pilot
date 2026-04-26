@@ -6,7 +6,7 @@
     "com.bbva.bancomermovil",
     "com.bancomer.mbanking"
   ],
-  "version": 1,
+  "version": 2,
   "default_currency": "MXN",
   "ignore_patterns": [
     {
@@ -20,27 +20,12 @@
   ],
   "patterns": [
     {
-      "id": "purchase_card",
+      "id": "purchase_tdc",
       "transaction_type": "expense",
       "match": {
         "field": "text",
-        "regex": "(?:Cargo|Compra)\\s+(?:aprobad[ao]|realizad[ao])(?:\\s+(?:por|de))?\\s+\\$(?<amount>[\\d,]+\\.\\d{2})\\s*(?<currency>[A-Z]{3})?\\s+en\\s+(?<merchant>.+?)(?:,|\\.|\\s+con\\s+).*?(?:tarjeta|term\\.?)\\s*(?:term\\.?\\s*)?(?<digits>\\d{4})",
-        "flags": "is"
-      },
-      "captures": {
-        "amount_cents": {"from": "amount", "transform": "money_to_cents"},
-        "currency_code": {"from": "currency", "transform": "upper", "default": "MXN"},
-        "merchant_description": {"from": "merchant", "transform": "trim"},
-        "card_last_digits": {"from": "digits"}
-      }
-    },
-    {
-      "id": "online_purchase",
-      "transaction_type": "expense",
-      "match": {
-        "field": "text",
-        "regex": "Compra\\s+en\\s+l[ií]nea(?:\\s+por)?\\s+\\$(?<amount>[\\d,]+\\.\\d{2})\\s*(?<currency>[A-Z]{3})?\\s+en\\s+(?<merchant>[^.,\\n]+(?:\\.[^.,\\n\\s]+)*)",
-        "flags": "is"
+        "regex": "^COMPRA TDC EN (?<merchant>.+?) \\$(?<amount>[\\d,]+\\.\\d{2})\\s+\\d+\\s+\\w+\\s+\\d{1,2}:\\d{2}h\\s*$",
+        "flags": "s"
       },
       "captures": {
         "amount_cents": {"from": "amount", "transform": "money_to_cents"},
@@ -49,31 +34,44 @@
       }
     },
     {
-      "id": "transfer_in",
-      "transaction_type": "income",
-      "match": {
-        "field": "text",
-        "regex": "(?:Recibiste|Te depositaron)\\s+\\$(?<amount>[\\d,]+\\.\\d{2})\\s*(?<currency>[A-Z]{3})?\\s+(?:de|por)\\s+(?<sender>[^.\\n]+?)(?:\\.|$|\\s+Concepto[:.])",
-        "flags": "is"
-      },
-      "captures": {
-        "amount_cents": {"from": "amount", "transform": "money_to_cents"},
-        "currency_code": {"from": "currency", "transform": "upper", "default": "MXN"},
-        "merchant_description": {"from": "sender", "transform": "trim"}
-      }
-    },
-    {
-      "id": "atm_withdrawal",
+      "id": "account_charge",
       "transaction_type": "expense",
       "match": {
         "field": "text",
-        "regex": "Retiro(?:\\s+en\\s+cajero)?\\s+por\\s+\\$(?<amount>[\\d,]+\\.\\d{2})\\s*(?<currency>[A-Z]{3})?\\s+(?:en\\s+(?<location>.+?))?(?:,|\\.|\\s+con\\s+).*?(?:tarjeta|term\\.?)\\s*(?:term\\.?\\s*)?(?<digits>\\d{4})",
-        "flags": "is"
+        "regex": "^Cargo a tu cuenta \\*\\d{0,2}(?<digits>\\d{4}) de \\$(?<amount>[\\d,]+\\.\\d{2})\\s*$",
+        "flags": "s"
       },
       "captures": {
         "amount_cents": {"from": "amount", "transform": "money_to_cents"},
         "currency_code": {"from": "currency", "transform": "upper", "default": "MXN"},
-        "merchant_description": {"from": "location", "transform": "trim", "default": "Retiro ATM"},
+        "card_last_digits": {"from": "digits"}
+      }
+    },
+    {
+      "id": "card_payment_credit",
+      "transaction_type": "income",
+      "match": {
+        "field": "text",
+        "regex": "^Abono a tu tarjeta \\*\\d{0,2}(?<digits>\\d{4}) de \\$(?<amount>[\\d,]+\\.\\d{2})\\s*$",
+        "flags": "s"
+      },
+      "captures": {
+        "amount_cents": {"from": "amount", "transform": "money_to_cents"},
+        "currency_code": {"from": "currency", "transform": "upper", "default": "MXN"},
+        "card_last_digits": {"from": "digits"}
+      }
+    },
+    {
+      "id": "account_credit",
+      "transaction_type": "income",
+      "match": {
+        "field": "text",
+        "regex": "^Abono a tu cuenta \\*\\d{0,2}(?<digits>\\d{4}) de \\$(?<amount>[\\d,]+\\.\\d{2})\\s*$",
+        "flags": "s"
+      },
+      "captures": {
+        "amount_cents": {"from": "amount", "transform": "money_to_cents"},
+        "currency_code": {"from": "currency", "transform": "upper", "default": "MXN"},
         "card_last_digits": {"from": "digits"}
       }
     }

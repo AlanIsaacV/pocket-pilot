@@ -41,7 +41,29 @@ class BankNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
-        if (sbn == null) return
+        if (sbn != null) captureIfBank(sbn)
+    }
+
+    /**
+     * Backfill al bindearse: vuelca las notis bancarias que siguen visibles en
+     * el shade. Esto cubre el caso "concedí el permiso después de recibir
+     * notis" y "el SO restartó el listener" sin perder nada que el usuario
+     * todavía pueda ver. Las descartadas del shade se pierden — no hay forma
+     * de recuperarlas vía API. La inserción es idempotente (dedupe por
+     * `(package, posted_at ± 60s, hash(title+text))` y `INSERT OR IGNORE`),
+     * así que llamar esto múltiples veces es seguro.
+     */
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        try {
+            val active = activeNotifications ?: return
+            for (sbn in active) captureIfBank(sbn)
+        } catch (t: Throwable) {
+            Log.w(TAG, "onListenerConnected backfill failed", t)
+        }
+    }
+
+    private fun captureIfBank(sbn: StatusBarNotification) {
         if (sbn.packageName !in BANK_PACKAGES) return
 
         try {

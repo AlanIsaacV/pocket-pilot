@@ -68,4 +68,28 @@ class ParserLocalStore {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
+
+  /// Upsert desde sync delta-pull. La fila remota gana si su versión es mayor
+  /// (o igual con updatedAt más reciente). Si llega `deletedAt` no nulo, se
+  /// retira la fila local — el ParserEngine.listActive ya filtra deleted_at.
+  Future<void> upsertFromSync({
+    required String bankId,
+    required int version,
+    required String definitionJson,
+    required DateTime updatedAt,
+    DateTime? deletedAt,
+  }) async {
+    final db = await _db.database;
+    await db.insert(
+      'notification_parsers',
+      {
+        'bank_id': bankId,
+        'version': version,
+        'definition': definitionJson,
+        'updated_at': updatedAt.toUtc().toIso8601String(),
+        'deleted_at': deletedAt?.toUtc().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
 }

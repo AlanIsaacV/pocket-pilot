@@ -10,6 +10,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
+import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/captured_notification.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/pending_transaction.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/notification_inbox_view_model.dart';
@@ -31,6 +33,14 @@ class PendingInboxScreen extends StatelessWidget {
           onPressed: () => context.pop(),
         ),
         actions: [
+          if (vm.hasUnparseable)
+            IconButton(
+              tooltip: 'Reintentar no parseables',
+              icon: const Icon(Icons.replay_rounded),
+              onPressed: vm.isLoading
+                  ? null
+                  : () => _reprocessUnparseable(context),
+            ),
           IconButton(
             tooltip: 'Configurar permiso',
             icon: const Icon(Icons.settings_outlined),
@@ -99,11 +109,27 @@ class PendingInboxScreen extends StatelessWidget {
     return ListView(padding: const EdgeInsets.symmetric(vertical: 8), children: children);
   }
 
+  Future<void> _reprocessUnparseable(BuildContext context) async {
+    final vm = context.read<NotificationInboxViewModel>();
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await vm.reprocessUnparseable();
+    final text = result.reopened == 0
+        ? 'No hay notificaciones para reintentar.'
+        : 'Reintentadas ${result.reopened}, '
+            'parseadas ${result.matched}.';
+    messenger.showSnackBar(SnackBar(content: Text(text)));
+  }
+
   Future<void> _openReviewSheet(
     BuildContext context,
     PendingTransactionModel pending,
   ) async {
+    // showModalBottomSheet usa el rootNavigator → no hereda los providers del
+    // NotificationCaptureRouteScope. Re-proveemos explícitamente los stores
+    // que el sheet necesita en initState.
     final vm = context.read<NotificationInboxViewModel>();
+    final accounts = context.read<AccountLocalStore>();
+    final categories = context.read<CategoryLocalStore>();
     await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -111,8 +137,12 @@ class PendingInboxScreen extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (sheetCtx) => ChangeNotifierProvider.value(
-        value: vm,
+      builder: (sheetCtx) => MultiProvider(
+        providers: [
+          ChangeNotifierProvider<NotificationInboxViewModel>.value(value: vm),
+          Provider<AccountLocalStore>.value(value: accounts),
+          Provider<CategoryLocalStore>.value(value: categories),
+        ],
         child: PendingReviewSheet(pending: pending),
       ),
     );

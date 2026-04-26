@@ -28,6 +28,7 @@ import (
 	"github.com/AlanIsaacV/pocket-pilot/internal/jwks"
 	"github.com/AlanIsaacV/pocket-pilot/internal/marketprice"
 	"github.com/AlanIsaacV/pocket-pilot/internal/middleware"
+	"github.com/AlanIsaacV/pocket-pilot/internal/notificationparser"
 	"github.com/AlanIsaacV/pocket-pilot/internal/sync"
 	"github.com/AlanIsaacV/pocket-pilot/internal/tag"
 	"github.com/AlanIsaacV/pocket-pilot/internal/transaction"
@@ -69,6 +70,7 @@ func main() {
 	userPreferenceHandler := userpreference.NewHandler(userpreference.NewRepository(pool, cursorStore))
 	cardMappingHandler := cardmapping.NewHandler(cardmapping.NewRepository(pool, cursorStore))
 	txRuleHandler := txrule.NewHandler(txrule.NewRepository(pool, cursorStore))
+	notificationParserHandler := notificationparser.NewHandler(notificationparser.NewRepository(pool, cursorStore))
 
 	// Investments: renta variable (acciones, ETFs). Repositories extracted
 	// to variables so the market price scheduler and admin handler share
@@ -127,6 +129,7 @@ func main() {
 	pb.RegisterSyncServiceServer(srv, syncHandler)
 	pb.RegisterAccountCardMappingServiceServer(srv, cardMappingHandler)
 	pb.RegisterTransactionRuleServiceServer(srv, txRuleHandler)
+	pb.RegisterNotificationParserServiceServer(srv, notificationParserHandler)
 
 	// Market price cron — gated by MARKETPRICE_ENABLED so dev machines do
 	// not hit Yahoo on boot unless explicitly asked.

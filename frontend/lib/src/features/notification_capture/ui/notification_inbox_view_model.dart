@@ -32,6 +32,11 @@ class NotificationInboxViewModel extends ChangeNotifier {
   bool permissionGranted = false;
   bool _disposed = false;
 
+  /// True si hay al menos una notificación visible que el engine descartó
+  /// como no parseable. Habilita el botón "Reintentar no parseables".
+  bool get hasUnparseable =>
+      rawNotifications.any((n) => n.status == 'unparseable');
+
   NotificationInboxViewModel({
     required CapturedNotificationLocalStore captured,
     required PendingTransactionLocalStore pending,
@@ -64,6 +69,23 @@ class NotificationInboxViewModel extends ChangeNotifier {
 
   Future<void> openPermissionSettings() async {
     await _permission.openSettings();
+  }
+
+  /// Reintenta el match local sobre las notificaciones que estaban en
+  /// `unparseable`. Útil cuando el parser se actualizó (bump server-side de
+  /// la definición). Devuelve cuántas se reabrieron y cuántas matchearon.
+  Future<({int reopened, int matched})> reprocessUnparseable() async {
+    isLoading = true;
+    _safeNotify();
+    try {
+      final result = await _repository.reprocessUnparseable();
+      pendingTransactions = await _pending.listPending();
+      rawNotifications = await _captured.listInbox();
+      return result;
+    } finally {
+      isLoading = false;
+      _safeNotify();
+    }
   }
 
   Future<void> dismissRaw(String capturedId) async {

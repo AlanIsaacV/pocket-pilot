@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+// NotificationParser describe el parser de notificaciones bancarias para un
+// banco específico. La tabla es global (compartida entre todos los usuarios) y
+// se distribuye en modo pull-only: el cliente reemplaza su definición local
+// cuando llega una versión más nueva.
+//
+// `definition` es el JSON serializado de NotificationParserDefinition tal como
+// lo entiende el ParserEngine del frontend (schema_version, package_names,
+// version, ignore_patterns, patterns, captures con transforms whitelisted).
+// Se transporta como string en lugar de google.protobuf.Struct para preservar
+// el orden de los patrones y minimizar overhead — el cliente hace
+// jsonDecode antes de inyectarlo a su store local.
+message NotificationParser {
+  // Identificador del banco (ej. "bbva_mx"). Natural key.
+  string bank_id = 1;
+
+  // Versión del parser. El cliente la compara con la versión local y si la
+  // recibida es mayor, reemplaza la definition almacenada.
+  int32 version = 2;
+
+  // JSON serializado del NotificationParserDefinition.
+  string definition = 3;
+
+  google.protobuf.Timestamp updated_at = 4;
+  google.protobuf.Timestamp deleted_at = 5;
+}
+
+service NotificationParserService {
+  // Lista los parsers con semántica delta-pull. Los clientes nunca empujan;
+  // los updates server-side se hacen vía SQL directo o admin path (Fase 4).
+  rpc ListNotificationParsers(ListNotificationParsersRequest) returns (ListNotificationParsersResponse);
+}
+
+message ListNotificationParsersRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListNotificationParsersResponse {
+  repeated NotificationParser parsers = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}

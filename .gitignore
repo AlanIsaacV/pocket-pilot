@@ -33,4 +33,5 @@ __debug*
 __pycache__/
 *.pdf
 *.csv
-bbva_tc.csv
+
+frontend/test_data/

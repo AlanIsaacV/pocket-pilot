@@ -7,7 +7,7 @@ CREATE TABLE pending_transactions (
     id                       TEXT PRIMARY KEY,
     captured_notification_id TEXT REFERENCES captured_notifications (id),
     suggested_account_id     TEXT REFERENCES accounts (id),
-    suggested_category_id    TEXT REFERENCES categories (id),
+    -- suggested_category_id se agrega vía migración 012 (reparación).
     amount_cents             INTEGER NOT NULL,
     currency_code            TEXT    NOT NULL,
     merchant_description     TEXT,

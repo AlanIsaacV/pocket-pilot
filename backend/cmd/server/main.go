@@ -17,6 +17,8 @@ import (
 	"github.com/AlanIsaacV/pocket-pilot/internal/account"
 	"github.com/AlanIsaacV/pocket-pilot/internal/aiassistant"
 	"github.com/AlanIsaacV/pocket-pilot/internal/auth"
+	"github.com/AlanIsaacV/pocket-pilot/internal/bankalias"
+	"github.com/AlanIsaacV/pocket-pilot/internal/bankpackage"
 	"github.com/AlanIsaacV/pocket-pilot/internal/budget"
 	"github.com/AlanIsaacV/pocket-pilot/internal/cardmapping"
 	"github.com/AlanIsaacV/pocket-pilot/internal/category"
@@ -73,6 +75,16 @@ func main() {
 	txRuleHandler := txrule.NewHandler(txrule.NewRepository(pool, cursorStore))
 	notificationParserRepo := notificationparser.NewRepository(pool, cursorStore)
 	parserFeedbackHandler := parserfeedback.NewHandler(parserfeedback.NewRepository(pool, cursorStore))
+
+	// Fase 8: catálogo global de paquetes bancarios + sugerencias anónimas
+	// + alias per-user. bank_packages mirror notification_parsers (global,
+	// pull-only, bumpAllUsers); bank_aliases mirror cardmapping (user-scoped,
+	// push+pull, LWW).
+	bankPackageHandler := bankpackage.NewHandler(
+		bankpackage.NewRepository(pool, cursorStore),
+		bankpackage.NewSuggestionRepository(pool),
+	)
+	bankAliasHandler := bankalias.NewHandler(bankalias.NewRepository(pool, cursorStore))
 
 	// Investments: renta variable (acciones, ETFs). Repositories extracted
 	// to variables so the market price scheduler and admin handler share
@@ -157,6 +169,8 @@ func main() {
 	pb.RegisterTransactionRuleServiceServer(srv, txRuleHandler)
 	pb.RegisterNotificationParserServiceServer(srv, notificationParserHandler)
 	pb.RegisterParserFeedbackServiceServer(srv, parserFeedbackHandler)
+	pb.RegisterBankPackageServiceServer(srv, bankPackageHandler)
+	pb.RegisterBankAliasServiceServer(srv, bankAliasHandler)
 
 	// Market price cron — gated by MARKETPRICE_ENABLED so dev machines do
 	// not hit Yahoo on boot unless explicitly asked.

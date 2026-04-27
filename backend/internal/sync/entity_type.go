@@ -23,6 +23,8 @@ const (
 	EntityTransactionRule     EntityType = "transaction_rule"
 	EntityNotificationParser  EntityType = "notification_parser"
 	EntityParserFeedback      EntityType = "parser_feedback"
+	EntityBankPackage         EntityType = "bank_package"
+	EntityBankAlias           EntityType = "bank_alias"
 )
 
 // AllEntityTypes returns every entity type a client may ask about.
@@ -47,5 +49,7 @@ func AllEntityTypes() []EntityType {
 		EntityTransactionRule,
 		EntityNotificationParser,
 		EntityParserFeedback,
+		EntityBankPackage,
+		EntityBankAlias,
 	}
 }

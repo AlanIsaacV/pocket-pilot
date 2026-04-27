@@ -23,10 +23,17 @@ class OnboardingPermissionScreen extends StatefulWidget {
 
 class _OnboardingPermissionScreenState
     extends State<OnboardingPermissionScreen> with WidgetsBindingObserver {
+  /// Snapshot del estado previo del permiso. Cuando flipa de false a true
+  /// (al volver de Ajustes), redirigimos al picker "Mis bancos" como
+  /// Step 2 first-time del onboarding (Fase 8).
+  bool _wasGranted = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    final vm = context.read<NotificationInboxViewModel>();
+    _wasGranted = vm.permissionGranted;
   }
 
   @override
@@ -36,11 +43,19 @@ class _OnboardingPermissionScreenState
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && mounted) {
-      // Al volver de Ajustes, refrescamos para ver si concedió el permiso.
-      context.read<NotificationInboxViewModel>().refresh();
+  void didChangeAppLifecycleState(AppLifecycleState state) async {
+    if (state != AppLifecycleState.resumed || !mounted) return;
+    final vm = context.read<NotificationInboxViewModel>();
+    await vm.refresh();
+    if (!mounted) return;
+
+    final nowGranted = vm.permissionGranted;
+    if (!_wasGranted && nowGranted) {
+      // Permiso recién concedido → al picker.
+      context.go('/settings/notification-capture/banks?firstTime=1');
+      return;
     }
+    _wasGranted = nowGranted;
   }
 
   @override

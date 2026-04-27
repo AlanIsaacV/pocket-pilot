@@ -7,33 +7,42 @@ import android.service.notification.StatusBarNotification
 import android.util.Log
 
 /**
- * Captura notificaciones de apps bancarias en allowlist y las persiste a SQLite
- * para que el isolate Dart las procese cuando la app se active.
+ * Captura notificaciones de las apps que el usuario marcó como bancos en la
+ * pantalla "Mis bancos" (Fase 8). Antes de Fase 8 había una allowlist de
+ * strings hardcoded; ahora la decisión vive en `watched_packages`, una tabla
+ * SQLite local-only que el usuario edita desde Dart.
  *
  * El servicio lo arranca el SO automáticamente cuando el usuario concede el
- * permiso `BIND_NOTIFICATION_LISTENER_SERVICE` en Ajustes → Acceso a
- * notificaciones. No se requiere foreground service.
+ * permiso `BIND_NOTIFICATION_LISTENER_SERVICE`. No se requiere foreground
+ * service.
  *
- * IMPORTANTE: Este servicio sólo escribe a la tabla `captured_notifications`
- * (schema estable). El parsing y conversión a `PendingTransaction` se hace
- * 100 % en Dart, en el isolate principal de la app.
+ * IMPORTANTE: Este servicio escribe a dos tablas:
+ *   - `captured_notifications` (con PII: title/text/big_text) solo para los
+ *     packages presentes en `watched_packages WHERE enabled = 1`.
+ *   - `package_observations` (sin PII: solo package_name + count + last_seen)
+ *     para TODA notificación recibida. Esta tabla alimenta el picker
+ *     "Mis bancos" para que el usuario pueda marcar como banco apps que
+ *     observa de hecho notificar — sin requerir QUERY_ALL_PACKAGES.
+ *
+ * El parsing y conversión a `PendingTransaction` se hace 100% en Dart, en el
+ * isolate principal de la app.
  */
 class BankNotificationListenerService : NotificationListenerService() {
     companion object {
         private const val TAG = "BankNLS"
-
-        /**
-         * Allowlist de paquetes considerados bancos. Mantener en código
-         * (no remoto) para que la decisión de qué se intercepta sea siempre
-         * verificable por el usuario.
-         */
-        private val BANK_PACKAGES = setOf(
-            "com.bbva.bancomermovil",
-            "com.bancomer.mbanking",
-        )
     }
 
     private lateinit var db: NotificationDb
+
+    /**
+     * Cache en memoria del set de packages a capturar. Se refresca al
+     * bindearse el listener (`onListenerConnected`) leyendo de
+     * `watched_packages`. Trade-off: durante la sesión activa del NLS,
+     * cambios desde la UI Dart no aplican hasta el próximo rebind. La
+     * pantalla "Mis bancos" puede inducir rebind via MethodChannel (ver
+     * roadmap) si el lag se vuelve molesto.
+     */
+    @Volatile private var watchedPackages: Set<String> = emptySet()
 
     override fun onCreate() {
         super.onCreate()
@@ -41,32 +50,36 @@ class BankNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
-        if (sbn != null) captureIfBank(sbn)
+        if (sbn != null) handleNotification(sbn)
     }
 
     /**
-     * Backfill al bindearse: vuelca las notis bancarias que siguen visibles en
-     * el shade. Esto cubre el caso "concedí el permiso después de recibir
-     * notis" y "el SO restartó el listener" sin perder nada que el usuario
-     * todavía pueda ver. Las descartadas del shade se pierden — no hay forma
-     * de recuperarlas vía API. La inserción es idempotente (dedupe por
-     * `(package, posted_at ± 60s, hash(title+text))` y `INSERT OR IGNORE`),
-     * así que llamar esto múltiples veces es seguro.
+     * Backfill al bindearse + refresh del cache de watched_packages.
+     * Vuelca las notis que siguen visibles en el shade y, antes de hacerlo,
+     * relee la tabla local para que cualquier cambio reciente del usuario
+     * aplique. La inserción es idempotente (dedupe por
+     * `(package, posted_at ± 60s, hash(title+text))` y `INSERT OR IGNORE`).
      */
     override fun onListenerConnected() {
         super.onListenerConnected()
         try {
+            watchedPackages = db.getEnabledWatchedPackages()
             val active = activeNotifications ?: return
-            for (sbn in active) captureIfBank(sbn)
+            for (sbn in active) handleNotification(sbn)
         } catch (t: Throwable) {
             Log.w(TAG, "onListenerConnected backfill failed", t)
         }
     }
 
-    private fun captureIfBank(sbn: StatusBarNotification) {
-        if (sbn.packageName !in BANK_PACKAGES) return
-
+    private fun handleNotification(sbn: StatusBarNotification) {
         try {
+            // 1. Log liviano (sin PII) en package_observations. Ocurre para
+            //    TODA noti — alimenta el picker "Mis bancos".
+            db.upsertPackageObservation(sbn.packageName, sbn.postNotification())
+
+            // 2. Captura completa solo si el package está marcado como banco.
+            if (sbn.packageName !in watchedPackages) return
+
             val extras: Bundle = sbn.notification.extras
             val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
             val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
@@ -86,14 +99,13 @@ class BankNotificationListenerService : NotificationListenerService() {
             )
         } catch (t: Throwable) {
             // Nunca debe morir el servicio por una notificación malformada.
-            Log.w(TAG, "Failed to capture notification from ${sbn.packageName}", t)
+            Log.w(TAG, "Failed to handle notification from ${sbn.packageName}", t)
         }
     }
 
     /**
      * `StatusBarNotification.postTime` no está deprecado pero algunos OEM
-     * lo trastocan. Usamos un wrapper local para tener un único punto de
-     * cambio en caso de tener que ajustar.
+     * lo trastocan. Wrapper local para tener un único punto de cambio.
      */
     private fun StatusBarNotification.postNotification(): Long = this.postTime
 }

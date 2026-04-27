@@ -23,6 +23,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:pocket_pilot/src/features/notification_capture/data/captured_notification_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_preferences.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/package_observation_local_store.dart';
 
 /// Función que ejecuta la query de purga. Inyectable para tests sin DB real.
 typedef PurgeRunner = Future<int> Function({
@@ -56,32 +57,40 @@ class CapturedNotificationsRetentionSweeper {
   /// múltiples veces si el usuario abre la app varias veces al día.
   static const Duration minInterval = Duration(hours: 24);
 
-  final PurgeRunner _purge;
+  final List<PurgeRunner> _runners;
   final LastPurgeAtStore _lastPurgeAt;
   final DateTime Function() _now;
 
   CapturedNotificationsRetentionSweeper._({
-    required PurgeRunner purge,
+    required List<PurgeRunner> runners,
     required LastPurgeAtStore lastPurgeAt,
     DateTime Function()? now,
-  })  : _purge = purge,
+  })  : _runners = runners,
         _lastPurgeAt = lastPurgeAt,
         _now = now ?? DateTime.now;
 
-  /// Constructor de producción: usa el store SQLite y las preferencias reales.
+  /// Constructor de producción: encadena los purge runners de
+  /// `captured_notifications` y `package_observations` (Fase 8). El store
+  /// de observations es opcional para mantener compat con callers que aún
+  /// no lo conocen — en cuyo caso solo se purga captured_notifications.
   factory CapturedNotificationsRetentionSweeper({
     required CapturedNotificationLocalStore store,
     required NotificationCapturePreferences prefs,
+    PackageObservationLocalStore? observations,
     DateTime Function()? now,
   }) {
+    final runners = <PurgeRunner>[
+      store.purgeOlderThan,
+      if (observations != null) observations.purgeOlderThan,
+    ];
     return CapturedNotificationsRetentionSweeper._(
-      purge: store.purgeOlderThan,
+      runners: runners,
       lastPurgeAt: _PreferencesLastPurgeAtStore(prefs),
       now: now,
     );
   }
 
-  /// Constructor para tests: acepta dependencias mockeables directamente.
+  /// Constructor para tests: acepta un único PurgeRunner directamente.
   @visibleForTesting
   factory CapturedNotificationsRetentionSweeper.forTesting({
     required PurgeRunner purge,
@@ -89,7 +98,7 @@ class CapturedNotificationsRetentionSweeper {
     DateTime Function()? now,
   }) {
     return CapturedNotificationsRetentionSweeper._(
-      purge: purge,
+      runners: [purge],
       lastPurgeAt: lastPurgeAt,
       now: now,
     );
@@ -117,11 +126,17 @@ class CapturedNotificationsRetentionSweeper {
     return affected;
   }
 
-  Future<int> _runSweep(DateTime now) {
+  Future<int> _runSweep(DateTime now) async {
     final cutoff = now.subtract(retention);
-    return _purge(
-      cutoffIso: cutoff.toIso8601String(),
-      purgedAtIso: now.toIso8601String(),
-    );
+    final cutoffIso = cutoff.toIso8601String();
+    final purgedAtIso = now.toIso8601String();
+    var total = 0;
+    for (final runner in _runners) {
+      total += await runner(
+        cutoffIso: cutoffIso,
+        purgedAtIso: purgedAtIso,
+      );
+    }
+    return total;
   }
 }

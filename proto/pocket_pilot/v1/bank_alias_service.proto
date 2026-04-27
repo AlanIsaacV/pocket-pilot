@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package pocket_pilot.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "pocket_pilot/v1/common.proto";
+
+option go_package = "github.com/AlanIsaacV/pocket-pilot/backend/internal/gen/proto/pocket_pilot/v1;pocketpilotv1";
+
+// BankAlias es la decisión per-user de "el package X es mi banco con etiqueta
+// Y". Es per-user (sincronizado entre los devices del mismo usuario via
+// outbox + delta-pull, mismo patrón que account_card_mappings).
+//
+// Diseño Fase 8:
+//   - watched_packages (tabla local-only en cada device) decide qué packages
+//     procesa el NLS Kotlin AQUÍ. Es per-device — el usuario debe re-marcar
+//     en cada device porque la captura se hace device-side.
+//   - bank_aliases (esta entidad) decide qué nombre/bank_id le da el usuario
+//     a cada package observado. Sincroniza para que el alias "Mi BBVA"
+//     llegue a los demás devices y aparezca como hint sugerido.
+//
+// bank_id es opcional: si el package está en BankPackage global, el cliente
+// lo prefilla; si no, queda vacío y el alias queda libre (display-only, sin
+// pickup automático de parser).
+message BankAlias {
+  string id = 1;
+
+  // Natural key per-user (UNIQUE en server por user_id+package_name).
+  string package_name = 2;
+
+  // bank_id resuelto. Vacío cuando el alias no está atado al catálogo
+  // global. No es FK estricta — el catálogo puede cambiar sin invalidar
+  // aliases preexistentes.
+  string bank_id = 3;
+
+  // Etiqueta visible. Requerido. Lo que el usuario escribió (o el
+  // default_label de BankPackage prefilleado).
+  string display_label = 4;
+
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  google.protobuf.Timestamp deleted_at = 7;
+}
+
+service BankAliasService {
+  rpc ListBankAliases(ListBankAliasesRequest) returns (ListBankAliasesResponse);
+  rpc UpsertBankAlias(UpsertBankAliasRequest) returns (UpsertBankAliasResponse);
+  rpc DeleteBankAlias(DeleteBankAliasRequest) returns (google.protobuf.Empty);
+}
+
+message ListBankAliasesRequest {
+  google.protobuf.Timestamp updated_since = 1;
+  PageRequest page = 2;
+}
+
+message ListBankAliasesResponse {
+  repeated BankAlias aliases = 1;
+  PageResponse page = 2;
+  google.protobuf.Timestamp synced_at = 3;
+}
+
+message UpsertBankAliasRequest {
+  BankAlias alias = 1;
+}
+
+message UpsertBankAliasResponse {
+  BankAlias alias = 1;
+  bool conflict_resolved = 2;
+}
+
+message DeleteBankAliasRequest {
+  string id = 1;
+  google.protobuf.Timestamp deleted_at = 2;
+}

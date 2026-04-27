@@ -29,6 +29,8 @@ import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/bank_alias_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/bank_package_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/captured_notification_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_preferences.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_feedback_local_store.dart';
@@ -53,6 +55,8 @@ class NotificationCaptureRepository {
   final AccountCardMappingLocalStore _cardMappings;
   final TransactionRuleLocalStore _rules;
   final ParserFeedbackLocalStore? _feedback;
+  final BankAliasLocalStore? _bankAliases;
+  final BankPackageLocalStore? _bankPackages;
   final TransactionRepository _transactions;
   final SyncOutbox _outbox;
   final ParserEngine _engine;
@@ -69,6 +73,8 @@ class NotificationCaptureRepository {
     required TransactionRepository transactions,
     required SyncOutbox outbox,
     ParserFeedbackLocalStore? feedback,
+    BankAliasLocalStore? bankAliases,
+    BankPackageLocalStore? bankPackages,
     ParserEngine? engine,
     ParserRemoteService? parserRemote,
     NotificationCapturePreferences? preferences,
@@ -79,6 +85,8 @@ class NotificationCaptureRepository {
         _cardMappings = cardMappings,
         _rules = rules,
         _feedback = feedback,
+        _bankAliases = bankAliases,
+        _bankPackages = bankPackages,
         _transactions = transactions,
         _outbox = outbox,
         _engine = engine ?? ParserEngine(),
@@ -207,7 +215,8 @@ class NotificationCaptureRepository {
 
       // El LLM no resuelve account ni category — los buscamos con la misma
       // lógica que para parsers locales (mappings y rules aprendidas).
-      final bankId = _bankIdForPackage(notification.packageName as String);
+      final bankId =
+          await _bankIdForPackage(notification.packageName as String);
       final accountId = outcome.cardLastDigits.isNotEmpty
           ? await _resolveAccount(
               bankId: bankId,
@@ -267,15 +276,31 @@ class NotificationCaptureRepository {
     }
   }
 
-  /// Mapeo trivial package_name → bank_id. Sirve para el lookup de
-  /// account_card_mappings cuando viene una sugerencia LLM (que no incluye
-  /// bank_id explícitamente). Lista corta — agregar cuando se soporten más
-  /// bancos. Si no hay match, devuelve 'unknown' y el lookup fallará en
-  /// silencio (no se preasigna cuenta, el usuario elige).
-  String _bankIdForPackage(String packageName) {
-    if (packageName == 'com.bbva.bancomermovil' ||
-        packageName == 'com.bancomer.mbanking') {
-      return 'bbva_mx';
+  /// Resolución package_name → bank_id (Fase 8): consulta primero el alias
+  /// per-user (si el usuario lo asignó manualmente al marcar el package
+  /// como banco) y, si no, el catálogo global pull-only. Fallback
+  /// 'unknown' si el package no está en ninguna tabla — el lookup de
+  /// account_card_mappings fallará en silencio (no se preasigna cuenta,
+  /// el usuario elige).
+  ///
+  /// Antes de Fase 8 era un switch hardcoded para BBVA; ahora la lista de
+  /// bancos crece sin redeploy gracias al loop comunitario (admin promueve
+  /// `package_suggestions` → `bank_packages`).
+  Future<String> _bankIdForPackage(String packageName) async {
+    final aliases = _bankAliases;
+    if (aliases != null) {
+      final alias = await aliases.getByPackageName(packageName);
+      final aliasBankId = alias?.bankId;
+      if (aliasBankId != null && aliasBankId.isNotEmpty) {
+        return aliasBankId;
+      }
+    }
+    final packages = _bankPackages;
+    if (packages != null) {
+      final pkg = await packages.getByPackageName(packageName);
+      if (pkg != null) {
+        return pkg.bankId;
+      }
     }
     return 'unknown';
   }

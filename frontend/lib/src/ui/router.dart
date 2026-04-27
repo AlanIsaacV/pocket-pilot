@@ -69,6 +69,7 @@ import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_form_scr
 import 'package:pocket_pilot/src/features/cashflow/ui/cashflow_route_scope.dart';
 import 'package:pocket_pilot/src/features/cashflow/ui/cashflow_tab.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_route_scope.dart';
+import 'package:pocket_pilot/src/features/notification_capture/ui/banks_picker_screen.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/notification_capture_route_scope.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/notification_capture_settings_screen.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/onboarding_permission_screen.dart';
@@ -535,6 +536,17 @@ GoRouter buildRouter(AuthProvider authProvider) {
         builder: (context, state) => const NotificationCaptureRouteScope(
           child: NotificationCaptureSettingsScreen(),
         ),
+      ),
+      // Picker "Mis bancos" (Fase 8). queryparam firstTime=1 cuando se llega
+      // post-permission para mostrar el banner explicativo.
+      GoRoute(
+        path: '/settings/notification-capture/banks',
+        builder: (context, state) {
+          final firstTime = state.uri.queryParameters['firstTime'] == '1';
+          return NotificationCaptureRouteScope(
+            child: BanksPickerScreen(firstTime: firstTime),
+          );
+        },
       ),
       GoRoute(
         path: '/onboarding/notifications',

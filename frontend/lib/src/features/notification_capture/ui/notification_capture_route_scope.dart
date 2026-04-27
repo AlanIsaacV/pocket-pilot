@@ -10,15 +10,21 @@ import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/bank_alias_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/bank_package_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/bank_package_remote_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/captured_notification_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_preferences.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_repository.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_permission_service.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/package_observation_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_feedback_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_remote_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/pending_transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/watched_package_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/ui/banks_picker_view_model.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/notification_inbox_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
@@ -59,6 +65,23 @@ class NotificationCaptureRouteScope extends StatelessWidget {
         Provider<ParserFeedbackLocalStore>(
           create: (_) => ParserFeedbackLocalStore(db: db),
         ),
+        // Fase 8 ─────────────────────────────────────────────────────────
+        Provider<PackageObservationLocalStore>(
+          create: (_) => PackageObservationLocalStore(db: db),
+        ),
+        Provider<WatchedPackageLocalStore>(
+          create: (_) => WatchedPackageLocalStore(db: db),
+        ),
+        Provider<BankAliasLocalStore>(
+          create: (_) => BankAliasLocalStore(db: db),
+        ),
+        Provider<BankPackageLocalStore>(
+          create: (_) => BankPackageLocalStore(db: db),
+        ),
+        Provider<BankPackageRemoteService>(
+          create: (_) => BankPackageRemoteService(),
+        ),
+        // ────────────────────────────────────────────────────────────────
         Provider<TransactionRepository>(
           create: (_) => TransactionRepository(
             local: TransactionLocalStore(db: db),
@@ -82,6 +105,8 @@ class NotificationCaptureRouteScope extends StatelessWidget {
             cardMappings: ctx.read<AccountCardMappingLocalStore>(),
             rules: ctx.read<TransactionRuleLocalStore>(),
             feedback: ctx.read<ParserFeedbackLocalStore>(),
+            bankAliases: ctx.read<BankAliasLocalStore>(),
+            bankPackages: ctx.read<BankPackageLocalStore>(),
             transactions: ctx.read<TransactionRepository>(),
             outbox: outbox,
             parserRemote: ctx.read<ParserRemoteService>(),
@@ -107,6 +132,17 @@ class NotificationCaptureRouteScope extends StatelessWidget {
               permission: ctx.read<NotificationPermissionService>(),
             )..loadOnAppear();
           },
+        ),
+        ChangeNotifierProvider<BanksPickerViewModel>(
+          create: (ctx) => BanksPickerViewModel(
+            observations: ctx.read<PackageObservationLocalStore>(),
+            watched: ctx.read<WatchedPackageLocalStore>(),
+            aliases: ctx.read<BankAliasLocalStore>(),
+            bankPackages: ctx.read<BankPackageLocalStore>(),
+            remote: ctx.read<BankPackageRemoteService>(),
+            preferences: ctx.read<NotificationCapturePreferences>(),
+            outbox: outbox,
+          ),
         ),
       ],
       child: child,

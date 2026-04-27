@@ -104,6 +104,17 @@ class _NotificationCaptureSettingsScreenState
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => context.push('/inbox'),
                     ),
+                    const Divider(height: 1, indent: 56),
+                    ListTile(
+                      leading: const Icon(Icons.account_balance_rounded),
+                      title: const Text('Mis bancos'),
+                      subtitle: const Text(
+                        'Elige qué apps de tu dispositivo son bancos. La captura solo procesa notificaciones de las apps que marques.',
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () =>
+                          context.push('/settings/notification-capture/banks'),
+                    ),
                   ]),
                 ),
                 const SizedBox(height: 16),

@@ -50,6 +50,10 @@ Auto-suggestion of transactions from Android bank push notifications. iOS not su
 | `notification_parsers` (mig 008) | Local cache of parser definitions. Phase 2: seeded from asset. Phase 3: replaced by sync delta-pull from backend; asset stays as fallback. | Yes (pull-only) |
 | `account_card_mappings` (mig 010) | (`bank_id`, `last_digits`) → `account_id`. Auto-populated on approval. | Yes |
 | `transaction_rules` (mig 011) | `match_text` (substring) → `category_id`. Auto-populated on approval. | Yes |
+| `package_observations` (mig 016) | Log liviano sin PII: `(package_name, first_seen_at, last_seen_at, noti_count)`. NLS UPSERT por cada noti del SO. Pobla el picker "Mis bancos". Retención 90d (sweeper Fase 6 extendido). | No (local-only) |
+| `watched_packages` (mig 016) | Per-device toggle: qué packages procesa el NLS aquí. NLS lee `WHERE enabled=1` en `onListenerConnected()`. | No (per-device intencionalmente) |
+| `bank_aliases` (mig 016) | Per-user alias: `(package_name, bank_id?, display_label)`. Sincroniza para que la decisión "Mi BBVA" llegue como hint a otros devices del mismo usuario. | Yes |
+| `bank_packages` (mig 016) | Cache local del catálogo global pull-only `(package_name → bank_id, default_label)`. Admin promueve sugerencias server-side. | Yes (pull-only) |
 
 ### `captured_notifications` lifecycle (`status` column)
 
@@ -66,10 +70,12 @@ received ─┬─► matched_local   (parser matched in client, PendingTransact
 
 ### Android native (`frontend/android/app/src/main/kotlin/app/pocketpilot/notifications/`)
 
-- `BankNotificationListenerService.kt` — extends `NotificationListenerService`. Allowlist of `packageName`s in code (`com.bbva.bancomermovil`, `com.bancomer.mbanking`). Writes directly to the sqflite SQLite file (path = `getDatabasePath("pocket_pilot.db")`). Only writes to `captured_notifications` — never reads other tables. Schema is stable. Two callbacks share a private `captureIfBank(sbn)` helper:
+- `BankNotificationListenerService.kt` — extends `NotificationListenerService`. **Fase 8**: la allowlist hardcoded de strings se reemplazó por un cache en memoria `@Volatile var watchedPackages: Set<String>` que se rellena desde `watched_packages WHERE enabled=1` en `onListenerConnected()` (rebind = refresh). Cada noti que llega pasa por `handleNotification(sbn)`:
+  1. **Siempre**: `db.upsertPackageObservation(sbn.packageName, sbn.postTime)` — log liviano sin PII para alimentar el picker "Mis bancos".
+  2. **Solo si** `sbn.packageName in watchedPackages`: el path original que escribe a `captured_notifications` con title/text/big_text.
   - `onNotificationPosted(sbn)` — every new notification while the listener is bound.
-  - `onListenerConnected()` — backfill from `activeNotifications` whenever the OS rebinds the service. Covers "user granted permission after notifications already arrived" and "OS restarted the listener". Idempotent thanks to `NotificationDb` dedupe; notifications dismissed from the shade cannot be recovered (no API).
-- `NotificationDb.kt` — minimal DB writer. Dedupes via `(package_name, posted_at ± 1 minute, text+title)` query before INSERT. Generates deterministic UUIDs from SHA-256 of the payload as a second-line idempotency defense.
+  - `onListenerConnected()` — refresh del cache + backfill from `activeNotifications`. Cubre "user granted permission after notifications already arrived" y "OS restarted the listener". Idempotente thanks to `NotificationDb` dedupe.
+- `NotificationDb.kt` — minimal DB writer. Dedupes via `(package_name, posted_at ± 1 minute, text+title)` query before INSERT. Generates deterministic UUIDs from SHA-256 of the payload as a second-line idempotency defense. **Fase 8** añade dos métodos: `upsertPackageObservation(packageName, postedAtMillis)` (INSERT … ON CONFLICT(package_name) DO UPDATE SET last_seen_at=MAX(...), noti_count+=1) y `getEnabledWatchedPackages(): Set<String>` (SELECT package_name FROM watched_packages WHERE enabled=1). Ambos manejan el caso DB-no-existe / mig-no-corrida devolviendo no-op / set vacío respectivamente.
 - `BootReceiver.kt` — re-enables the NLS component after `BOOT_COMPLETED` (defense for OEMs that disable it).
 
 `AndroidManifest.xml` declares the `<service>` with `BIND_NOTIFICATION_LISTENER_SERVICE` and the `<receiver>` for boot. Permission flow: user must manually toggle the listener in *Settings → Notification access*. The OS does not allow a runtime permission prompt.
@@ -225,6 +231,7 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 | 5 | done | `parser_feedback` push-only (BE mig 015 + módulo `internal/parserfeedback/` + proto `parser_feedback_service.proto` con `Upsert`/`List`, sin `Delete`). FE mig 014 + `domain/parser_feedback.dart` + `data/parser_feedback_*.dart` (local store, remote service, sync handler push-only `syncOrder=7`). Cada decisión final en `PendingReviewSheet` (Aprobar O Descartar) inserta una fila con: thumb opcional `was_helpful` tri-estado (`google.protobuf.BoolValue` en wire, `INTEGER 0\|1\|NULL` en SQLite), 4 flags derivados (`account_changed`, `category_changed`, `amount_changed`, `description_changed`) calculados al aprobar comparando `suggested_*` vs final, `was_dismissed`, y trazabilidad completa (bank_id, pattern_id, parser_version, extraction_method). UI: dos `IconButton.filledTonal` (thumb_up/thumb_down) inmediatamente después del header del sheet — opcional, tap segundo vuelve a none. Helper `PendingTransactionModel.splitParserId` extraído del view model. `_descriptionChanged` con normalización conservadora (trim + lowercase + colapso de whitespace) — un usuario que solo limpia trailing spaces NO dispara el flag. UNIQUE server-side `(user_id, pending_transaction_id)` como salvaguarda; LWW resuelto por `id` (mismo patrón que cardmapping). 13 tests unitarios en `frontend/test/parser_feedback_helpers_test.dart`; 3 tests de cursor en `backend/internal/parserfeedback/cursor_integration_test.go`. Sin toggle (feedback no incluye texto crudo, solo IDs/flags). |
 | 7 | done (2026-04-26) | Modelo LLM configurable por feature (chat vs parser). `GeminiProvider` toma `model` en construcción; `LLMProvider` interface expone `Model()`. Env vars `AI_CHAT_MODEL` y `NOTIFICATION_PARSER_MODEL` (default `gemini-3.1-flash-lite-preview` en ambos: cero cambio de comportamiento). BE mig 017 añade `ai_usage.model TEXT NOT NULL DEFAULT 'gemini-3.1-flash-lite-preview'` + índice por modelo. `LLMFallback.modelVersion` eliminado: tanto `RecordUsage` como `candidate_parsers.llm_model_version` ahora leen de `provider.Model()` (single source of truth). Detalle completo en `architecture/ai_assistant.md`. |
 | 6 | done | Retención 90-day simétrica FE+BE. **FE** (mig 015): `captured_notifications` añade `purged_at TEXT` + índice parcial; sweeper Dart (`captured_notifications_retention_sweeper.dart`) NULLea `title`/`text`/`big_text` y marca `purged_at` cuando `posted_at < now-90d`, gated por `lastPurgeAt` (clave device-local en `NotificationCapturePreferences`) con cadencia ≥24h; trigger `unawaited(sweeper.sweepIfDue())` en `main.dart` post-init. Filtro `WHERE purged_at IS NULL` en `listInbox`/`listPendingProcessing`/`resetUnparseableToReceived` (al nivel del local store). El status del lifecycle se preserva → trazabilidad y `parser_feedback` agregado intactos. **BE** (mig 016): extiende CHECK con `'purged'` y añade `purged_at TIMESTAMPTZ`; `candidate_repo.go::PurgeOldSamples` NULLea `sample_title`/`sample_text`/`sample_big_text`, marca `status='purged'`. Goroutine en `cmd/server/main.go` (`startCandidateRetentionSweeper`) corre al startup y luego con `time.NewTicker(24h)`. Preserva `proposed_regex`/`extracted_fields` (no son PII). Tests: 5 unit FE en `test/notification_capture/captured_notifications_retention_sweeper_test.dart` (gating + cutoff + sweepNow); 2 integration BE en `internal/notificationparser/candidate_repo_test.go` (skippean sin `TEST_DATABASE_URL`). |
+| 8 | done (2026-04-26) | Package selection dinámica + loop comunitario. Reemplaza la allowlist hardcoded del NLS Kotlin (BANK_PACKAGES) por una decisión per-device en `watched_packages` (FE local-only). El NLS lee la tabla en `onListenerConnected()` y la cachea como `Volatile Set<String>`; refresh por rebind (sin MethodChannel ping aún). Discovery vía `package_observations` (FE local-only, sin PII): el NLS hace UPSERT (package_name, last_seen_at, noti_count) por TODA noti recibida — no requiere `QUERY_ALL_PACKAGES`. **Tres tablas BE nuevas (mig 018):** `bank_packages` (catálogo global pull-only, mismo patrón que `notification_parsers` con `bumpAllUsers`); `bank_aliases` (per-user push+pull, mismo patrón que `account_card_mappings` con LWW por id, UNIQUE `(user_id, package_name)`); `package_suggestions` (anónimo, sin user_id, gated por `help_improve_app=ON`). **Cuatro tablas FE nuevas (mig 016):** `package_observations`, `watched_packages`, `bank_aliases`, `bank_packages`. Mig 016 seed BBVA en `watched_packages` + `bank_packages` (cero fricción para existing users) y backfill de `package_observations` desde `captured_notifications` (UI accionable desde primer abrir). **Sync entities:** `EntityBankPackage` (syncOrder=4 igual que parser) + `EntityBankAlias` (syncOrder=5 igual que cardmapping). **UI nueva:** `BanksPickerScreen` en `/settings/notification-capture/banks?firstTime=1` (con banner explicativo cuando se llega post-permission). `OnboardingPermissionScreen` redirige al picker cuando el observer detecta el flip false→true al volver de Ajustes. `NotificationCaptureSettingsScreen` añade ListTile "Mis bancos". **Repository refactor:** `_bankIdForPackage` ahora async, consulta bank_aliases → bank_packages → 'unknown' (era switch hardcoded BBVA). **Retention sweeper extendido:** acepta `List<PurgeRunner>`; en producción incluye `package_observations.purgeOlderThan` además del existente para `captured_notifications`. **Tie-in Fase 4:** sin cambios al pipeline — packages habilitados sin parser local caen al LLM fallback existente; si `help_improve_app=ON`, alimenta `candidate_parsers` y se sigue el mismo loop admin para promover regex. **Loop comunitario:** cliente envía sugerencias anónimas a `package_suggestions`; admin revisa y promueve a `bank_packages` vía SQL directo (o `repo.Upsert` que `bumpAllUsers`). |
 
 ## Operational tooling
 
@@ -240,6 +247,8 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 - `proto/pocket_pilot/v1/transaction_rule_service.proto`
 - `proto/pocket_pilot/v1/notification_parser_service.proto`
 - `proto/pocket_pilot/v1/parser_feedback_service.proto` (Fase 5)
+- `proto/pocket_pilot/v1/bank_package_service.proto` (Fase 8: ListBankPackages pull-only + SubmitPackageSuggestion anónima)
+- `proto/pocket_pilot/v1/bank_alias_service.proto` (Fase 8: List/Upsert/Delete user-scoped, mirror cardmapping)
 
 **Backend:**
 - `backend/internal/cardmapping/cardmapping.go` (model + repo + handler)
@@ -260,6 +269,10 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 - `backend/migrations/015_parser_feedback.sql` (Fase 5: señal de calidad por sugerencia)
 - `backend/migrations/016_candidate_parsers_retention.sql` (Fase 6: status `purged` + `purged_at`)
 - `backend/migrations/017_ai_usage_model.sql` (Fase 7: `ai_usage.model` + índice por modelo)
+- `backend/migrations/018_bank_packages.sql` (Fase 8: bank_packages global + bank_aliases user-scoped + package_suggestions anónimo)
+- `backend/internal/bankpackage/bankpackage.go` (Fase 8: Repository + Handler global pull-only + bumpAllUsers)
+- `backend/internal/bankpackage/suggestion_repo.go` (Fase 8: Insert anónimo en package_suggestions)
+- `backend/internal/bankalias/bankalias.go` (Fase 8: Repository + Handler user-scoped, LWW, mirror cardmapping)
 - `backend/internal/parserfeedback/parserfeedback.go` (Fase 5: módulo Modelo + Repository + Handler)
 - `backend/internal/parserfeedback/cursor_integration_test.go` (Fase 5: tests cursor + LWW)
 - `backend/cmd/server/main.go` — DI: `notificationParserLimiter` con feature_key, `candidateRepo`, `notificationparser.NewHandlerWithLLM(...)`. Fase 6: helper `startCandidateRetentionSweeper(ctx, candidateRepo)` (goroutine 24h ticker)
@@ -278,6 +291,15 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 - `assets/migrations/013.sql` — Fase 4: trazabilidad `matched_parser_version`/`matched_pattern_id`/`extraction_method` en `captured_notifications`. `database_helper.dart::_version = 13`.
 - `assets/migrations/014.sql` — Fase 5: tabla local `parser_feedback` mirror del schema BE. `database_helper.dart::_version = 14`.
 - `assets/migrations/015.sql` — Fase 6: `captured_notifications.purged_at TEXT` + índice parcial. `database_helper.dart::_version = 15`.
+- `assets/migrations/016.sql` — Fase 8: 4 tablas nuevas (`package_observations`, `watched_packages`, `bank_aliases`, `bank_packages`) + seed BBVA en watched/bank_packages + backfill de package_observations desde captured_notifications. `database_helper.dart::_version = 16`.
+- `lib/src/features/notification_capture/domain/{package_observation,watched_package,bank_alias,bank_package}.dart` — Fase 8: 4 modelos de dominio.
+- `lib/src/features/notification_capture/data/{package_observation,watched_package,bank_alias,bank_package}_local_store.dart` — Fase 8: 4 DAOs.
+- `lib/src/features/notification_capture/data/bank_package_sync_handler.dart` — Fase 8: pull-only `syncOrder=4`, mismo orden que parser.
+- `lib/src/features/notification_capture/data/bank_alias_sync_handler.dart` — Fase 8: push+pull `syncOrder=5`, mismo orden que cardmapping/txrule.
+- `lib/src/features/notification_capture/data/{bank_package,bank_alias}_remote_service.dart` — Fase 8: clientes gRPC.
+- `lib/src/features/notification_capture/ui/banks_picker_screen.dart` — Fase 8: pantalla "Mis bancos" en `/settings/notification-capture/banks`.
+- `lib/src/features/notification_capture/ui/banks_picker_view_model.dart` — Fase 8: `BanksPickerEntry` agregando observation+watched+alias+catalogEntry; `markAsBank`/`unmarkAsBank` orquestan watched + alias + outbox + suggestion.
+- `lib/src/features/notification_capture/data/captured_notifications_retention_sweeper.dart` — Fase 8 extension: `_runners: List<PurgeRunner>` para encadenar la purga de `package_observations`.
 - `lib/src/features/notification_capture/domain/parser_feedback.dart` — Fase 5: `ParserFeedbackModel` con conversión `BoolValue`↔`bool?` y `INTEGER`↔`bool` para SQLite.
 - `lib/src/features/notification_capture/data/parser_feedback_local_store.dart` — Fase 5: `upsert`, `upsertRow`, `findByPendingTransactionId`.
 - `lib/src/features/notification_capture/data/parser_feedback_remote_service.dart` — Fase 5: `upsertFeedback(map)` (push-only, no `list`).
@@ -286,7 +308,7 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 - `lib/src/features/notification_capture/data/captured_notification_local_store.dart` — Fase 6: método `purgeOlderThan(...)` y filtros `purged_at IS NULL` en queries de bandeja.
 
 **Android native:**
-- `frontend/android/app/src/main/kotlin/app/pocketpilot/notifications/` — entire native module
+- `frontend/android/app/src/main/kotlin/app/pocketpilot/notifications/` — entire native module. **Fase 8**: `BankNotificationListenerService.kt` perdió `BANK_PACKAGES`; ahora cachea el set desde `watched_packages` en `onListenerConnected()` y observa todos los packages a `package_observations`. `NotificationDb.kt` añadió `upsertPackageObservation` y `getEnabledWatchedPackages`.
 - `frontend/android/app/src/main/AndroidManifest.xml`
 - `frontend/android/app/src/main/kotlin/app/pocketpilot/MainActivity.kt`
 

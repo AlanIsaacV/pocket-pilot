@@ -52,7 +52,9 @@ protoc \
     pocket_pilot/v1/account_card_mapping_service.proto \
     pocket_pilot/v1/transaction_rule_service.proto \
     pocket_pilot/v1/notification_parser_service.proto \
-    pocket_pilot/v1/parser_feedback_service.proto
+    pocket_pilot/v1/parser_feedback_service.proto \
+    pocket_pilot/v1/bank_alias_service.proto \
+    pocket_pilot/v1/bank_package_service.proto
 
 echo "→ Generating Dart code..."
 # --dart_out=grpc:<dir>  : "grpc" is a plugin option that tells protoc_plugin
@@ -84,7 +86,9 @@ protoc \
     pocket_pilot/v1/account_card_mapping_service.proto \
     pocket_pilot/v1/transaction_rule_service.proto \
     pocket_pilot/v1/notification_parser_service.proto \
-    pocket_pilot/v1/parser_feedback_service.proto
+    pocket_pilot/v1/parser_feedback_service.proto \
+    pocket_pilot/v1/bank_alias_service.proto \
+    pocket_pilot/v1/bank_package_service.proto
 
 echo "✓ Done. Generated files:"
 echo "  Go   → ${GO_OUT}"

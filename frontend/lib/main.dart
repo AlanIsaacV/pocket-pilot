@@ -80,6 +80,8 @@ import 'package:pocket_pilot/src/features/notification_capture/data/bank_package
 import 'package:pocket_pilot/src/features/notification_capture/data/captured_notification_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/captured_notifications_retention_sweeper.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_preferences.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_repository.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/notification_permission_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/package_observation_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_feedback_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_feedback_remote_service.dart';
@@ -87,9 +89,11 @@ import 'package:pocket_pilot/src/features/notification_capture/data/parser_feedb
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_remote_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_sync_handler.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/pending_transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_remote_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_sync_handler.dart';
+import 'package:pocket_pilot/src/features/notification_capture/ui/pending_suggestions_view_model.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_remote_service.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_sync_handler.dart';
@@ -458,6 +462,57 @@ Future<void> main() async {
   );
   unawaited(retentionSweeper.sweepIfDue());
 
+  // Notification capture: stores + repo + VM compartidos a nivel app.
+  // Antes vivían en NotificationCaptureRouteScope (vida = sub-árbol settings/
+  // banks/onboarding); al mover la sección "Por confirmar" a /transactions el
+  // VM y sus dependencias necesitan estar disponibles en ambos scopes y en el
+  // sheet (showModalBottomSheet usa el rootNavigator). Subir al raíz evita
+  // duplicar el VM y mantiene el inbox unificado.
+  final ncCaptured = CapturedNotificationLocalStore(db: dbHelper);
+  final ncPending = PendingTransactionLocalStore(db: dbHelper);
+  final ncParsers = ParserLocalStore(db: dbHelper);
+  final ncAccounts = AccountLocalStore(db: dbHelper);
+  final ncCategories = CategoryLocalStore(db: dbHelper);
+  final ncCardMappings = AccountCardMappingLocalStore(db: dbHelper);
+  final ncRules = TransactionRuleLocalStore(db: dbHelper);
+  final ncFeedback = ParserFeedbackLocalStore(db: dbHelper);
+  final ncBankAliases = BankAliasLocalStore(db: dbHelper);
+  final ncBankPackages = BankPackageLocalStore(db: dbHelper);
+  final ncPreferences = NotificationCapturePreferences(
+    store: userPreferenceLocalStore,
+  );
+  final ncParserRemote = ParserRemoteService();
+  final ncPermissionService = NotificationPermissionService();
+  final ncTransactionRepo = TransactionRepository(
+    local: TransactionLocalStore(db: dbHelper),
+    outbox: syncOutbox,
+  );
+  final ncRepository = NotificationCaptureRepository(
+    captured: ncCaptured,
+    pending: ncPending,
+    parsers: ncParsers,
+    accounts: ncAccounts,
+    cardMappings: ncCardMappings,
+    rules: ncRules,
+    feedback: ncFeedback,
+    bankAliases: ncBankAliases,
+    bankPackages: ncBankPackages,
+    transactions: ncTransactionRepo,
+    outbox: syncOutbox,
+    parserRemote: ncParserRemote,
+    preferences: ncPreferences,
+  );
+  // Seed asset es fire-and-forget; el engine lo recoge en la próxima refresh.
+  unawaited(ncParsers.seedFromAssetIfMissing(
+    bankId: 'bbva_mx',
+    assetPath: 'assets/parsers/bbva_mx.json',
+  ));
+  final pendingSuggestionsVM = PendingSuggestionsViewModel(
+    pending: ncPending,
+    repository: ncRepository,
+    permission: ncPermissionService,
+  )..loadOnAppear();
+
   runApp(
     MultiProvider(
       providers: [
@@ -478,6 +533,27 @@ Future<void> main() async {
         Provider<NotificationRepository>.value(value: notificationRepo),
         ChangeNotifierProvider<NotificationCenterViewModel>.value(
           value: notificationCenterVM,
+        ),
+        // Notification capture (compartido entre /transactions, settings,
+        // banks picker, onboarding y el review sheet).
+        Provider<CapturedNotificationLocalStore>.value(value: ncCaptured),
+        Provider<PendingTransactionLocalStore>.value(value: ncPending),
+        Provider<ParserLocalStore>.value(value: ncParsers),
+        Provider<AccountLocalStore>.value(value: ncAccounts),
+        Provider<CategoryLocalStore>.value(value: ncCategories),
+        Provider<AccountCardMappingLocalStore>.value(value: ncCardMappings),
+        Provider<TransactionRuleLocalStore>.value(value: ncRules),
+        Provider<ParserFeedbackLocalStore>.value(value: ncFeedback),
+        Provider<BankAliasLocalStore>.value(value: ncBankAliases),
+        Provider<BankPackageLocalStore>.value(value: ncBankPackages),
+        Provider<NotificationCapturePreferences>.value(value: ncPreferences),
+        Provider<ParserRemoteService>.value(value: ncParserRemote),
+        Provider<NotificationPermissionService>.value(
+          value: ncPermissionService,
+        ),
+        Provider<NotificationCaptureRepository>.value(value: ncRepository),
+        ChangeNotifierProvider<PendingSuggestionsViewModel>.value(
+          value: pendingSuggestionsVM,
         ),
       ],
       child: PocketPilotApp(router: router),

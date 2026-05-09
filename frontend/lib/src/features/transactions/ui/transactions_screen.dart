@@ -14,6 +14,9 @@ import 'package:pocket_pilot/src/features/categories/data/category_local_store.d
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/categories/ui/category_icon_data.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
+import 'package:pocket_pilot/src/features/notification_capture/domain/pending_transaction.dart';
+import 'package:pocket_pilot/src/features/notification_capture/ui/pending_review_sheet.dart';
+import 'package:pocket_pilot/src/features/notification_capture/ui/pending_suggestions_view_model.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_view_model.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_templates_list_tab.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
@@ -244,9 +247,25 @@ class _TransactionsListTabState extends State<_TransactionsListTab> {
     return Consumer<TransactionsViewModel>(
       builder: (context, vm, _) {
         final filterVM = context.watch<TransactionFilterViewModel>();
+        final pendingVM = context.watch<PendingSuggestionsViewModel>();
         final hasFilters = filterVM.resolvedFilter.hasAdvancedFilters ||
             filterVM.activePageIndex != 0 ||
             filterVM.quickSelection != QuickRange.d30;
+
+        // Las occurrences pendientes (templates con next_run vencida) viven
+        // en `vm.transactions` con status='pending'. Las separamos para
+        // mostrarlas dentro de la sección "Por confirmar" (junto con las
+        // sugerencias de notificaciones) y evitar duplicarlas en el listado
+        // mensual. La data subyacente no cambia: es solo presentación.
+        final pendingOccurrences = vm.transactions
+            .where((t) => t.status == 'pending')
+            .toList(growable: false);
+        final confirmedTransactions = vm.transactions
+            .where((t) => t.status != 'pending')
+            .toList(growable: false);
+        final pendingSuggestions = pendingVM.pendingTransactions;
+        final hasAnyData = vm.transactions.isNotEmpty ||
+            pendingSuggestions.isNotEmpty;
 
         return Stack(
           children: [
@@ -263,10 +282,8 @@ class _TransactionsListTabState extends State<_TransactionsListTab> {
                 Expanded(
                   child: PpScreenState(
                     isLoading: vm.isLoading || !_lookupsLoaded,
-                    errorMessage: vm.transactions.isEmpty
-                        ? vm.errorMessage
-                        : null,
-                    isEmpty: vm.transactions.isEmpty,
+                    errorMessage: !hasAnyData ? vm.errorMessage : null,
+                    isEmpty: !hasAnyData,
                     emptyIcon: hasFilters
                         ? Icons.filter_list_off_rounded
                         : Icons.receipt_long_outlined,
@@ -276,10 +293,14 @@ class _TransactionsListTabState extends State<_TransactionsListTab> {
                     emptySubLabel: hasFilters
                         ? 'Intenta cambiar los filtros'
                         : 'Presiona + para registrar una',
-                    onRefresh: vm.refresh,
+                    onRefresh: () =>
+                        Future.wait([vm.refresh(), pendingVM.refresh()]),
                     child: _TransactionList(
-                      transactions: vm.transactions,
+                      transactions: confirmedTransactions,
+                      pendingOccurrences: pendingOccurrences,
+                      pendingSuggestions: pendingSuggestions,
                       vm: vm,
+                      pendingVM: pendingVM,
                       categoryMap: _categoryMap,
                       accountMap: _accountMap,
                     ),
@@ -301,13 +322,19 @@ class _TransactionsListTabState extends State<_TransactionsListTab> {
 
 class _TransactionList extends StatelessWidget {
   final List<TransactionModel> transactions;
+  final List<TransactionModel> pendingOccurrences;
+  final List<PendingTransactionModel> pendingSuggestions;
   final TransactionsViewModel vm;
+  final PendingSuggestionsViewModel pendingVM;
   final Map<String, CategoryModel> categoryMap;
   final Map<String, AccountModel> accountMap;
 
   const _TransactionList({
     required this.transactions,
+    required this.pendingOccurrences,
+    required this.pendingSuggestions,
     required this.vm,
+    required this.pendingVM,
     required this.categoryMap,
     required this.accountMap,
   });
@@ -322,71 +349,136 @@ class _TransactionList extends StatelessWidget {
       groups.putIfAbsent(key, () => []).add(t);
     }
 
-    final sections = groups.entries.toList();
+    final children = <Widget>[];
+    final pendingTotal =
+        pendingSuggestions.length + pendingOccurrences.length;
+    if (pendingTotal > 0) {
+      children.add(_PendingConfirmHeader(count: pendingTotal));
+      for (final s in pendingSuggestions) {
+        children.add(_buildSuggestionRow(context, s));
+      }
+      for (final t in pendingOccurrences) {
+        children.add(_buildTransactionRow(context, t));
+      }
+      children.add(const SizedBox(height: 16));
+    }
+
+    for (final section in groups.entries) {
+      children.add(_MonthHeader(monthKey: section.key));
+      for (final t in section.value) {
+        children.add(_buildTransactionRow(context, t));
+      }
+    }
 
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 160),
-      itemCount: sections.fold<int>(0, (sum, e) => sum + 1 + e.value.length),
-      itemBuilder: (context, index) {
-        int offset = 0;
-        for (final section in sections) {
-          if (index == offset) {
-            return _MonthHeader(monthKey: section.key);
-          }
-          offset++;
-          final itemIndex = index - offset;
-          if (itemIndex < section.value.length) {
-            final t = section.value[itemIndex];
-            return Dismissible(
-              key: ValueKey(t.id),
-              direction: DismissDirection.endToStart,
-              background: _DeleteBackground(),
-              confirmDismiss: (_) => _confirmDelete(context, t),
-              onDismissed: (_) async {
-                try {
-                  await vm.deleteTransaction(
-                    t.id,
-                    linkedTransactionId: t.linkedTransactionId,
-                  );
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          t.isTransfer
-                              ? 'Transferencia eliminada'
-                              : 'Transacción eliminada',
-                        ),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('No se pudo eliminar: $e')),
-                    );
-                  }
-                }
-              },
-              child: _TransactionTile(
-                transaction: t,
-                category: t.categoryId != null
-                    ? categoryMap[t.categoryId]
-                    : null,
-                account: accountMap[t.accountId],
-                onTap: () {
-                  _handleTransactionTap(context, t);
-                },
-                onConfirm: t.status == 'pending'
-                    ? () => _handleConfirmTap(context, t)
-                    : null,
+      itemCount: children.length,
+      itemBuilder: (context, index) => children[index],
+    );
+  }
+
+  Widget _buildTransactionRow(BuildContext context, TransactionModel t) {
+    return Dismissible(
+      key: ValueKey('tx-${t.id}'),
+      direction: DismissDirection.endToStart,
+      background: _DeleteBackground(),
+      confirmDismiss: (_) => _confirmDelete(context, t),
+      onDismissed: (_) async {
+        try {
+          await vm.deleteTransaction(
+            t.id,
+            linkedTransactionId: t.linkedTransactionId,
+          );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  t.isTransfer
+                      ? 'Transferencia eliminada'
+                      : 'Transacción eliminada',
+                ),
               ),
             );
           }
-          offset += section.value.length;
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('No se pudo eliminar: $e')),
+            );
+          }
         }
-        return const SizedBox.shrink();
       },
+      child: _TransactionTile(
+        transaction: t,
+        category: t.categoryId != null ? categoryMap[t.categoryId] : null,
+        account: accountMap[t.accountId],
+        onTap: () => _handleTransactionTap(context, t),
+        onConfirm: t.status == 'pending'
+            ? () => _handleConfirmTap(context, t)
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildSuggestionRow(
+    BuildContext context,
+    PendingTransactionModel suggestion,
+  ) {
+    return Dismissible(
+      key: ValueKey('sg-${suggestion.id}'),
+      direction: DismissDirection.endToStart,
+      background: _DeleteBackground(),
+      confirmDismiss: (_) => _confirmDismissSuggestion(context, suggestion),
+      onDismissed: (_) async {
+        try {
+          await pendingVM.dismissPending(suggestion);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Sugerencia descartada')),
+            );
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('No se pudo descartar: $e')),
+            );
+          }
+        }
+      },
+      child: _SuggestionTile(
+        suggestion: suggestion,
+        onTap: () => _openReviewSheet(context, suggestion),
+        onConfirm: () => _openReviewSheet(context, suggestion),
+      ),
+    );
+  }
+
+  Future<void> _openReviewSheet(
+    BuildContext context,
+    PendingTransactionModel suggestion,
+  ) async {
+    // showModalBottomSheet usa el rootNavigator → no hereda los providers
+    // del subtree de TransactionsRouteScope. Re-proveemos explícitamente
+    // los stores que el sheet consulta en su initState.
+    final pVM = context.read<PendingSuggestionsViewModel>();
+    final accounts = context.read<AccountLocalStore>();
+    final categories = context.read<CategoryLocalStore>();
+    await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => MultiProvider(
+        providers: [
+          ChangeNotifierProvider<PendingSuggestionsViewModel>.value(value: pVM),
+          Provider<AccountLocalStore>.value(value: accounts),
+          Provider<CategoryLocalStore>.value(value: categories),
+        ],
+        child: PendingReviewSheet(pending: suggestion),
+      ),
     );
   }
 
@@ -837,6 +929,37 @@ class _TransactionTile extends StatelessWidget {
 // Helpers de eliminación
 // ============================================================
 
+Future<bool?> _confirmDismissSuggestion(
+  BuildContext context,
+  PendingTransactionModel suggestion,
+) {
+  final label = suggestion.merchantDescription?.trim().isNotEmpty == true
+      ? '"${suggestion.merchantDescription}"'
+      : 'esta sugerencia';
+  return showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Descartar sugerencia'),
+      content: Text(
+        'Se descartará $label. La notificación original seguirá guardada localmente sin generar transacción.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(ctx).colorScheme.error,
+          ),
+          child: const Text('Descartar'),
+        ),
+      ],
+    ),
+  );
+}
+
 Future<bool?> _confirmDelete(BuildContext context, TransactionModel t) {
   final isTransfer = t.isTransfer;
   final label = t.description.isNotEmpty
@@ -901,6 +1024,199 @@ class _DeleteBackground extends StatelessWidget {
             color: Theme.of(context).colorScheme.error,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Sección "Por confirmar" — header + filas de sugerencias
+// ============================================================
+
+class _PendingConfirmHeader extends StatelessWidget {
+  final int count;
+
+  const _PendingConfirmHeader({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          Icon(
+            Icons.pending_actions_rounded,
+            size: 16,
+            color: cs.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'POR CONFIRMAR ($count)',
+            style: GoogleFonts.ibmPlexSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SuggestionTile extends StatelessWidget {
+  final PendingTransactionModel suggestion;
+  final VoidCallback onTap;
+  final VoidCallback onConfirm;
+
+  const _SuggestionTile({
+    required this.suggestion,
+    required this.onTap,
+    required this.onConfirm,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isIncome = suggestion.transactionType == 'income';
+    final amountColor = isIncome ? cs.onTertiary : cs.error;
+    final iconBg = isIncome
+        ? cs.onTertiary.withValues(alpha: 0.12)
+        : cs.error.withValues(alpha: 0.1);
+
+    final amount = (suggestion.amountCents / 100).toStringAsFixed(2);
+    final sign = isIncome ? '+' : '-';
+    final description = suggestion.merchantDescription?.trim();
+    final title = description != null && description.isNotEmpty
+        ? description
+        : 'Sin descripción';
+    final cardSuffix = suggestion.cardLastDigits != null
+        ? '····${suggestion.cardLastDigits}'
+        : null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      child: Container(
+        decoration: BoxDecoration(
+          color: cs.surfaceContainer,
+          borderRadius: AppTheme.radiusMedium,
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: const BorderRadius.all(Radius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: AppTheme.radiusFull,
+                  ),
+                  child: Icon(
+                    Icons.notifications_active_outlined,
+                    color: amountColor,
+                    size: 17,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: GoogleFonts.ibmPlexSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: cs.onSurface,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$sign${suggestion.currencyCode} $amount',
+                            style: GoogleFonts.ibmPlexSans(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: amountColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      if (cardSuffix != null)
+                        Text(
+                          cardSuffix,
+                          style: GoogleFonts.ibmPlexSans(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.tertiaryContainer,
+                              borderRadius: AppTheme.radiusFull,
+                            ),
+                            child: Text(
+                              'Notificación bancaria',
+                              style: GoogleFonts.ibmPlexSans(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: cs.onTertiaryContainer,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: onConfirm,
+                            icon: const Icon(
+                              Icons.check_circle_outline,
+                              size: 16,
+                            ),
+                            label: Text(
+                              'Confirmar',
+                              style: GoogleFonts.ibmPlexSans(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              foregroundColor: cs.primary,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 0,
+                              ),
+                              minimumSize: const Size(0, 28),
+                              tapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

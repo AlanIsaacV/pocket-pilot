@@ -11,7 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import 'package:pocket_pilot/src/features/notification_capture/ui/notification_inbox_view_model.dart';
+import 'package:pocket_pilot/src/features/notification_capture/ui/pending_suggestions_view_model.dart';
 
 class OnboardingPermissionScreen extends StatefulWidget {
   const OnboardingPermissionScreen({super.key});
@@ -32,7 +32,7 @@ class _OnboardingPermissionScreenState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    final vm = context.read<NotificationInboxViewModel>();
+    final vm = context.read<PendingSuggestionsViewModel>();
     _wasGranted = vm.permissionGranted;
   }
 
@@ -45,7 +45,7 @@ class _OnboardingPermissionScreenState
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) async {
     if (state != AppLifecycleState.resumed || !mounted) return;
-    final vm = context.read<NotificationInboxViewModel>();
+    final vm = context.read<PendingSuggestionsViewModel>();
     await vm.refresh();
     if (!mounted) return;
 
@@ -60,7 +60,7 @@ class _OnboardingPermissionScreenState
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<NotificationInboxViewModel>();
+    final vm = context.watch<PendingSuggestionsViewModel>();
     final theme = Theme.of(context);
     final isAndroid = Platform.isAndroid;
 

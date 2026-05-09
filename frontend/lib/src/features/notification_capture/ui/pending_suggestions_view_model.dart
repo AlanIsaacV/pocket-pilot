@@ -1,49 +1,40 @@
 // ============================================================
-// NotificationInboxViewModel — estado de la bandeja de notificaciones
+// PendingSuggestionsViewModel — sugerencias de notificaciones
 // ============================================================
 //
-// La bandeja muestra dos cosas:
-//   - PendingTransactions activas (sugerencias listas para aprobar/editar)
-//   - CapturedNotifications raw aún sin procesar o no parseables
+// Mantiene la lista de PendingTransactions activas (sugerencias listas para
+// aprobar/editar) y dispara `processInbox` antes de cada refresh para que
+// nuevas sugerencias aparezcan inmediatamente.
 //
-// Al refrescar, primero corre el engine sobre los `received` para producir
-// nuevas sugerencias, luego carga ambas listas para renderizar.
+// Las raw notifications (status='received'/'unparseable') siguen guardándose
+// en SQLite pero ya no se exponen aquí: el sweeper de retención las purga a
+// los 90 días y el botón "Reintentar parseo" en Ajustes vuelve a correr el
+// engine sobre las unparseables sin necesidad de mostrarlas.
 
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import 'package:pocket_pilot/src/features/notification_capture/data/captured_notification_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_repository.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_permission_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/pending_transaction_local_store.dart';
-import 'package:pocket_pilot/src/features/notification_capture/domain/captured_notification.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/pending_transaction.dart';
 
-class NotificationInboxViewModel extends ChangeNotifier {
-  final CapturedNotificationLocalStore _captured;
+class PendingSuggestionsViewModel extends ChangeNotifier {
   final PendingTransactionLocalStore _pending;
   final NotificationCaptureRepository _repository;
   final NotificationPermissionService _permission;
 
   List<PendingTransactionModel> pendingTransactions = [];
-  List<CapturedNotificationModel> rawNotifications = [];
   bool isLoading = false;
   bool permissionGranted = false;
   bool _disposed = false;
 
-  /// True si hay al menos una notificación visible que el engine descartó
-  /// como no parseable. Habilita el botón "Reintentar no parseables".
-  bool get hasUnparseable =>
-      rawNotifications.any((n) => n.status == 'unparseable');
-
-  NotificationInboxViewModel({
-    required CapturedNotificationLocalStore captured,
+  PendingSuggestionsViewModel({
     required PendingTransactionLocalStore pending,
     required NotificationCaptureRepository repository,
     required NotificationPermissionService permission,
-  })  : _captured = captured,
-        _pending = pending,
+  })  : _pending = pending,
         _repository = repository,
         _permission = permission;
 
@@ -60,7 +51,6 @@ class NotificationInboxViewModel extends ChangeNotifier {
       // transactions show up immediately on this refresh.
       await _repository.processInbox();
       pendingTransactions = await _pending.listPending();
-      rawNotifications = await _captured.listInbox();
     } finally {
       isLoading = false;
       _safeNotify();
@@ -80,18 +70,11 @@ class NotificationInboxViewModel extends ChangeNotifier {
     try {
       final result = await _repository.reprocessUnparseable();
       pendingTransactions = await _pending.listPending();
-      rawNotifications = await _captured.listInbox();
       return result;
     } finally {
       isLoading = false;
       _safeNotify();
     }
-  }
-
-  Future<void> dismissRaw(String capturedId) async {
-    await _captured.updateStatus(capturedId, 'ignored');
-    rawNotifications = rawNotifications.where((n) => n.id != capturedId).toList();
-    _safeNotify();
   }
 
   Future<void> dismissPending(

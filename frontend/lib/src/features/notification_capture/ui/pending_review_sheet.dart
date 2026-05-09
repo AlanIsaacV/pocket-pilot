@@ -17,8 +17,10 @@ import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
+import 'package:pocket_pilot/src/features/categories/ui/category_icon_data.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/pending_transaction.dart';
-import 'package:pocket_pilot/src/features/notification_capture/ui/notification_inbox_view_model.dart';
+import 'package:pocket_pilot/src/features/notification_capture/ui/pending_suggestions_view_model.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/category_picker_screen.dart';
 
 class PendingReviewSheet extends StatefulWidget {
   final PendingTransactionModel pending;
@@ -39,11 +41,10 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
   late DateTime _occurredAt;
 
   String? _selectedAccountId;
-  String? _selectedCategoryId;
+  CategoryModel? _selectedCategory;
   List<AccountModel> _accounts = const [];
-  List<CategoryModel> _categories = const [];
   bool _isLoadingAccounts = true;
-  bool _isLoadingCategories = true;
+  bool _isLoadingCategory = true;
   bool _isSaving = false;
   _ThumbState _thumb = _ThumbState.none;
 
@@ -66,10 +67,9 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
     _currencyController = TextEditingController(text: p.currencyCode);
     _occurredAt = p.occurredAt.toLocal();
     _selectedAccountId = p.suggestedAccountId;
-    _selectedCategoryId = p.suggestedCategoryId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadAccounts();
-      _loadCategories();
+      _loadInitialCategory();
     });
   }
 
@@ -90,20 +90,43 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
     });
   }
 
-  Future<void> _loadCategories() async {
+  Future<void> _loadInitialCategory() async {
+    final suggestedId = widget.pending.suggestedCategoryId;
+    if (suggestedId == null) {
+      if (mounted) setState(() => _isLoadingCategory = false);
+      return;
+    }
     final store = context.read<CategoryLocalStore>();
     final all = await store.getCategories();
     if (!mounted) return;
-    final type = widget.pending.transactionType; // 'income' | 'expense'
-    final assignable = all.where((c) => c.type == type).toList(growable: false);
-    setState(() {
-      _categories = assignable;
-      _isLoadingCategories = false;
-      if (_selectedCategoryId != null &&
-          !assignable.any((c) => c.id == _selectedCategoryId)) {
-        _selectedCategoryId = null;
+    final type = widget.pending.transactionType;
+    CategoryModel? match;
+    for (final c in all) {
+      if (c.id == suggestedId && c.type == type) {
+        match = c;
+        break;
       }
+    }
+    setState(() {
+      _selectedCategory = match;
+      _isLoadingCategory = false;
     });
+  }
+
+  Future<void> _openCategoryPicker() async {
+    if (_isSaving) return;
+    final store = context.read<CategoryLocalStore>();
+    final result = await Navigator.of(context).push<CategoryModel>(
+      MaterialPageRoute(
+        builder: (_) => Provider<CategoryLocalStore>.value(
+          value: store,
+          child: CategoryPickerScreen(type: widget.pending.transactionType),
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() => _selectedCategory = result);
+    }
   }
 
   @override
@@ -143,10 +166,10 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
               _amountController.text.replaceAll(',', '.')) *
           100)
           .round();
-      await context.read<NotificationInboxViewModel>().approvePending(
+      await context.read<PendingSuggestionsViewModel>().approvePending(
             pending: widget.pending,
             accountId: accountId,
-            categoryId: _selectedCategoryId,
+            categoryId: _selectedCategory?.id,
             amountCentsOverride: amountCents,
             currencyCodeOverride: _currencyController.text.trim().toUpperCase(),
             descriptionOverride: _descriptionController.text.trim(),
@@ -169,7 +192,7 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
     setState(() => _isSaving = true);
     try {
       await context
-          .read<NotificationInboxViewModel>()
+          .read<PendingSuggestionsViewModel>()
           .dismissPending(widget.pending, wasHelpful: _wasHelpful);
       if (!mounted) return;
       Navigator.of(context).pop(false);
@@ -344,28 +367,18 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
               const SizedBox(height: 16),
               _SectionLabel('Categoría (opcional)'),
               const SizedBox(height: 6),
-              if (_isLoadingCategories)
+              if (_isLoadingCategory)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
                   child: LinearProgressIndicator(),
                 )
               else
-                DropdownButtonFormField<String?>(
-                  initialValue: _selectedCategoryId,
-                  hint: const Text('Sin categoría'),
-                  items: <DropdownMenuItem<String?>>[
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('Sin categoría'),
-                    ),
-                    ..._categories.map(
-                      (c) => DropdownMenuItem<String?>(
-                        value: c.id,
-                        child: Text(c.name),
-                      ),
-                    ),
-                  ],
-                  onChanged: (id) => setState(() => _selectedCategoryId = id),
+                _CategoryTile(
+                  category: _selectedCategory,
+                  onTap: _openCategoryPicker,
+                  onClear: _selectedCategory == null
+                      ? null
+                      : () => setState(() => _selectedCategory = null),
                 ),
               if (_hasCurrencyMismatch) ...[
                 const SizedBox(height: 8),
@@ -476,6 +489,93 @@ class _SectionLabel extends StatelessWidget {
         fontWeight: FontWeight.w600,
         color: Theme.of(context).colorScheme.onSurfaceVariant,
         letterSpacing: 0.3,
+      ),
+    );
+  }
+}
+
+Color _hexToColor(String hex, Color fallback) {
+  if (hex.isEmpty) return fallback;
+  try {
+    final sanitized = hex.replaceFirst('#', '');
+    if (sanitized.length != 6) return fallback;
+    return Color(int.parse('FF$sanitized', radix: 16));
+  } catch (_) {
+    return fallback;
+  }
+}
+
+class _CategoryTile extends StatelessWidget {
+  final CategoryModel? category;
+  final VoidCallback onTap;
+  final VoidCallback? onClear;
+
+  const _CategoryTile({
+    required this.category,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cat = category;
+    final hasSelection = cat != null;
+    final color = hasSelection
+        ? _hexToColor(cat.color, theme.colorScheme.primary)
+        : theme.colorScheme.surfaceContainerHigh;
+    final iconData = hasSelection
+        ? CategoryIconData.iconFromHex(cat.icon)
+        : Icons.category_outlined;
+
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: hasSelection
+                    ? color.withValues(alpha: 0.18)
+                    : color,
+                child: Icon(
+                  iconData,
+                  size: 18,
+                  color: hasSelection
+                      ? color
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  hasSelection ? cat.name : 'Sin categoría',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: hasSelection ? FontWeight.w500 : FontWeight.w400,
+                    color: hasSelection
+                        ? theme.colorScheme.onSurface
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              if (onClear != null)
+                IconButton(
+                  tooltip: 'Quitar categoría',
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  onPressed: onClear,
+                )
+              else
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

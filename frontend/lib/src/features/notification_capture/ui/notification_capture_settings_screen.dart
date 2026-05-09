@@ -21,6 +21,7 @@ import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_preferences.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_permission_service.dart';
+import 'package:pocket_pilot/src/features/notification_capture/ui/pending_suggestions_view_model.dart';
 
 class NotificationCaptureSettingsScreen extends StatefulWidget {
   const NotificationCaptureSettingsScreen({super.key});
@@ -73,6 +74,17 @@ class _NotificationCaptureSettingsScreenState
     await svc.openSettings();
   }
 
+  Future<void> _reprocessUnparseable() async {
+    final vm = context.read<PendingSuggestionsViewModel>();
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await vm.reprocessUnparseable();
+    if (!mounted) return;
+    final text = result.reopened == 0
+        ? 'No hay notificaciones para reintentar.'
+        : 'Reintentadas ${result.reopened}, parseadas ${result.matched}.';
+    messenger.showSnackBar(SnackBar(content: Text(text)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -96,16 +108,6 @@ class _NotificationCaptureSettingsScreenState
                     ),
                     const Divider(height: 1, indent: 56),
                     ListTile(
-                      leading: const Icon(Icons.inbox_rounded),
-                      title: const Text('Bandeja de sugerencias'),
-                      subtitle: const Text(
-                        'Revisa y aprueba transacciones detectadas en tus notificaciones.',
-                      ),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => context.push('/inbox'),
-                    ),
-                    const Divider(height: 1, indent: 56),
-                    ListTile(
                       leading: const Icon(Icons.account_balance_rounded),
                       title: const Text('Mis bancos'),
                       subtitle: const Text(
@@ -114,6 +116,15 @@ class _NotificationCaptureSettingsScreenState
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () =>
                           context.push('/settings/notification-capture/banks'),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    ListTile(
+                      leading: const Icon(Icons.replay_rounded),
+                      title: const Text('Reintentar parseo'),
+                      subtitle: const Text(
+                        'Vuelve a procesar las notificaciones que el engine no pudo leer antes (útil tras una actualización del parser).',
+                      ),
+                      onTap: _reprocessUnparseable,
                     ),
                   ]),
                 ),

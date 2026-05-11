@@ -61,16 +61,25 @@ class TransactionRepository {
   /// Confirma una transacción pendiente: cambia status a 'cleared' y
   /// preserva todos los demás campos (incluida la fecha). Idempotente:
   /// no hace nada si la transacción no existe o ya está cleared.
+  ///
+  /// No delega en `updateTransaction` porque esa signature no acepta
+  /// `linkedTransactionId`/`yieldId`/`holdingId`/`lotId` y `upsertRow`
+  /// reemplaza la fila completa, borrando esos campos en transfers,
+  /// yields e inversiones.
   Future<void> confirmTransaction(String id) async {
     final current = await getTransactionById(id);
     if (current == null || current.status == 'cleared') return;
 
-    await updateTransaction(
+    final updated = TransactionModel(
       id: current.id,
       accountId: current.accountId,
       categoryId: current.categoryId,
+      linkedTransactionId: current.linkedTransactionId,
       templateId: current.templateId,
-      amountMinor: current.amount,
+      yieldId: current.yieldId,
+      holdingId: current.holdingId,
+      lotId: current.lotId,
+      amount: current.amount,
       installmentsCount: current.installmentsCount,
       currencyCode: current.currencyCode,
       description: current.description,
@@ -80,6 +89,15 @@ class TransactionRepository {
       status: 'cleared',
       tags: current.tags,
       createdAt: current.createdAt,
+      updatedAt: DateTime.now().toUtc(),
+    );
+
+    await _local.upsertRow(updated.toMap());
+    await _outbox.enqueue(
+      entityType: 'transaction',
+      entityId: id,
+      operation: 'upsert',
+      payload: jsonEncode(updated.toServerMap()),
     );
   }
 

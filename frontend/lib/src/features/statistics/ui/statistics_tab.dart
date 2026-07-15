@@ -37,6 +37,13 @@ class StatisticsTab extends StatelessWidget {
               subtitle: 'Ingresos vs gastos y neto del periodo',
               onTap: () => context.push('/dashboard/statistics/cashflow'),
             ),
+            const SizedBox(height: 10),
+            _HubEntry(
+              icon: Icons.label_outlined,
+              title: 'Etiquetas',
+              subtitle: 'Cuánto y en qué gastas por etiqueta',
+              onTap: () => context.push('/dashboard/statistics/tags'),
+            ),
             const SizedBox(height: 20),
             Text(
               'Próximamente se agregarán más visualizaciones aquí.',

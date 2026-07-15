@@ -745,57 +745,68 @@ class _TagSpendBreakdown extends StatelessWidget {
             final pct = totalSpent > 0
                 ? (item.spentCents / totalSpent * 100).round()
                 : 0;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: colorFor(item.tagName),
-                      borderRadius:
-                          const BorderRadius.all(Radius.circular(3)),
+            return InkWell(
+              borderRadius: AppTheme.radiusSmall,
+              onTap: () => context.push(
+                '/dashboard/statistics/tags/${Uri.encodeComponent(item.tagName)}'
+                '?currency=${item.currencyCode}',
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: colorFor(item.tagName),
+                        borderRadius:
+                            const BorderRadius.all(Radius.circular(3)),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      item.tagName,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        item.tagName,
+                        style: GoogleFonts.ibmPlexSans(
+                          fontSize: 13,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '$pct%',
+                      style: GoogleFonts.ibmPlexSans(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      _formatAmount(item.spentCents, currency),
                       style: GoogleFonts.ibmPlexSans(
                         fontSize: 13,
+                        fontWeight: FontWeight.w600,
                         color: cs.onSurface,
                       ),
                     ),
-                  ),
-                  Text(
-                    '$pct%',
-                    style: GoogleFonts.ibmPlexSans(
-                      fontSize: 12,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    _formatAmount(item.spentCents, currency),
-                    style: GoogleFonts.ibmPlexSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           }),
           if (sorted.length > 8)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                '+${sorted.length - 8} más',
-                style: GoogleFonts.ibmPlexSans(
-                  fontSize: 12,
-                  color: cs.onSurfaceVariant,
+            InkWell(
+              borderRadius: AppTheme.radiusSmall,
+              onTap: () => context.push('/dashboard/statistics/tags'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(
+                  '+${sorted.length - 8} más',
+                  style: GoogleFonts.ibmPlexSans(
+                    fontSize: 12,
+                    color: cs.primary,
+                  ),
                 ),
               ),
             ),

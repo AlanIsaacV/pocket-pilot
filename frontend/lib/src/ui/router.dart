@@ -77,6 +77,8 @@ import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.
 import 'package:pocket_pilot/src/features/statistics/ui/categories_route_scope.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/categories_tab.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/category_history_screen.dart';
+import 'package:pocket_pilot/src/features/statistics/ui/tag_history_screen.dart';
+import 'package:pocket_pilot/src/features/statistics/ui/tag_list_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/settings/settings_screen.dart';
@@ -135,6 +137,20 @@ GoRouter buildRouter(AuthProvider authProvider) {
                     builder: (context, state) => CategoryHistoryScreen(
                       categoryId: state.pathParameters['categoryId']!,
                       initialSummary: state.extra as CategorySeriesDTO?,
+                      initialCurrencyCode:
+                          state.uri.queryParameters['currency'],
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'statistics/tags',
+                    builder: (context, state) => const TagListScreen(),
+                  ),
+                  GoRoute(
+                    path: 'statistics/tags/:tagName',
+                    builder: (context, state) => TagHistoryScreen(
+                      tagName: Uri.decodeComponent(
+                        state.pathParameters['tagName']!,
+                      ),
                       initialCurrencyCode:
                           state.uri.queryParameters['currency'],
                     ),

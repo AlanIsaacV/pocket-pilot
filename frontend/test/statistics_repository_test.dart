@@ -247,6 +247,118 @@ void main() {
       expect(history.budget, isNull);
     });
   });
+
+  group('StatisticsRepository.getTagHistory', () {
+    test(
+      'total = sum of breakdown slices; current = last month in points',
+      () async {
+        final repo = StatisticsRepository(
+          local: _FakeLocalStore(
+            tagMonthlySeries: const [
+              {'ym': '2026-03', 'amount_cents': 30000},
+              {'ym': '2026-05', 'amount_cents': 50000},
+            ],
+            tagBreakdown: const [
+              {
+                'category_id': 'c1',
+                'category_name': 'Hotel',
+                'category_color': '#FF0000',
+                'category_icon': 'hotel',
+                'kind': 'expense',
+                'amount_cents': 60000,
+              },
+              {
+                'category_id': 'c2',
+                'category_name': 'Comida',
+                'category_color': '#00FF00',
+                'category_icon': 'restaurant',
+                'kind': 'expense',
+                'amount_cents': 20000,
+              },
+            ],
+          ),
+          budgetLocal: _FakeBudgetLocalStore(),
+        );
+
+        final h = await repo.getTagHistory(
+          tagName: 'vacaciones_merida_2026',
+          currencyCode: 'MXN',
+          from: '2026-03-01',
+          to: '2026-05-31',
+        );
+
+        // 3 months in window: Mar, Apr, May → zero-fill April.
+        expect(h.points.map((p) => p.yearMonth).toList(),
+            ['2026-03', '2026-04', '2026-05']);
+        expect(h.points.map((p) => p.amountCents).toList(),
+            [30000, 0, 50000]);
+
+        // Total comes from breakdown (60k + 20k), avg = total / 3 months.
+        expect(h.totalCents, 80000);
+        expect(h.avgMonthlyCents, 80000 ~/ 3);
+        expect(h.currentMonthCents, 50000);
+
+        // Breakdown order preserved from local store.
+        expect(h.categoryBreakdown.map((s) => s.categoryId).toList(),
+            ['c1', 'c2']);
+        expect(h.categoryBreakdown[0].categoryName, 'Hotel');
+      },
+    );
+
+    test('empty data returns zero-filled points and zero totals', () async {
+      final repo = StatisticsRepository(
+        local: _FakeLocalStore(),
+        budgetLocal: _FakeBudgetLocalStore(),
+      );
+
+      final h = await repo.getTagHistory(
+        tagName: 'unused',
+        currencyCode: 'MXN',
+        from: '2026-04-01',
+        to: '2026-04-30',
+      );
+
+      expect(h.totalCents, 0);
+      expect(h.avgMonthlyCents, 0);
+      expect(h.currentMonthCents, 0);
+      expect(h.points, hasLength(1));
+      expect(h.points.first.amountCents, 0);
+      expect(h.categoryBreakdown, isEmpty);
+    });
+  });
+
+  group('StatisticsRepository.listTagsWithTotals', () {
+    test('maps rows to TagSummaryDTO preserving order', () async {
+      final repo = StatisticsRepository(
+        local: _FakeLocalStore(
+          allTagsRows: const [
+            {
+              'tag_name': 'vacaciones_merida_2026',
+              'currency_code': 'MXN',
+              'amount_cents': 120000,
+            },
+            {
+              'tag_name': 'casa',
+              'currency_code': 'MXN',
+              'amount_cents': 80000,
+            },
+          ],
+        ),
+        budgetLocal: _FakeBudgetLocalStore(),
+      );
+
+      final tags = await repo.listTagsWithTotals(
+        from: '2026-01-01',
+        to: '2026-05-31',
+      );
+
+      expect(tags, hasLength(2));
+      expect(tags[0].tagName, 'vacaciones_merida_2026');
+      expect(tags[0].totalCents, 120000);
+      expect(tags[0].currencyCode, 'MXN');
+      expect(tags[1].tagName, 'casa');
+    });
+  });
 }
 
 // ---- fakes ---------------------------------------------------------
@@ -254,10 +366,16 @@ void main() {
 class _FakeLocalStore extends StatisticsLocalStore {
   final List<Map<String, dynamic>> categorySeries;
   final List<Map<String, dynamic>> monthlySeries;
+  final List<Map<String, dynamic>> tagMonthlySeries;
+  final List<Map<String, dynamic>> tagBreakdown;
+  final List<Map<String, dynamic>> allTagsRows;
 
   _FakeLocalStore({
     this.categorySeries = const [],
     this.monthlySeries = const [],
+    this.tagMonthlySeries = const [],
+    this.tagBreakdown = const [],
+    this.allTagsRows = const [],
   }) : super(db: DatabaseHelper());
 
   @override
@@ -280,6 +398,35 @@ class _FakeLocalStore extends StatisticsLocalStore {
     Set<String>? accountIds,
   }) async =>
       monthlySeries;
+
+  @override
+  Future<List<Map<String, dynamic>>> getTagMonthlySeries({
+    required String tagName,
+    required String currencyCode,
+    required String windowStart,
+    required String windowEnd,
+    Set<String>? accountIds,
+  }) async =>
+      tagMonthlySeries;
+
+  @override
+  Future<List<Map<String, dynamic>>> getTagCategoryBreakdown({
+    required String tagName,
+    required String currencyCode,
+    required String windowStart,
+    required String windowEnd,
+    Set<String>? accountIds,
+  }) async =>
+      tagBreakdown;
+
+  @override
+  Future<List<Map<String, dynamic>>> getAllTagsWithTotals({
+    required String windowStart,
+    required String windowEnd,
+    Set<String>? accountIds,
+    String? currencyCode,
+  }) async =>
+      allTagsRows;
 }
 
 class _FakeBudgetLocalStore extends BudgetLocalStore {

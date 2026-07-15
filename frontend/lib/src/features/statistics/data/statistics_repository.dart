@@ -13,6 +13,9 @@ import 'package:pocket_pilot/src/features/statistics/data/statistics_local_store
 import 'package:pocket_pilot/src/features/statistics/domain/category_history_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/monthly_point_dto.dart';
+import 'package:pocket_pilot/src/features/statistics/domain/tag_category_slice_dto.dart';
+import 'package:pocket_pilot/src/features/statistics/domain/tag_history_dto.dart';
+import 'package:pocket_pilot/src/features/statistics/domain/tag_summary_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/trend.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/window_math.dart';
 
@@ -102,6 +105,99 @@ class StatisticsRepository {
       points: points,
       budget: budget,
     );
+  }
+
+  /// Detalle de un tag para [TagHistoryScreen]. Combina serie mensual
+  /// + breakdown por categoría dentro del tag. Comparte la ventana de
+  /// `StatisticsWindow.fromRange` con CategoriesTab para mantener
+  /// consistencia (mismo cálculo de avg mensual, mismo zero-fill).
+  Future<TagHistoryDTO> getTagHistory({
+    required String tagName,
+    required String currencyCode,
+    required String from,
+    required String to,
+    Set<String>? accountIds,
+  }) async {
+    final window = StatisticsWindow.fromRange(from: from, to: to);
+
+    final pointRows = await _local.getTagMonthlySeries(
+      tagName: tagName,
+      currencyCode: currencyCode,
+      windowStart: window.windowStart,
+      windowEnd: window.windowEnd,
+      accountIds: accountIds,
+    );
+    final byYm = <String, int>{
+      for (final r in pointRows) r['ym'] as String: _asInt(r['amount_cents']),
+    };
+    final points = window.monthsInWindow
+        .map(
+          (ym) => MonthlyPointDTO(
+            yearMonth: ym,
+            amountCents: byYm[ym] ?? 0,
+          ),
+        )
+        .toList(growable: false);
+
+    final breakdownRows = await _local.getTagCategoryBreakdown(
+      tagName: tagName,
+      currencyCode: currencyCode,
+      windowStart: window.windowStart,
+      windowEnd: window.windowEnd,
+      accountIds: accountIds,
+    );
+    final breakdown = breakdownRows
+        .map(
+          (r) => TagCategorySliceDTO(
+            categoryId: (r['category_id'] as String?) ?? '',
+            categoryName: (r['category_name'] as String?) ?? 'Sin categoría',
+            categoryColor: (r['category_color'] as String?) ?? '',
+            categoryIcon: (r['category_icon'] as String?) ?? '',
+            kind: (r['kind'] as String?) ?? 'expense',
+            amountCents: _asInt(r['amount_cents']),
+          ),
+        )
+        .toList(growable: false);
+
+    final totalCents = breakdown.fold<int>(0, (s, b) => s + b.amountCents);
+    final avg = window.months > 0 ? totalCents ~/ window.months : 0;
+    final currentMonth = points.isEmpty ? 0 : points.last.amountCents;
+
+    return TagHistoryDTO(
+      tagName: tagName,
+      currencyCode: currencyCode,
+      totalCents: totalCents,
+      avgMonthlyCents: avg,
+      currentMonthCents: currentMonth,
+      points: points,
+      categoryBreakdown: breakdown,
+    );
+  }
+
+  /// Lista completa de tags con actividad neta positiva (gasto) en la
+  /// ventana. Si [currencyCode] es null, agrupa por (tag, currency).
+  Future<List<TagSummaryDTO>> listTagsWithTotals({
+    required String from,
+    required String to,
+    Set<String>? accountIds,
+    String? currencyCode,
+  }) async {
+    final window = StatisticsWindow.fromRange(from: from, to: to);
+    final rows = await _local.getAllTagsWithTotals(
+      windowStart: window.windowStart,
+      windowEnd: window.windowEnd,
+      accountIds: accountIds,
+      currencyCode: currencyCode,
+    );
+    return rows
+        .map(
+          (r) => TagSummaryDTO(
+            tagName: r['tag_name'] as String,
+            currencyCode: r['currency_code'] as String,
+            totalCents: _asInt(r['amount_cents']),
+          ),
+        )
+        .toList(growable: false);
   }
 
   // ---- helpers -----------------------------------------------------

@@ -785,6 +785,7 @@ class _TransactionTile extends StatelessWidget {
     final accountName = account?.name;
     final description = transaction.description;
     final tags = transaction.tags;
+    final isAutoConfirmed = transaction.source == 'auto_notification';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
@@ -869,7 +870,9 @@ class _TransactionTile extends StatelessWidget {
                         ],
                       ),
                       // Row 3: Description (left) | Tags (right)
-                      if (tags.isNotEmpty || description.isNotEmpty) ...[
+                      if (tags.isNotEmpty ||
+                          description.isNotEmpty ||
+                          isAutoConfirmed) ...[
                         const SizedBox(height: 4),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -888,31 +891,52 @@ class _TransactionTile extends StatelessWidget {
                               )
                             else
                               const Spacer(),
-                            if (tags.isNotEmpty) ...[
+                            if (isAutoConfirmed || tags.isNotEmpty) ...[
                               const SizedBox(width: 8),
                               Wrap(
                                 spacing: 4,
                                 runSpacing: 4,
-                                children: tags.map((tag) {
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: cs.surfaceContainerHighest,
-                                      borderRadius: AppTheme.radiusFull,
-                                    ),
-                                    child: Text(
-                                      tag,
-                                      style: GoogleFonts.ibmPlexSans(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w500,
-                                        color: cs.onSurfaceVariant,
+                                children: [
+                                  if (isAutoConfirmed)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: cs.primaryContainer,
+                                        borderRadius: AppTheme.radiusFull,
+                                      ),
+                                      child: Text(
+                                        'Auto',
+                                        style: GoogleFonts.ibmPlexSans(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: cs.onPrimaryContainer,
+                                        ),
                                       ),
                                     ),
-                                  );
-                                }).toList(),
+                                  ...tags.map((tag) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: cs.surfaceContainerHighest,
+                                        borderRadius: AppTheme.radiusFull,
+                                      ),
+                                      child: Text(
+                                        tag,
+                                        style: GoogleFonts.ibmPlexSans(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w500,
+                                          color: cs.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ],
                               ),
                             ],
                           ],

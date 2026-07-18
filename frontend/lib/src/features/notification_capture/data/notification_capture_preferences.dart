@@ -25,6 +25,8 @@ import 'package:pocket_pilot/src/features/user_preferences/domain/user_preferenc
 
 const String kPrefShareWithLlmForParser = 'notification_capture.share_with_llm_for_parser';
 const String kPrefHelpImproveApp = 'notification_capture.help_improve_app';
+const String kPrefAutoConfirmEnabled =
+    'notification_capture.auto_confirm_enabled';
 const String kPrefLastPurgeAt = 'notification_capture.last_purge_at';
 
 class NotificationCapturePreferences {
@@ -43,11 +45,19 @@ class NotificationCapturePreferences {
     return _parseBool(pref?.prefValue, defaultValue: true);
   }
 
+  Future<bool> autoConfirmEnabled() async {
+    final pref = await _store.getByKey(kPrefAutoConfirmEnabled);
+    return _parseBool(pref?.prefValue, defaultValue: false);
+  }
+
   Future<void> setShareWithLlmForParser(bool value) =>
       _setBool(kPrefShareWithLlmForParser, value);
 
   Future<void> setHelpImproveApp(bool value) =>
       _setBool(kPrefHelpImproveApp, value);
+
+  Future<void> setAutoConfirmEnabled(bool value) =>
+      _setBool(kPrefAutoConfirmEnabled, value);
 
   /// Última vez que el sweeper de retención (90d) corrió. NULL = nunca.
   /// El sweeper consulta este valor para evitar correr más de una vez por día.

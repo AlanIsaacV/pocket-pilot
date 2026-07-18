@@ -28,6 +28,7 @@ type Transaction struct {
 	InstallmentsCount   int32
 	CurrencyCode        string
 	Status              string
+	Source              string // "manual" | "auto_notification" | future provenance values
 	Tags                []string
 	Description         string
 	Nature              string    // "required" | "obligation" | "lifestyle" | "active" | "passive" | "windfall" | "investment" | ""
@@ -46,7 +47,7 @@ func NewRepository(pool *pgxpool.Pool, cursor *sync.CursorStore) *Repository {
 	return &Repository{pool: pool, cursor: cursor}
 }
 
-const scanColumns = `id, user_id, account_id, category_id, linked_transaction_id, template_id, yield_id, holding_id, lot_id, type, amount_cents, installments_count, currency_code, status, tags, description, nature, date, created_at, updated_at, deleted_at`
+const scanColumns = `id, user_id, account_id, category_id, linked_transaction_id, template_id, yield_id, holding_id, lot_id, type, amount_cents, installments_count, currency_code, status, source, tags, description, nature, date, created_at, updated_at, deleted_at`
 
 var (
 	ErrTemplateReferenceNotFound       = errors.New("template reference does not exist for user")
@@ -66,7 +67,7 @@ func (r *Repository) scan(row pgx.Row) (*Transaction, error) {
 		&t.YieldID,
 		&t.HoldingID,
 		&t.LotID,
-		&t.Type, &t.AmountCents, &t.InstallmentsCount, &t.CurrencyCode, &t.Status,
+		&t.Type, &t.AmountCents, &t.InstallmentsCount, &t.CurrencyCode, &t.Status, &t.Source,
 		&t.Tags, &t.Description, &t.Nature, &t.Date,
 		&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt,
 	)
@@ -147,8 +148,8 @@ func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, 
 	defer tx.Rollback(ctx)
 
 	row := tx.QueryRow(ctx, `
-		INSERT INTO transactions (id, user_id, account_id, category_id, linked_transaction_id, template_id, yield_id, holding_id, lot_id, type, amount_cents, installments_count, currency_code, status, tags, description, nature, date, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+		INSERT INTO transactions (id, user_id, account_id, category_id, linked_transaction_id, template_id, yield_id, holding_id, lot_id, type, amount_cents, installments_count, currency_code, status, source, tags, description, nature, date, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 		ON CONFLICT (id) DO UPDATE SET
 			account_id              = EXCLUDED.account_id,
 			category_id             = EXCLUDED.category_id,
@@ -162,6 +163,7 @@ func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, 
 			installments_count      = EXCLUDED.installments_count,
 			currency_code           = EXCLUDED.currency_code,
 			status                  = EXCLUDED.status,
+			source                  = EXCLUDED.source,
 			tags                    = EXCLUDED.tags,
 			description             = EXCLUDED.description,
 			nature                  = EXCLUDED.nature,
@@ -174,7 +176,7 @@ func (r *Repository) Upsert(ctx context.Context, t *Transaction) (*Transaction, 
 		t.YieldID,
 		t.HoldingID,
 		t.LotID,
-		t.Type, t.AmountCents, t.InstallmentsCount, t.CurrencyCode, t.Status,
+		t.Type, t.AmountCents, t.InstallmentsCount, t.CurrencyCode, t.Status, t.Source,
 		t.Tags, t.Description, t.Nature, t.Date,
 		t.CreatedAt, t.UpdatedAt,
 	)

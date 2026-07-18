@@ -32,6 +32,7 @@ class TransactionModel {
   final String date;
   final String type;
   final String status;
+  final String source;
   final List<String> tags;
 
   final DateTime createdAt;
@@ -54,6 +55,7 @@ class TransactionModel {
     required this.date,
     required this.type,
     required this.status,
+    this.source = 'manual',
     required this.tags,
     required this.createdAt,
     required this.updatedAt,
@@ -82,6 +84,7 @@ class TransactionModel {
       date: proto.date.toDateTime().toIso8601String().substring(0, 10),
       type: _transactionTypeToString(proto.type),
       status: proto.status,
+      source: proto.hasSource() ? proto.source : 'manual',
       tags: List<String>.from(proto.tags),
       createdAt: proto.createdAt.toDateTime(),
       updatedAt: proto.updatedAt.toDateTime(),
@@ -109,6 +112,7 @@ class TransactionModel {
       date: map['date'] as String,
       type: map['type'] as String,
       status: map['status'] as String,
+      source: map['source'] as String? ?? 'manual',
       tags: _decodeTags(map['tags']),
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
@@ -137,6 +141,7 @@ class TransactionModel {
       'date': date,
       'type': type,
       'status': status,
+      'source': source,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -163,6 +168,7 @@ class TransactionModel {
       'date': date,
       'type': type,
       'status': status,
+      'source': source,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };

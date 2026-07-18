@@ -228,6 +228,25 @@ class TransactionLocalStore {
     return rows.map((r) => r['category_id'] as String).toList();
   }
 
+  /// Returns whether transactions whose description starts with [prefix]
+  /// have been assigned two or more distinct categories. This deliberately
+  /// includes all active history because it is a conservative confidence
+  /// signal for notification auto-confirmation.
+  Future<bool> hasAmbiguousCategoryHistoryForDescriptionPrefix(
+    String prefix,
+  ) async {
+    if (prefix.trim().isEmpty) return false;
+    final db = await _db.database;
+    final rows = await db.rawQuery(
+      'SELECT COUNT(DISTINCT category_id) AS category_count '
+      'FROM transactions '
+      'WHERE deleted_at IS NULL AND lower(description) LIKE lower(?) || \'%\'',
+      [prefix],
+    );
+    final count = (rows.first['category_count'] as num?)?.toInt() ?? 0;
+    return count >= 2;
+  }
+
   // ----------------------------------------------------------
   // WRITE
   // ----------------------------------------------------------

@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/generated/pocket_pilot/v1/transaction_service.pb.dart'
+    as pb;
 
 void main() {
   test('fromMap parses tags JSON array', () {
@@ -23,6 +25,7 @@ void main() {
     });
 
     expect(model.tags, ['rent', 'fixed']);
+    expect(model.source, 'manual');
   });
 
   test('toMap encodes tags and template_id for local storage', () {
@@ -49,6 +52,7 @@ void main() {
 
     expect(map['template_id'], 'tpl-1');
     expect(map['tags'], '["rent","fixed"]');
+    expect(map['source'], 'manual');
   });
 
   test('toServerMap keeps tags as repeated string payload', () {
@@ -75,5 +79,35 @@ void main() {
 
     expect(payload['template_id'], 'tpl-1');
     expect(payload['tags'], ['rent', 'fixed']);
+    expect(payload['source'], 'manual');
+  });
+
+  test('source round-trips through local and server maps', () {
+    final model = TransactionModel(
+      id: 't1',
+      accountId: 'a1',
+      amount: 100,
+      installmentsCount: 1,
+      currencyCode: 'MXN',
+      description: '',
+      date: '2026-04-01',
+      type: 'expense',
+      status: 'cleared',
+      source: 'auto_notification',
+      tags: const [],
+      createdAt: DateTime.parse('2026-04-01T00:00:00Z'),
+      updatedAt: DateTime.parse('2026-04-01T00:00:00Z'),
+    );
+
+    expect(TransactionModel.fromMap(model.toMap()).source, 'auto_notification');
+    expect(model.toServerMap()['source'], 'auto_notification');
+  });
+
+  test('fromProto keeps optional source when present', () {
+    final model = TransactionModel.fromProto(
+      pb.Transaction(source: 'auto_notification', installmentsCount: 1),
+    );
+
+    expect(model.source, 'auto_notification');
   });
 }

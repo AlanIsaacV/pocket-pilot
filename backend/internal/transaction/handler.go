@@ -152,6 +152,10 @@ func toProto(t *Transaction) *pb.Transaction {
 		CreatedAt:         timestamppb.New(t.CreatedAt),
 		UpdatedAt:         timestamppb.New(t.UpdatedAt),
 	}
+	if t.Source != "" {
+		s := t.Source
+		proto.Source = &s
+	}
 	if t.CategoryID != nil {
 		s := t.CategoryID.String()
 		proto.CategoryId = &s
@@ -255,6 +259,11 @@ func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
 		date = p.Date.AsTime().UTC().Truncate(24 * time.Hour)
 	}
 
+	source := "manual"
+	if p.Source != nil && *p.Source != "" {
+		source = *p.Source
+	}
+
 	return &Transaction{
 		ID:                  id,
 		UserID:              userID,
@@ -270,6 +279,7 @@ func fromProto(p *pb.Transaction, userID uuid.UUID) (*Transaction, error) {
 		InstallmentsCount:   p.InstallmentsCount,
 		CurrencyCode:        p.CurrencyCode,
 		Status:              p.Status,
+		Source:              source,
 		Tags:                p.Tags,
 		Description:         p.Description,
 		Nature:              financialNatureToString(p.Nature),

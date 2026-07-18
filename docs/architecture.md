@@ -15,7 +15,7 @@ pocket-pilot/
 ├── proto/pocket_pilot/v1/     # gRPC contracts (source of truth) — one *_service.proto per entity + common.proto
 ├── backend/                   # Go gRPC server + PostgreSQL
 │   ├── cmd/server/            # entrypoint (main)
-│   ├── migrations/            # numbered PostgreSQL migrations (001..018)
+│   ├── migrations/            # numbered PostgreSQL migrations (001..NNN — see dir for current head)
 │   └── internal/
 │       ├── <entity>/          # one package per domain: handler.go (gRPC) + repository.go (pgx SQL)
 │       ├── sync/              # SyncService: GetSyncStatus preflight + per-user cursors
@@ -33,7 +33,7 @@ pocket-pilot/
 │   │   ├── core/{db,ids,sync,grpc,auth,notifications,theme,constants}/
 │   │   ├── generated/         # GENERATED Dart gRPC stubs — do not edit by hand
 │   │   └── ui/                # shared widgets/theme
-│   └── assets/migrations/     # numbered SQLite migrations (001..016)
+│   └── assets/migrations/     # numbered SQLite migrations (001..NNN; head == DatabaseHelper._version)
 ├── scripts/                   # Python bank-statement parsers (uv) + gen_proto.sh + adb dump helper
 ├── statements/                # sample bank statements (input for the parsers)
 ├── docker-compose.yml         # local PostgreSQL
@@ -77,10 +77,12 @@ sync). Triggers: connectivity recovery, app resume (30s throttle), manual. Full 
 - **Contract shape** (`proto/pocket_pilot/v1/`): each syncable entity exposes
   `List/Upsert/Delete<Entity>` RPCs; `List` carries `updated_since`; `Delete` carries `deleted_at`
   for LWW soft deletes. `Money` in `common.proto`; money stored as cents (`BIGINT`/`INTEGER`).
-- **PostgreSQL** (`backend/migrations/`, 18 applied): UUID ids, `TIMESTAMP WITH TIME ZONE`, LWW
+- **PostgreSQL** (`backend/migrations/`, numbered sequentially — the directory is the source of
+  truth for the current head): UUID ids, `TIMESTAMP WITH TIME ZONE`, LWW
   columns on syncable tables; composite-key entities (e.g. `user_preferences`) do LWW against their
   unique key.
-- **SQLite** (`frontend/assets/migrations/`, 16 applied): `TEXT` UUIDs, ISO-8601 UTC timestamps,
+- **SQLite** (`frontend/assets/migrations/`; `DatabaseHelper._version` always equals the highest
+  migration number): `TEXT` UUIDs, ISO-8601 UTC timestamps,
   `INTEGER` cents; may omit `user_id` (single-user local DB). Bump `_version` in `DatabaseHelper`.
 - **user_preferences** — cross-cutting key-value store (`pref_key`,`pref_value`) synced like any
   other entity; feeds currency options and `app.theme_mode`.

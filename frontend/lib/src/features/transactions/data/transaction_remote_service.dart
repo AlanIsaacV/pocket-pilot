@@ -41,61 +41,69 @@ class TransactionRemoteService {
     Map<String, dynamic> map,
   ) async {
     try {
-      final now = DateTime.now().toUtc();
-      final installmentsCount = (map['installments_count'] as int?) ?? 1;
-      if (installmentsCount < 1) {
-        throw ArgumentError.value(
-          installmentsCount,
-          'installments_count',
-          'installments_count must be >= 1',
-        );
-      }
-      final transaction = Transaction(
-        id: map['id'] as String,
-        accountId: map['account_id'] as String,
-        type: TransactionModel.stringToTransactionType(map['type'] as String),
-        nature: TransactionModel.stringToFinancialNature(
-            map['nature'] as String? ?? ''),
-        amountCents: Int64(map['amount_cents'] as int),
-        installmentsCount: installmentsCount,
-        currencyCode: map['currency_code'] as String,
-        status: map['status'] as String? ?? 'cleared',
-        tags: _toTags(map['tags']),
-        description: map['description'] as String,
-        date: Timestamp.fromDateTime(
-          DateTime.parse(map['date'] as String).toUtc(),
-        ),
-        updatedAt: Timestamp.fromDateTime(
-          map['updated_at'] != null
-              ? DateTime.parse(map['updated_at'] as String).toUtc()
-              : now,
-        ),
-      );
-      if (map['category_id'] != null) {
-        transaction.categoryId = map['category_id'] as String;
-      }
-      if (map['linked_transaction_id'] != null) {
-        transaction.linkedTransactionId =
-            map['linked_transaction_id'] as String;
-      }
-      if (map['template_id'] != null) {
-        transaction.templateId = map['template_id'] as String;
-      }
-      if (map['yield_id'] != null) {
-        transaction.yieldId = map['yield_id'] as String;
-      }
-      if (map['holding_id'] != null) {
-        transaction.holdingId = map['holding_id'] as String;
-      }
-      if (map['lot_id'] != null) {
-        transaction.lotId = map['lot_id'] as String;
-      }
+      final transaction = transactionFromPayload(map);
       return await _client.upsertTransaction(
         UpsertTransactionRequest(transaction: transaction),
       );
     } on GrpcError catch (e) {
       throw Exception('gRPC upsertTransaction error: ${e.message}');
     }
+  }
+
+  /// Builds the wire transaction from an outbox payload. Kept separate so
+  /// every syncable field can be regression-tested without a gRPC channel.
+  static Transaction transactionFromPayload(Map<String, dynamic> map) {
+    final now = DateTime.now().toUtc();
+    final installmentsCount = (map['installments_count'] as int?) ?? 1;
+    if (installmentsCount < 1) {
+      throw ArgumentError.value(
+        installmentsCount,
+        'installments_count',
+        'installments_count must be >= 1',
+      );
+    }
+    final transaction = Transaction(
+      id: map['id'] as String,
+      accountId: map['account_id'] as String,
+      type: TransactionModel.stringToTransactionType(map['type'] as String),
+      nature: TransactionModel.stringToFinancialNature(
+        map['nature'] as String? ?? '',
+      ),
+      amountCents: Int64(map['amount_cents'] as int),
+      installmentsCount: installmentsCount,
+      currencyCode: map['currency_code'] as String,
+      status: map['status'] as String? ?? 'cleared',
+      source: map['source'] as String? ?? 'manual',
+      tags: _toTags(map['tags']),
+      description: map['description'] as String,
+      date: Timestamp.fromDateTime(
+        DateTime.parse(map['date'] as String).toUtc(),
+      ),
+      updatedAt: Timestamp.fromDateTime(
+        map['updated_at'] != null
+            ? DateTime.parse(map['updated_at'] as String).toUtc()
+            : now,
+      ),
+    );
+    if (map['category_id'] != null) {
+      transaction.categoryId = map['category_id'] as String;
+    }
+    if (map['linked_transaction_id'] != null) {
+      transaction.linkedTransactionId = map['linked_transaction_id'] as String;
+    }
+    if (map['template_id'] != null) {
+      transaction.templateId = map['template_id'] as String;
+    }
+    if (map['yield_id'] != null) {
+      transaction.yieldId = map['yield_id'] as String;
+    }
+    if (map['holding_id'] != null) {
+      transaction.holdingId = map['holding_id'] as String;
+    }
+    if (map['lot_id'] != null) {
+      transaction.lotId = map['lot_id'] as String;
+    }
+    return transaction;
   }
 
   Future<void> deleteTransaction({

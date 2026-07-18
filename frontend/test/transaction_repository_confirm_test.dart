@@ -44,40 +44,95 @@ void main() {
       expect(inRow['template_id'], 'tpl-1');
       expect(outRow['status'], 'cleared');
       expect(inRow['status'], 'cleared');
+      expect(outRow['source'], 'manual');
 
       expect(outbox.payloads.length, 2);
-      final outPayload =
-          jsonDecode(outbox.payloads[0]) as Map<String, dynamic>;
+      final outPayload = jsonDecode(outbox.payloads[0]) as Map<String, dynamic>;
       final inPayload = jsonDecode(outbox.payloads[1]) as Map<String, dynamic>;
       expect(outPayload['linked_transaction_id'], 'in-1');
       expect(outPayload['template_id'], 'tpl-1');
       expect(outPayload['status'], 'cleared');
+      expect(outPayload['source'], 'manual');
       expect(inPayload['linked_transaction_id'], 'out-1');
       expect(inPayload['template_id'], 'tpl-1');
       expect(inPayload['status'], 'cleared');
     },
   );
 
-  test(
-    'confirmTransaction es idempotente cuando ya está cleared',
-    () async {
-      final local = _FakeTransactionLocalStore();
-      final outbox = _CapturingSyncOutbox();
-      final repository = TransactionRepository(local: local, outbox: outbox);
+  test('confirmTransaction es idempotente cuando ya está cleared', () async {
+    final local = _FakeTransactionLocalStore();
+    final outbox = _CapturingSyncOutbox();
+    final repository = TransactionRepository(local: local, outbox: outbox);
 
-      local.rowsById['tx-1'] = _baseRow(
-        id: 'tx-1',
+    local.rowsById['tx-1'] = _baseRow(
+      id: 'tx-1',
+      accountId: 'acc-a',
+      type: 'expense',
+      status: 'cleared',
+      createdAt: DateTime.utc(2026, 4, 10).toIso8601String(),
+    );
+
+    await repository.confirmTransaction('tx-1');
+
+    expect(outbox.payloads, isEmpty);
+  });
+
+  test('createTransaction persists the manual source by default', () async {
+    final local = _FakeTransactionLocalStore();
+    final outbox = _CapturingSyncOutbox();
+    final repository = TransactionRepository(local: local, outbox: outbox);
+
+    await repository.createTransaction(
+      id: 'tx-1',
+      accountId: 'acc-a',
+      categoryId: null,
+      amountMinor: 5000,
+      currencyCode: 'MXN',
+      description: 'Compra',
+      date: '2026-07-18',
+      type: 'expense',
+      status: 'cleared',
+      tags: const [],
+    );
+
+    expect(local.rowsById['tx-1']!['source'], 'manual');
+    final payload = jsonDecode(outbox.payloads.single) as Map<String, dynamic>;
+    expect(payload['source'], 'manual');
+  });
+
+  test('updateTransaction preserves an auto transaction source', () async {
+    final local = _FakeTransactionLocalStore();
+    final outbox = _CapturingSyncOutbox();
+    final repository = TransactionRepository(local: local, outbox: outbox);
+    final createdAt = DateTime.utc(2026, 7, 18).toIso8601String();
+    local.rowsById['auto-1'] = {
+      ..._baseRow(
+        id: 'auto-1',
         accountId: 'acc-a',
         type: 'expense',
-        status: 'cleared',
-        createdAt: DateTime.utc(2026, 4, 10).toIso8601String(),
-      );
+        createdAt: createdAt,
+      ),
+      'source': 'auto_notification',
+    };
 
-      await repository.confirmTransaction('tx-1');
+    await repository.updateTransaction(
+      id: 'auto-1',
+      accountId: 'acc-a',
+      categoryId: null,
+      amountMinor: 5000,
+      currencyCode: 'MXN',
+      description: 'Compra editada',
+      date: '2026-07-18',
+      type: 'expense',
+      status: 'cleared',
+      tags: const [],
+      createdAt: DateTime.parse(createdAt),
+    );
 
-      expect(outbox.payloads, isEmpty);
-    },
-  );
+    expect(local.rowsById['auto-1']!['source'], 'auto_notification');
+    final payload = jsonDecode(outbox.payloads.single) as Map<String, dynamic>;
+    expect(payload['source'], 'auto_notification');
+  });
 
   test(
     'confirmTransaction preserva yield_id en transacciones de yield',
@@ -137,6 +192,7 @@ Map<String, dynamic> _baseRow({
     'date': '2026-04-10',
     'type': type,
     'status': status,
+    'source': 'manual',
     'created_at': createdAt,
     'updated_at': createdAt,
   };

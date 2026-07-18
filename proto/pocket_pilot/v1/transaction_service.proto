@@ -39,6 +39,7 @@ message Transaction {
   // generator. When lot_id is set, holding_id is also set.
   optional string holding_id = 19;
   optional string lot_id = 20;
+  optional string source = 21;
 }
 
 service TransactionService {

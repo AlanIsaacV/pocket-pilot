@@ -5,7 +5,7 @@
   "updated_at": "2026-07-18",
   "owner": null,
   "status": "in-progress",
-  "current_phase": 2,
+  "current_phase": 3,
   "phases": [
     {
       "id": 1,
@@ -150,11 +150,69 @@
       "name": "auto-confirm",
       "file": "phase-3-auto-confirm.md",
       "goal": "Suggestions that pass a conservative confidence gate become real transactions with zero user",
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "tasks": [],
-      "deviations": []
+      "status": "completed",
+      "started_at": "2026-07-18",
+      "completed_at": "2026-07-18",
+      "tasks": [
+        {
+          "id": "3.1",
+          "title": "Proto+backend: optional string source=21 on Transaction, make proto, PG migration 020_transactions_source.sql (ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'), thread source through backend/internal/transaction (struct, scan, Upsert, toProto/fromProto) + Go tests",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "3.2",
+          "title": "Frontend schema/model: SQLite migration 018.sql (ADD COLUMN source TEXT NOT NULL DEFAULT 'manual') + DatabaseHelper._version=18, TransactionModel.source field (fromMap/toMap/toServerMap/fromProto), createTransaction defaults source to 'manual'",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "3.3",
+          "title": "Preference notification_capture.auto_confirm_enabled (default false, _setBool/_parseBool pattern) + SwitchListTile toggle in notification_capture_settings_screen",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "3.4",
+          "title": "Repository: ambiguous-merchant detection (>=2 distinct categories over transactions matching rule prefix, case-insensitive, all history, per-run cache) + auto-confirm gate in processInbox (source=='parser_local' AND account resolved AND suggestedCategoryId!=null AND not ambiguous) + auto-approve path (transaction source='auto_notification', pending approved, notification consumed, parser_feedback thumb null flags false, NO mapping/rule learning)",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "3.5",
+          "title": "'Auto' badge in _TransactionTile when transaction.source=='auto_notification'",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "3.6",
+          "title": "Tests: gate happy path creates Transaction with auto provenance and no pending; ambiguous merchant stays pending; LLM match never auto-confirmed; toggle OFF reproduces current behavior",
+          "status": "done",
+          "notes": null
+        }
+      ],
+      "deviations": [
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Tasks 3.1-3.2 implemented via Codex (codex:codex-rescue). Codex sandbox could not run flutter test; orchestrator ran targeted tests inline: one new test fixture (installments_count=0 in fromProto fixture) failed and was fixed by resuming the Codex session; go test ./... and touched flutter tests green afterwards."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Tasks 3.3-3.4 implemented via Codex (resumed session). Ambiguity distinct-category query required touching transaction_local_store.dart and transaction_repository.dart (not in the phase file table; same pattern as phase 2's deviation). Existing notification_capture tests stay green with toggle OFF (10/10, run inline by orchestrator)."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Tasks 3.5-3.6 implemented via Codex (resumed session). Gate tests added as new file notification_capture_repository_auto_confirm_test.dart (4 scenarios). Full flutter test 258/259 \u2014 sole failure is the pre-existing statistics_category_list_row_test.dart documented since phase 1."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Verify found 1 CRITICAL: transaction_remote_service.upsertTransaction() dropped source from the outbound proto (backend defaulted it to 'manual', losing auto provenance on sync \u2014 same bug class as phase 1's pattern_id forwarding). Fixed via Codex resume together with: updateTransaction() now preserves source, regression tests at the remote-service seam, and deleted_at IS NULL filter in the ambiguity query. Full flutter suite 261/262 (sole pre-existing stats failure)."
+        }
+      ]
     },
     {
       "id": 4,
@@ -205,6 +263,11 @@
       "date": "2026-07-18",
       "note": "Phase 2: batch approval loop is continue-on-error \u2014 a mid-batch failure never rolls back approved items, the loop keeps going, failures are collected and reported in the result snackbar ('N aprobadas, M con error'); failed suggestions stay in the list for retry.",
       "adr_candidate": false
+    },
+    {
+      "date": "2026-07-18",
+      "note": "Phase 3: transaction provenance stored as a synced transactions.source column (proto field 21, PG migration 020, SQLite migration 018 + _version=18). Allowed values: 'manual' (default, incl. human-approved suggestions), 'auto_notification', future 'import_csv' (phase 5 dedup reuses it). Chosen over local-only marker: survives sync/reinstall and benefits phase 5.",
+      "adr_candidate": true
     }
   ],
   "references": [],

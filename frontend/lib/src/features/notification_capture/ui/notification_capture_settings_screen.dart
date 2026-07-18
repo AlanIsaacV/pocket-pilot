@@ -36,6 +36,7 @@ class _NotificationCaptureSettingsScreenState
   bool _loading = true;
   bool _shareWithLlm = false;
   bool _helpImproveApp = true;
+  bool _autoConfirmEnabled = false;
 
   @override
   void initState() {
@@ -47,10 +48,12 @@ class _NotificationCaptureSettingsScreenState
     final prefs = context.read<NotificationCapturePreferences>();
     final share = await prefs.shareWithLlmForParser();
     final help = await prefs.helpImproveApp();
+    final autoConfirm = await prefs.autoConfirmEnabled();
     if (!mounted) return;
     setState(() {
       _shareWithLlm = share;
       _helpImproveApp = help;
+      _autoConfirmEnabled = autoConfirm;
       _loading = false;
     });
   }
@@ -67,6 +70,13 @@ class _NotificationCaptureSettingsScreenState
     await prefs.setHelpImproveApp(value);
     if (!mounted) return;
     setState(() => _helpImproveApp = value);
+  }
+
+  Future<void> _setAutoConfirmEnabled(bool value) async {
+    final prefs = context.read<NotificationCapturePreferences>();
+    await prefs.setAutoConfirmEnabled(value);
+    if (!mounted) return;
+    setState(() => _autoConfirmEnabled = value);
   }
 
   Future<void> _openOSPermissionSettings() async {
@@ -127,6 +137,19 @@ class _NotificationCaptureSettingsScreenState
                       onTap: _reprocessUnparseable,
                     ),
                   ]),
+                ),
+                const SizedBox(height: 16),
+                _SectionLabel(label: 'CONFIRMACIÓN AUTOMÁTICA'),
+                _Card(
+                  child: SwitchListTile(
+                    title: const Text('Confirmar transacciones resueltas'),
+                    subtitle: const Text(
+                      'Registra automáticamente notificaciones leídas '
+                      'localmente cuando la cuenta y categoría son claras.',
+                    ),
+                    value: _autoConfirmEnabled,
+                    onChanged: _setAutoConfirmEnabled,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 _SectionLabel(label: 'PRIVACIDAD E IA'),

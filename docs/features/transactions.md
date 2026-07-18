@@ -23,12 +23,16 @@ Backend: `internal/transaction` (`TransactionService` — List/Upsert/Delete). C
 ## Files involved
 
 - `features/transactions/domain/` — `TransactionModel` (`tags`, optional `templateId`, nullable
-  `categoryId`), `transaction_filter.dart` (`TransactionFilter` value object).
+  `categoryId`, `source` provenance since frictionless-capture f3), `transaction_filter.dart`
+  (`TransactionFilter` value object).
 - `features/transactions/data/` — `transaction_local_store.dart` (SQL incl. `queryRowsFiltered`,
-  `queryTopCategoryIds` — optionally scoped by `accountId` since frictionless-capture f2),
-  `transaction_repository.dart` (`createTransfer`, `softDelete(id, linkedId)`,
-  `getTopCategoryIdsForAccount(accountId, {limit})` — consumed cross-feature by
-  notification-capture's quick-pick category chips), sync handler + remote service.
+  `queryTopCategoryIds` — optionally scoped by `accountId` since frictionless-capture f2 — and
+  `hasAmbiguousCategoryHistoryForDescriptionPrefix` since f3, consumed by notification-capture's
+  auto-confirm ambiguity check), `transaction_repository.dart` (`createTransfer`,
+  `softDelete(id, linkedId)`, `getTopCategoryIdsForAccount(accountId, {limit})` — consumed
+  cross-feature by notification-capture's quick-pick category chips), sync handler + remote
+  service (`transactionFromPayload` builds the outbound proto — every model field, incl. `source`,
+  must be forwarded there).
 - `features/transactions/ui/` — `transactions_view_model.dart`, `transaction_filter_view_model.dart`,
   `transactions_screen.dart`, plus the form screens documented in
   [transaction-forms.md](transaction-forms.md).
@@ -87,6 +91,16 @@ The top of `/transactions` unifies pending suggestions from two sources: `Pendin
 `Dismissible` + confirm dialog. Confirming a transfer confirms both legs. See
 [notification-capture.md](notification-capture.md) and [transaction-templates.md](transaction-templates.md).
 
+### Provenance (`source` column, frictionless-capture f3)
+
+`transactions.source` records how a transaction was created: `'manual'` (default — forms, voice,
+human-approved suggestions), `'auto_notification'` (auto-confirmed by the notification-capture
+gate; rendered as an "Auto" badge in `_TransactionTile`), and `'import_csv'` reserved for the CSV
+importer's dedup (frictionless-capture f5). Synced end-to-end: proto field 21, PG mig 020 /
+SQLite mig 018 (`TEXT NOT NULL DEFAULT 'manual'`). `createTransaction` defaults it to `'manual'`;
+`confirmTransaction` and `updateTransaction` preserve the existing value. See
+[decisions/0004-transaction-source-provenance.md](../decisions/0004-transaction-source-provenance.md).
+
 ### Categories & seeder
 
 Categories are a foundational entity (`features/categories/`, `internal/category`).
@@ -101,6 +115,12 @@ to hex via `CategoryIconData.resolveIcon()`, then enqueues all to `SyncOutbox`.
 - Filter `type='transfer'` must expand to both leg types in SQL, or transfers disappear from results.
 - Adjustment transactions (`nature='adjustment'`, `categoryId=null`) are transactions too — see
   [adjustment-nature.md](adjustment-nature.md) for the tap-routing guard.
+- New model fields must be forwarded in `transaction_remote_service.dart::transactionFromPayload`
+  or they silently reset to their backend default on sync — bit both f1 (`pattern_id` on card
+  mappings) and f3 (`source`, caught by verify before release); both now have regression tests.
+- A client running a pre-`source` app version that edits an auto transaction resets its server
+  `source` to `'manual'` under LWW (whole-row wins). Accepted single-user edge; self-healing as
+  clients upgrade.
 
 ## Related docs
 

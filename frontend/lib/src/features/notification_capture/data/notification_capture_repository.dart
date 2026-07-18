@@ -107,14 +107,19 @@ class NotificationCaptureRepository {
     // Lee el toggle UNA vez por batch para evitar I/O por noti.
     bool llmEnabled = false;
     bool helpImprove = true;
+    bool autoConfirmEnabled = false;
     final preferences = _preferences;
     if (_parserRemote != null && preferences != null) {
       llmEnabled = await preferences.shareWithLlmForParser();
       helpImprove = await preferences.helpImproveApp();
     }
+    if (preferences != null) {
+      autoConfirmEnabled = await preferences.autoConfirmEnabled();
+    }
 
     int processed = 0;
     bool quotaExhausted = false;
+    final ambiguousByRulePrefix = <String, bool>{};
 
     for (final notification in pending) {
       // 1. Match local primero. Si lo hay, gana sin tocar la red.
@@ -129,14 +134,32 @@ class NotificationCaptureRepository {
           notification,
           match,
         );
-        await _captured.updateStatus(
-          notification.id,
-          'matched_local',
-          pendingTxId: pendingTx.id,
-          matchedParserVersion: match.parser.version,
-          matchedPatternId: match.pattern.id,
-          extractionMethod: 'local',
-        );
+        if (autoConfirmEnabled &&
+            await _shouldAutoConfirm(pendingTx, ambiguousByRulePrefix)) {
+          final (bankId, _) = PendingTransactionModel.splitParserId(
+            pendingTx.parserId,
+          );
+          await _approve(
+            pending: pendingTx,
+            accountId: pendingTx.suggestedAccountId!,
+            bankId: bankId,
+            categoryId: pendingTx.suggestedCategoryId,
+            source: 'auto_notification',
+            learn: false,
+            capturedMatchedParserVersion: match.parser.version,
+            capturedMatchedPatternId: match.pattern.id,
+            capturedExtractionMethod: 'local',
+          );
+        } else {
+          await _captured.updateStatus(
+            notification.id,
+            'matched_local',
+            pendingTxId: pendingTx.id,
+            matchedParserVersion: match.parser.version,
+            matchedPatternId: match.pattern.id,
+            extractionMethod: 'local',
+          );
+        }
         processed++;
         continue;
       }
@@ -328,6 +351,33 @@ class NotificationCaptureRepository {
     String? descriptionOverride,
     DateTime? dateOverride,
     bool? wasHelpful,
+  }) => _approve(
+    pending: pending,
+    accountId: accountId,
+    bankId: bankId,
+    categoryId: categoryId,
+    amountCentsOverride: amountCentsOverride,
+    currencyCodeOverride: currencyCodeOverride,
+    descriptionOverride: descriptionOverride,
+    dateOverride: dateOverride,
+    wasHelpful: wasHelpful,
+  );
+
+  Future<void> _approve({
+    required PendingTransactionModel pending,
+    required String accountId,
+    required String? bankId,
+    String? categoryId,
+    int? amountCentsOverride,
+    String? currencyCodeOverride,
+    String? descriptionOverride,
+    DateTime? dateOverride,
+    bool? wasHelpful,
+    String source = 'manual',
+    bool learn = true,
+    int? capturedMatchedParserVersion,
+    String? capturedMatchedPatternId,
+    String? capturedExtractionMethod,
   }) async {
     final amount = amountCentsOverride ?? pending.amountCents;
     final currency = currencyCodeOverride ?? pending.currencyCode;
@@ -348,25 +398,35 @@ class NotificationCaptureRepository {
       date: _formatDate(date),
       type: pending.transactionType,
       status: 'cleared',
+      source: source,
       tags: const [],
     );
 
     await _pending.updateStatus(pending.id, 'approved');
     if (pending.capturedNotificationId != null) {
-      await _captured.updateStatus(pending.capturedNotificationId!, 'consumed');
+      await _captured.updateStatus(
+        pending.capturedNotificationId!,
+        'consumed',
+        pendingTxId: pending.id,
+        matchedParserVersion: capturedMatchedParserVersion,
+        matchedPatternId: capturedMatchedPatternId,
+        extractionMethod: capturedExtractionMethod,
+      );
     }
 
     // Aprendizaje implícito ──────────────────────────────────────────────
-    await _learnCardMapping(
-      bankId: bankId,
-      cardLastDigits: pending.cardLastDigits,
-      parserId: pending.parserId,
-      accountId: accountId,
-    );
-    await _learnRule(
-      merchantDescription: pending.merchantDescription,
-      categoryId: categoryId,
-    );
+    if (learn) {
+      await _learnCardMapping(
+        bankId: bankId,
+        cardLastDigits: pending.cardLastDigits,
+        parserId: pending.parserId,
+        accountId: accountId,
+      );
+      await _learnRule(
+        merchantDescription: pending.merchantDescription,
+        categoryId: categoryId,
+      );
+    }
 
     // Señal de calidad ───────────────────────────────────────────────────
     await _persistFeedback(
@@ -584,6 +644,33 @@ class NotificationCaptureRepository {
   Future<String?> _resolveCategory(String description) async {
     final rule = await _rules.findRuleForDescription(description);
     return rule?.categoryId;
+  }
+
+  Future<bool> _shouldAutoConfirm(
+    PendingTransactionModel pending,
+    Map<String, bool> ambiguousByRulePrefix,
+  ) async {
+    if (pending.source != 'parser_local' ||
+        pending.suggestedAccountId == null ||
+        pending.suggestedCategoryId == null) {
+      return false;
+    }
+
+    final description = pending.merchantDescription;
+    if (description == null || description.trim().isEmpty) return false;
+    final rule = await _rules.findRuleForDescription(description);
+    if (rule == null || rule.categoryId != pending.suggestedCategoryId) {
+      return false;
+    }
+
+    final cacheKey = rule.matchText.toLowerCase();
+    final isAmbiguous =
+        ambiguousByRulePrefix[cacheKey] ??
+        await _transactions.hasAmbiguousCategoryHistoryForDescriptionPrefix(
+          rule.matchText,
+        );
+    ambiguousByRulePrefix[cacheKey] = isAmbiguous;
+    return !isAmbiguous;
   }
 
   /// Aprende el mapeo (banco, dígitos) → cuenta cuando la notificación traía

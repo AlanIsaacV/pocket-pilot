@@ -42,6 +42,9 @@ class TransactionRepository {
     int limit = 5,
   }) => _local.queryTopCategoryIds(accountId: accountId, limit: limit);
 
+  Future<bool> hasAmbiguousCategoryHistoryForDescriptionPrefix(String prefix) =>
+      _local.hasAmbiguousCategoryHistoryForDescriptionPrefix(prefix);
+
   Future<({String fromAccountId, String toAccountId})?>
   getLastTransferAccountIds() => _local.queryLastTransferPair();
 
@@ -92,6 +95,7 @@ class TransactionRepository {
       date: current.date,
       type: current.type,
       status: 'cleared',
+      source: current.source,
       tags: current.tags,
       createdAt: current.createdAt,
       updatedAt: DateTime.now().toUtc(),
@@ -124,6 +128,7 @@ class TransactionRepository {
     required String type,
     required String status,
     required List<String> tags,
+    String source = 'manual',
   }) async {
     final now = DateTime.now().toUtc();
     final model = TransactionModel(
@@ -139,6 +144,7 @@ class TransactionRepository {
       date: date,
       type: type,
       status: status,
+      source: source,
       tags: tags,
       createdAt: now,
       updatedAt: now,
@@ -169,6 +175,7 @@ class TransactionRepository {
     required List<String> tags,
     required DateTime createdAt,
   }) async {
+    final existing = await getTransactionById(id);
     final model = TransactionModel(
       id: id,
       accountId: accountId,
@@ -182,6 +189,7 @@ class TransactionRepository {
       date: date,
       type: type,
       status: status,
+      source: existing?.source ?? 'manual',
       tags: tags,
       createdAt: createdAt,
       updatedAt: DateTime.now().toUtc(),

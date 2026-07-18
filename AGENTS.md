@@ -1,18 +1,29 @@
-# Pocket Pilot - Agent Context Index
+# Pocket Pilot — Agent Context Index
 
-This file is the entry point for all AI agents (Gemini CLI, Claude Code, OpenCode). To maintain consistency, technical documentation and architectural conventions have been moved to the `docs/context/` directory.
+Entry point for AI agents other than Claude Code (Gemini CLI, OpenCode, …). `GEMINI.md` symlinks
+here; Claude Code uses its own `CLAUDE.md`. All routers point to the **same** `docs/` knowledge base,
+so there is one source of truth.
 
-## Critical Instructions for Agents
-1. **Read the Manifest:** Before starting any task, read [docs/context/MANIFEST.md](docs/context/MANIFEST.md) to identify the relevant files for the current domain.
-2. **Follow Conventions:** Adhere strictly to the coding and architectural patterns defined in `docs/context/architecture/` and `docs/context/conventions/`.
-3. **Log Changes:** Every technical decision or convention change made during the session **MUST** be logged in [docs/context/.journal.md](docs/context/.journal.md).
-4. **Consolidate:** At the end of a session, if the user requests a "save" or "consolidate," update the permanent documentation in `docs/context/` using the entries from `.journal.md`.
+Pocket Pilot is an offline-first personal finance app: Flutter + SQLite client, Go/gRPC + PostgreSQL
+backend, synced with Last Write Wins over Protobuf contracts. Monorepo: `backend/` (Go),
+`frontend/` (Flutter), `proto/` (contracts), `scripts/` (Python parsers).
 
-## Directory Map
-- **Protobuf Contracts:** `proto/`
-- **Backend (Go):** `backend/`
-- **Frontend (Flutter):** `frontend/`
-- **Context Documentation:** `docs/context/`
+## Read before starting a task
+
+- **Architecture / layout / data flow** → [docs/architecture.md](docs/architecture.md)
+- **Conventions** (Go/Dart, proto, DB/migrations, UI) → [docs/conventions.md](docs/conventions.md)
+- **Local dev / env / make targets** → [docs/runbook.md](docs/runbook.md)
+- **Features** → [docs/features/_index.md](docs/features/_index.md)
+- **Decisions (ADRs)** → [docs/decisions/_index.md](docs/decisions/_index.md)
+- **Historical plans & specs** (reference) → `plans/`, `docs/specs/`
+
+## Critical rules
+
+1. **Never hand-edit generated code** (`backend/internal/gen/`, `frontend/lib/src/generated/`);
+   after any `proto/` change run `make proto`.
+2. **Dual migrations** (PostgreSQL + SQLite) and **LWW** on every syncable table — see
+   `docs/conventions.md`.
+3. Never commit secrets; real config lives in `.env` (git-ignored).
 
 ---
-*This file is a pointer to ensure all agents share the same source of truth.*
+*Pointer file — the source of truth is `docs/`.*

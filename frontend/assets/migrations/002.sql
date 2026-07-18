@@ -1,5 +1,5 @@
 -- Investments schema: renta variable (acciones, ETFs). Mirrors 003_investments.sql
--- in the backend. See docs/context/architecture/investments.md.
+-- in the backend. See docs/features/investments.md.
 
 CREATE TABLE investment_holdings (
     id            TEXT PRIMARY KEY,

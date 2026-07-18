@@ -1,5 +1,5 @@
 -- Investments: renta variable (acciones, ETFs) with offline-first sync.
--- See docs/context/architecture/investments.md for the full design.
+-- See docs/features/investments.md for the full design.
 
 -- =============================================================================
 -- investment_holdings

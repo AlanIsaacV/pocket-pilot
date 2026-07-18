@@ -1,6 +1,6 @@
 -- Investment splits: forward and reverse stock splits as first-class events.
 -- Mirror del backend (007_investment_splits.sql) sin user_id.
--- See docs/context/architecture/investments.md §Splits.
+-- See docs/features/investments.md §Splits.
 
 CREATE TABLE investment_splits (
     id          TEXT PRIMARY KEY,

@@ -21,10 +21,10 @@ architecture lives in [../architecture.md](../architecture.md); conventions in
 | Dashboard | Net worth, metrics grid, credit cards, spend breakdowns | [dashboard](dashboard.md) |
 | Statistics tab | Stats hub + unified filter + full-screen visualizations | [statistics-tab](statistics-tab.md) |
 | Cashflow tab | Flujo view: in/out/net cards + waterfall + detail | [cashflow-tab](cashflow-tab.md) |
-| Proactive notifications | Date-projection engine + notification center + OS scheduler | [proactive-notifications](proactive-notifications.md) |
+| Proactive notifications | Date-projection engine + notification center + OS scheduler + statement-import reminders | [proactive-notifications](proactive-notifications.md) |
 | Notification capture | Android bank-notification capture → pending suggestions + gated auto-confirm | [notification-capture](notification-capture.md) |
 | AI assistant | Gemini provider: chat + notification parser, per-feature models | [ai-assistant](ai-assistant.md) |
-| CSV import | Extract→Map→Insert importer with account/category mapping | [csv-import](csv-import.md) |
+| CSV import | Extract→Map→Insert importer with account/category mapping + duplicate detection | [csv-import](csv-import.md) |
 | Bank statement parser | Python `scripts/` PDF→CSV parsers (BBVA TC/Deb, RappiCard) | [bank-statement-parser](bank-statement-parser.md) |
 
 > **Gap**: the frontend `features/debts/` module is not documented yet. `categories`, `tags` and

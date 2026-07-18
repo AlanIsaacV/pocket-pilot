@@ -5,7 +5,7 @@
   "updated_at": "2026-07-18",
   "owner": null,
   "status": "in-progress",
-  "current_phase": 3,
+  "current_phase": 5,
   "phases": [
     {
       "id": 1,
@@ -223,18 +223,76 @@
       "started_at": null,
       "completed_at": null,
       "tasks": [],
-      "deviations": []
+      "deviations": [
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Phase postponed before start: today's notification dump (325 items) contains NO real ATM-withdrawal notification (task 4.1 unmet \u2014 only a BBVA marketing message mentions 'retiros'). User chose to postpone the whole phase until a real withdrawal fixture is captured, and to proceed with phase 5 instead (independent). Pre-implementation exploration findings to reuse when this phase starts: transfers are created only by TransactionRepository.createTransfer (transaction_repository.dart:211-274, paired linked rows, caller supplies both UUIDs); parser seed-bump cursor caveat documented at docs/features/notification-capture.md:200-210; PendingTransaction already has transactionType but no destination-account column; auto-confirm gate hard-requires suggestedCategoryId!=null (notification_capture_repository.dart:649-674) so transfers need a separate eligibility branch; AdjustBalanceSheet is already 2 taps from accounts screen (account card -> 'Ajustar saldo'); proactive-notifications engine has hardcoded event types \u2014 monthly reminder means extending NotificationRepository's projection."
+        }
+      ]
     },
     {
       "id": 5,
       "name": "statement-reconciliation",
       "file": "phase-5-statement-reconciliation.md",
       "goal": "Make monthly statement import the reliable channel for accounts that don't notify (RappiCard",
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "tasks": [],
-      "deviations": []
+      "status": "completed",
+      "started_at": "2026-07-18",
+      "completed_at": "2026-07-18",
+      "tasks": [
+        {
+          "id": "5.1",
+          "title": "Pure duplicate matcher in csv_import/domain: (csvRows, existingTransactions) -> matches; same account + same amount cents + date within +/-3 days; one-to-one greedy by closest date; excludes soft-deleted; unit tests",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "5.2",
+          "title": "Wire matcher into import flow: fetch existing transactions per mapped account, flag duplicate rows in view model, flagged rows default to skip",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "5.3",
+          "title": "CsvMappingScreen UI: duplicate chip per flagged row, include toggle, bulk 'include anyway', import summary (imported vs skipped-as-duplicate counts)",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "5.4",
+          "title": "Provenance: importBatch stamps source='import_csv' on created transactions (reuses phase 3 column) + test",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "5.5",
+          "title": "STATEMENT_IMPORT monthly reminder: device-local preference (account + day of month) + settings entry + NotificationRepository projection + OS scheduler integration + tests",
+          "status": "done",
+          "notes": null
+        }
+      ],
+      "deviations": [
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Tasks 5.1/5.2/5.4 implemented via Codex (codex:codex-rescue). Codex sandbox could not run flutter test (SDK cache write blocked); orchestrator ran the new tests inline: 1 ordering failure in the matcher contract (greedy-pairing order vs row order) fixed via Codex resume \u2014 matcher now returns matches sorted by CSV row index. 5/5 green after fix."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Task 5.3 implemented via Codex (resumed session). Codex sandbox still can't run flutter test; orchestrator ran the UI + data tests inline: 9/9 green (duplicate chip, per-row toggle, bulk include, import summary)."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Task 5.5 implemented via Codex (resumed session): multi-account statement_import preference store + settings screen (new route), STATEMENT_IMPORT projection in NotificationRepository, same-day OS scheduler offset. Orchestrator ran tests inline: 3/3 projection/dedup tests green; full flutter test 273/274 (sole pre-existing statistics failure documented since phase 1)."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Post-verify polish batch via Codex (resumed): production getUpcomingEvents now calls the pure projectStatementImportEvents (single source of truth), K-M seam test added, exclude-all edge case fixed (explicit exclusions survive duplicate refresh), analyzer regressions removed (back to 1-issue pre-existing baseline), dedicated STATEMENT_IMPORT icon. One compile-error round-trip fixed via second resume. Final: flutter analyze 1 pre-existing info; flutter test 275/276 (sole documented pre-existing statistics failure)."
+        }
+      ]
     },
     {
       "id": 6,
@@ -268,6 +326,11 @@
       "date": "2026-07-18",
       "note": "Phase 3: transaction provenance stored as a synced transactions.source column (proto field 21, PG migration 020, SQLite migration 018 + _version=18). Allowed values: 'manual' (default, incl. human-approved suggestions), 'auto_notification', future 'import_csv' (phase 5 dedup reuses it). Chosen over local-only marker: survives sync/reinstall and benefits phase 5.",
       "adr_candidate": true
+    },
+    {
+      "date": "2026-07-18",
+      "note": "Phase 5: monthly statement-import reminder implemented as a new STATEMENT_IMPORT event type in NotificationRepository's projection, driven by a device-local preference (marked account(s) + day of month) \u2014 integrates with the notification center, badge and the existing clean-slate OS scheduler. Chosen over a standalone one-off local notification (outside the idempotent scheduler pattern, invisible in the center) and over skipping the reminder.",
+      "adr_candidate": false
     }
   ],
   "references": [],

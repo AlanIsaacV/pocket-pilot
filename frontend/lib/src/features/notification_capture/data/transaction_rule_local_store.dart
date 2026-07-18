@@ -29,6 +29,22 @@ class TransactionRuleLocalStore {
     return TransactionRuleModel.fromMap(rows.first);
   }
 
+  /// Returns active rules whose match text prefixes [description], with the
+  /// most specific rule first. Used to offer category choices during review.
+  Future<List<TransactionRuleModel>> findRulesForDescriptionPrefix(
+    String description,
+  ) async {
+    if (description.trim().isEmpty) return const [];
+    final db = await _db.database;
+    final rows = await db.query(
+      'transaction_rules',
+      where: "deleted_at IS NULL AND lower(?) LIKE lower(match_text) || '%'",
+      whereArgs: [description],
+      orderBy: 'LENGTH(match_text) DESC, priority DESC, updated_at DESC',
+    );
+    return rows.map(TransactionRuleModel.fromMap).toList();
+  }
+
   /// Busca una regla activa con el mismo match_text exacto (case-insensitive).
   /// Usado al aprender: si ya existe la regla, la actualizamos en lugar de
   /// duplicar.

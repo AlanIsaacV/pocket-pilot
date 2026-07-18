@@ -206,17 +206,24 @@ class TransactionLocalStore {
     return rows.first['balance_cents'] as int;
   }
 
-  /// Returns the IDs of the N most frequently used categories.
-  Future<List<String>> queryTopCategoryIds({int limit = 5}) async {
+  /// Returns the IDs of the N most frequently used categories, optionally
+  /// scoped to [accountId].
+  Future<List<String>> queryTopCategoryIds({
+    String? accountId,
+    int limit = 5,
+  }) async {
     final db = await _db.database;
+    final where = accountId == null
+        ? 'deleted_at IS NULL AND category_id IS NOT NULL'
+        : 'account_id = ? AND deleted_at IS NULL AND category_id IS NOT NULL';
     final rows = await db.rawQuery(
       'SELECT category_id, COUNT(*) as cnt '
       'FROM transactions '
-      'WHERE deleted_at IS NULL AND category_id IS NOT NULL '
+      'WHERE $where '
       'GROUP BY category_id '
       'ORDER BY cnt DESC '
       'LIMIT ?',
-      [limit],
+      [?accountId, limit],
     );
     return rows.map((r) => r['category_id'] as String).toList();
   }

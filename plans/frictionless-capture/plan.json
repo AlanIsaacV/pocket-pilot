@@ -5,7 +5,7 @@
   "updated_at": "2026-07-18",
   "owner": null,
   "status": "in-progress",
-  "current_phase": 1,
+  "current_phase": 2,
   "phases": [
     {
       "id": 1,
@@ -92,11 +92,58 @@
       "name": "fast-review",
       "file": "phase-2-fast-review.md",
       "goal": "Turn the accumulated \"Por confirmar\" backlog from a dreaded session into a few taps: approve all",
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "tasks": [],
-      "deviations": []
+      "status": "completed",
+      "started_at": "2026-07-18",
+      "completed_at": "2026-07-18",
+      "tasks": [
+        {
+          "id": "2.1",
+          "title": "Repository: approveAllResolved() sequential batch loop over resolved pendings reusing approve(), continue-on-error, returns (approved, failed)",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "2.2",
+          "title": "Repository: candidateCategoriesFor(pending) \u2014 longest-prefix rule matches first, fallback to most-used categories for suggested account, cap 3",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "2.3",
+          "title": "View model: expose approveAllResolved() and candidateCategoriesFor(), refresh list after batch",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "2.4",
+          "title": "UI transactions_screen: 'Aprobar N resueltas' header action with confirm dialog (PendingTransactionModel only) + result snackbar + ChoiceChip category row on _SuggestionTile",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "2.5",
+          "title": "Tests: approveAllResolved filtering (N approved, M untouched, notifications consumed) + candidate-category ranking + chip approval learns rule",
+          "status": "done",
+          "notes": null
+        }
+      ],
+      "deviations": [
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Tasks 2.1-2.5 implemented via Codex (codex:codex-rescue, two batches; second resumed the session). Codex sandbox could not run flutter test (SDK cache lock); orchestrator ran test/notification_capture/ inline after each batch: 10/10 green."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "scope-change",
+          "note": "Candidate-category frequency query required touching frontend/lib/src/features/transactions/data/transaction_local_store.dart and transaction_repository.dart (most-used categories per account) \u2014 files not listed in the phase table."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Phase table said 'create' a new test file; tests were added to the existing test/notification_capture/notification_capture_repository_learn_test.dart instead (functionally equivalent). Full flutter test remains 250/251 with the sole pre-existing statistics_category_list_row_test.dart failure documented in phase 1."
+        }
+      ]
     },
     {
       "id": 3,
@@ -152,6 +199,11 @@
     {
       "date": "2026-07-18",
       "note": "Phase 1: relax account_card_mappings.last_digits to nullable in the unpublished 019/017 migrations (PostgreSQL DROP NOT NULL; SQLite table-rebuild), with a CHECK that at least one of last_digits/pattern_id is present; backend validator accepts 4-digit last_digits OR non-empty pattern_id. Chosen over sentinel value and separate table.",
+      "adr_candidate": false
+    },
+    {
+      "date": "2026-07-18",
+      "note": "Phase 2: batch approval loop is continue-on-error \u2014 a mid-batch failure never rolls back approved items, the loop keeps going, failures are collected and reported in the result snackbar ('N aprobadas, M con error'); failed suggestions stay in the list for retry.",
       "adr_candidate": false
     }
   ],

@@ -37,6 +37,11 @@ class TransactionRepository {
 
   Future<String?> getLastUsedAccountId() => _local.getLastUsedAccountId();
 
+  Future<List<String>> getTopCategoryIdsForAccount(
+    String accountId, {
+    int limit = 5,
+  }) => _local.queryTopCategoryIds(accountId: accountId, limit: limit);
+
   Future<({String fromAccountId, String toAccountId})?>
   getLastTransferAccountIds() => _local.queryLastTransferPair();
 

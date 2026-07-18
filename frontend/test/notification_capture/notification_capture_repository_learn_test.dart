@@ -21,6 +21,7 @@ import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart
 import 'package:pocket_pilot/src/features/notification_capture/data/account_card_mapping_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/captured_notification_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_repository.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/notification_permission_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/pending_transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_local_store.dart';
@@ -29,6 +30,7 @@ import 'package:pocket_pilot/src/features/notification_capture/domain/captured_n
 import 'package:pocket_pilot/src/features/notification_capture/domain/notification_parser.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/pending_transaction.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/transaction_rule.dart';
+import 'package:pocket_pilot/src/features/notification_capture/ui/pending_suggestions_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
 
@@ -49,6 +51,7 @@ void main() {
     required FakePendingTransactionLocalStore pending,
     required FakeAccountCardMappingLocalStore cardMappings,
     required FakeTransactionRuleLocalStore rules,
+    FakeTransactionLocalStore? transactions,
   }) {
     return NotificationCaptureRepository(
       captured: captured,
@@ -58,7 +61,7 @@ void main() {
       cardMappings: cardMappings,
       rules: rules,
       transactions: TransactionRepository(
-        local: FakeTransactionLocalStore(),
+        local: transactions ?? FakeTransactionLocalStore(),
         outbox: FakeSyncOutbox(),
       ),
       outbox: FakeSyncOutbox(),
@@ -82,66 +85,63 @@ void main() {
   }
 
   group('digit-less TDC resolution + learn-on-approval', () {
-    test(
-      'first "COMPRA TDC" (no digits) yields no account; after approval the '
-      'next one resolves to the approved account',
-      () async {
-        final captured = FakeCapturedNotificationLocalStore();
-        final pending = FakePendingTransactionLocalStore();
-        final cardMappings = FakeAccountCardMappingLocalStore();
-        final repo = buildRepository(
-          captured: captured,
-          pending: pending,
-          cardMappings: cardMappings,
-          rules: FakeTransactionRuleLocalStore(),
-        );
+    test('first "COMPRA TDC" (no digits) yields no account; after approval the '
+        'next one resolves to the approved account', () async {
+      final captured = FakeCapturedNotificationLocalStore();
+      final pending = FakePendingTransactionLocalStore();
+      final cardMappings = FakeAccountCardMappingLocalStore();
+      final repo = buildRepository(
+        captured: captured,
+        pending: pending,
+        cardMappings: cardMappings,
+        rules: FakeTransactionRuleLocalStore(),
+      );
 
-        captured.seed(
-          tdcNotification(
-            id: 'n1',
-            text: 'COMPRA TDC EN PAGOMITELMEXCOMSI \$578.00 24 abril 18:24h',
-            postedAt: DateTime.utc(2026, 4, 25, 0, 24, 48),
-          ),
-        );
+      captured.seed(
+        tdcNotification(
+          id: 'n1',
+          text: 'COMPRA TDC EN PAGOMITELMEXCOMSI \$578.00 24 abril 18:24h',
+          postedAt: DateTime.utc(2026, 4, 25, 0, 24, 48),
+        ),
+      );
 
-        expect(await repo.processInbox(), 1);
-        final firstPendingTx = pending.byId.values.single;
-        expect(firstPendingTx.cardLastDigits, isNull);
-        expect(firstPendingTx.parserId, 'bbva_mx/purchase_tdc');
-        expect(
-          firstPendingTx.suggestedAccountId,
-          isNull,
-          reason: 'no pattern mapping learned yet',
-        );
+      expect(await repo.processInbox(), 1);
+      final firstPendingTx = pending.byId.values.single;
+      expect(firstPendingTx.cardLastDigits, isNull);
+      expect(firstPendingTx.parserId, 'bbva_mx/purchase_tdc');
+      expect(
+        firstPendingTx.suggestedAccountId,
+        isNull,
+        reason: 'no pattern mapping learned yet',
+      );
 
-        await repo.approve(
-          pending: firstPendingTx,
-          accountId: 'acc-credit',
-          bankId: 'bbva_mx',
-        );
+      await repo.approve(
+        pending: firstPendingTx,
+        accountId: 'acc-credit',
+        bankId: 'bbva_mx',
+      );
 
-        final learned = cardMappings.mappings.single;
-        expect(learned.bankId, 'bbva_mx');
-        expect(learned.patternId, 'purchase_tdc');
-        expect(learned.lastDigits, isNull);
-        expect(learned.accountId, 'acc-credit');
+      final learned = cardMappings.mappings.single;
+      expect(learned.bankId, 'bbva_mx');
+      expect(learned.patternId, 'purchase_tdc');
+      expect(learned.lastDigits, isNull);
+      expect(learned.accountId, 'acc-credit');
 
-        // Segunda notificación TDC sin dígitos, mismo patrón.
-        captured.seed(
-          tdcNotification(
-            id: 'n2',
-            text: 'COMPRA TDC EN MACCHINA SUC PUER \$85.00 24 abril 12:07h',
-            postedAt: DateTime.utc(2026, 4, 24, 18, 8, 20),
-          ),
-        );
+      // Segunda notificación TDC sin dígitos, mismo patrón.
+      captured.seed(
+        tdcNotification(
+          id: 'n2',
+          text: 'COMPRA TDC EN MACCHINA SUC PUER \$85.00 24 abril 12:07h',
+          postedAt: DateTime.utc(2026, 4, 24, 18, 8, 20),
+        ),
+      );
 
-        expect(await repo.processInbox(), 1);
-        final secondPendingTx = pending.byId.values.firstWhere(
-          (tx) => tx.id != firstPendingTx.id,
-        );
-        expect(secondPendingTx.suggestedAccountId, 'acc-credit');
-      },
-    );
+      expect(await repo.processInbox(), 1);
+      final secondPendingTx = pending.byId.values.firstWhere(
+        (tx) => tx.id != firstPendingTx.id,
+      );
+      expect(secondPendingTx.suggestedAccountId, 'acc-credit');
+    });
   });
 
   group('longest-prefix rule learning', () {
@@ -178,8 +178,10 @@ void main() {
           bankId: null,
           categoryId: 'transporte',
         );
-        expect((await rules.findByExactMatchText('DIDI'))?.categoryId,
-            'transporte');
+        expect(
+          (await rules.findByExactMatchText('DIDI'))?.categoryId,
+          'transporte',
+        );
 
         // 2. "DIDI FOOD MX" → Comida: "DIDI" ya apunta a otra categoría, así
         //    que aprende el prefijo de dos palabras en vez de sobrescribir.
@@ -201,13 +203,190 @@ void main() {
 
         // 3. Resolución: coincidencia más larga gana.
         expect(
-          (await rules.findRuleForDescription('DIDI FOOD MONTERREY'))
-              ?.categoryId,
+          (await rules.findRuleForDescription(
+            'DIDI FOOD MONTERREY',
+          ))?.categoryId,
           'comida',
         );
         expect(
           (await rules.findRuleForDescription('DIDI VIAJE'))?.categoryId,
           'transporte',
+        );
+      },
+    );
+  });
+
+  group('fast review repository operations', () {
+    PendingTransactionModel makePending({
+      required String id,
+      String? accountId,
+      String? categoryId,
+      String description = 'MERCHANT',
+    }) {
+      final now = DateTime.utc(2026, 7, 18);
+      return PendingTransactionModel(
+        id: id,
+        capturedNotificationId: 'notification-$id',
+        suggestedAccountId: accountId,
+        suggestedCategoryId: categoryId,
+        amountCents: 10000,
+        currencyCode: 'MXN',
+        merchantDescription: description,
+        transactionType: 'expense',
+        occurredAt: now,
+        source: 'parser_local',
+        status: 'pending',
+        createdAt: now,
+      );
+    }
+
+    test(
+      'batch approves only resolved suggestions and continues after errors',
+      () async {
+        final captured = FakeCapturedNotificationLocalStore();
+        final pending = FakePendingTransactionLocalStore();
+        final transactions = FakeTransactionLocalStore(
+          failForDescription: 'FAIL',
+        );
+        final resolved = makePending(
+          id: 'resolved',
+          accountId: 'account-1',
+          categoryId: 'category-1',
+        );
+        final failing = makePending(
+          id: 'failing',
+          accountId: 'account-1',
+          categoryId: 'category-1',
+          description: 'FAIL',
+        );
+        final unresolved = makePending(
+          id: 'unresolved',
+          accountId: 'account-1',
+        );
+        for (final model in [resolved, failing, unresolved]) {
+          pending.byId[model.id] = model;
+          captured.seed(
+            CapturedNotificationModel(
+              id: model.capturedNotificationId!,
+              packageName: 'bank',
+              postedAt: model.createdAt,
+              status: 'matched',
+              createdAt: model.createdAt,
+            ),
+          );
+        }
+        final repo = buildRepository(
+          captured: captured,
+          pending: pending,
+          cardMappings: FakeAccountCardMappingLocalStore(),
+          rules: FakeTransactionRuleLocalStore(),
+          transactions: transactions,
+        );
+
+        final viewModel = PendingSuggestionsViewModel(
+          pending: pending,
+          repository: repo,
+          permission: FakeNotificationPermissionService(),
+        );
+        viewModel.pendingTransactions = [resolved, failing, unresolved];
+
+        expect(await viewModel.approveAllResolved(), (approved: 1, failed: 1));
+        expect(pending.byId['resolved']!.status, 'approved');
+        expect(captured._byId['notification-resolved']!.status, 'consumed');
+        expect(pending.byId['failing']!.status, 'pending');
+        expect(pending.byId['unresolved']!.status, 'pending');
+        expect(viewModel.pendingTransactions.map((model) => model.id), [
+          'failing',
+          'unresolved',
+        ]);
+      },
+    );
+
+    test(
+      'category candidates rank prefix rules then account usage without duplicates',
+      () async {
+        final now = DateTime.utc(2026, 7, 18);
+        final rules = FakeTransactionRuleLocalStore()
+          ..rules.addAll([
+            TransactionRuleModel(
+              id: 'rule-short',
+              matchText: 'DIDI',
+              categoryId: 'transport',
+              priority: 0,
+              matchCount: 1,
+              createdAt: now,
+              updatedAt: now,
+            ),
+            TransactionRuleModel(
+              id: 'rule-long',
+              matchText: 'DIDI FOOD',
+              categoryId: 'food',
+              priority: 0,
+              matchCount: 1,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          ]);
+        final transactions = FakeTransactionLocalStore()
+          ..seedCategoryUsage('account-1', ['food', 'shopping', 'bills']);
+        final repo = buildRepository(
+          captured: FakeCapturedNotificationLocalStore(),
+          pending: FakePendingTransactionLocalStore(),
+          cardMappings: FakeAccountCardMappingLocalStore(),
+          rules: rules,
+          transactions: transactions,
+        );
+
+        expect(
+          await repo.candidateCategoriesFor(
+            makePending(
+              id: 'candidate',
+              accountId: 'account-1',
+              description: 'DIDI FOOD MEXICO',
+            ),
+          ),
+          ['food', 'transport', 'shopping'],
+        );
+      },
+    );
+
+    test(
+      'quick-pick approval uses the suggested account and learns the rule',
+      () async {
+        final pending = FakePendingTransactionLocalStore();
+        final rules = FakeTransactionRuleLocalStore();
+        final transactions = FakeTransactionLocalStore();
+        final quickPick = makePending(
+          id: 'quick-pick',
+          accountId: 'account-1',
+          description: 'UBER VIAJE',
+        );
+        pending.byId[quickPick.id] = quickPick;
+        final repo = buildRepository(
+          captured: FakeCapturedNotificationLocalStore(),
+          pending: pending,
+          cardMappings: FakeAccountCardMappingLocalStore(),
+          rules: rules,
+          transactions: transactions,
+        );
+        final viewModel = PendingSuggestionsViewModel(
+          pending: pending,
+          repository: repo,
+          permission: FakeNotificationPermissionService(),
+        );
+
+        await viewModel.approvePending(
+          pending: quickPick,
+          accountId: quickPick.suggestedAccountId!,
+          categoryId: 'transport',
+        );
+
+        expect(pending.byId[quickPick.id]!.status, 'approved');
+        expect(transactions.rows.single['account_id'], 'account-1');
+        expect(transactions.rows.single['category_id'], 'transport');
+        expect(
+          (await rules.findByExactMatchText('UBER'))?.categoryId,
+          'transport',
         );
       },
     );
@@ -224,7 +403,8 @@ class FakeParserLocalStore extends ParserLocalStore {
   Future<List<NotificationParserDefinition>> listActive() async => _parsers;
 }
 
-class FakeCapturedNotificationLocalStore extends CapturedNotificationLocalStore {
+class FakeCapturedNotificationLocalStore
+    extends CapturedNotificationLocalStore {
   FakeCapturedNotificationLocalStore() : super(db: DatabaseHelper());
   final Map<String, CapturedNotificationModel> _byId = {};
 
@@ -267,6 +447,10 @@ class FakePendingTransactionLocalStore extends PendingTransactionLocalStore {
   final Map<String, PendingTransactionModel> byId = {};
 
   @override
+  Future<List<PendingTransactionModel>> listPending({int limit = 100}) async =>
+      byId.values.where((model) => model.status == 'pending').toList();
+
+  @override
   Future<void> insert(PendingTransactionModel model) async {
     byId[model.id] = model;
   }
@@ -289,11 +473,16 @@ class FakeAccountCardMappingLocalStore extends AccountCardMappingLocalStore {
     required String bankId,
     required String lastDigits,
   }) async {
-    final candidates = mappings
-        .where((m) =>
-            m.bankId == bankId && m.lastDigits == lastDigits && m.isActive)
-        .toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final candidates =
+        mappings
+            .where(
+              (m) =>
+                  m.bankId == bankId &&
+                  m.lastDigits == lastDigits &&
+                  m.isActive,
+            )
+            .toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return candidates.isEmpty ? null : candidates.first;
   }
 
@@ -302,11 +491,14 @@ class FakeAccountCardMappingLocalStore extends AccountCardMappingLocalStore {
     required String bankId,
     required String patternId,
   }) async {
-    final candidates = mappings
-        .where((m) =>
-            m.bankId == bankId && m.patternId == patternId && m.isActive)
-        .toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final candidates =
+        mappings
+            .where(
+              (m) =>
+                  m.bankId == bankId && m.patternId == patternId && m.isActive,
+            )
+            .toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return candidates.isEmpty ? null : candidates.first;
   }
 
@@ -326,28 +518,58 @@ class FakeTransactionRuleLocalStore extends TransactionRuleLocalStore {
   ) async {
     if (description.trim().isEmpty) return null;
     final lowerDesc = description.toLowerCase();
-    final candidates = rules
-        .where((r) =>
-            r.deletedAt == null && lowerDesc.contains(r.matchText.toLowerCase()))
-        .toList()
-      ..sort((a, b) {
-        final byLength = b.matchText.length.compareTo(a.matchText.length);
-        if (byLength != 0) return byLength;
-        final byPriority = b.priority.compareTo(a.priority);
-        if (byPriority != 0) return byPriority;
-        return b.updatedAt.compareTo(a.updatedAt);
-      });
+    final candidates =
+        rules
+            .where(
+              (r) =>
+                  r.deletedAt == null &&
+                  lowerDesc.contains(r.matchText.toLowerCase()),
+            )
+            .toList()
+          ..sort((a, b) {
+            final byLength = b.matchText.length.compareTo(a.matchText.length);
+            if (byLength != 0) return byLength;
+            final byPriority = b.priority.compareTo(a.priority);
+            if (byPriority != 0) return byPriority;
+            return b.updatedAt.compareTo(a.updatedAt);
+          });
     return candidates.isEmpty ? null : candidates.first;
   }
 
   @override
+  Future<List<TransactionRuleModel>> findRulesForDescriptionPrefix(
+    String description,
+  ) async {
+    final lowerDescription = description.toLowerCase();
+    final matches =
+        rules
+            .where(
+              (rule) =>
+                  rule.deletedAt == null &&
+                  lowerDescription.startsWith(rule.matchText.toLowerCase()),
+            )
+            .toList()
+          ..sort((a, b) {
+            final byLength = b.matchText.length.compareTo(a.matchText.length);
+            if (byLength != 0) return byLength;
+            final byPriority = b.priority.compareTo(a.priority);
+            if (byPriority != 0) return byPriority;
+            return b.updatedAt.compareTo(a.updatedAt);
+          });
+    return matches;
+  }
+
+  @override
   Future<TransactionRuleModel?> findByExactMatchText(String matchText) async {
-    final matches = rules
-        .where((r) =>
-            r.deletedAt == null &&
-            r.matchText.toLowerCase() == matchText.toLowerCase())
-        .toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final matches =
+        rules
+            .where(
+              (r) =>
+                  r.deletedAt == null &&
+                  r.matchText.toLowerCase() == matchText.toLowerCase(),
+            )
+            .toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return matches.isEmpty ? null : matches.first;
   }
 
@@ -359,11 +581,41 @@ class FakeTransactionRuleLocalStore extends TransactionRuleLocalStore {
 }
 
 class FakeTransactionLocalStore extends TransactionLocalStore {
-  FakeTransactionLocalStore() : super(db: DatabaseHelper());
+  FakeTransactionLocalStore({this.failForDescription})
+    : super(db: DatabaseHelper());
+  final String? failForDescription;
+  final List<Map<String, dynamic>> rows = [];
+
+  void seedCategoryUsage(String accountId, List<String> categoryIds) {
+    for (final categoryId in categoryIds) {
+      rows.add({'account_id': accountId, 'category_id': categoryId});
+    }
+  }
 
   @override
   Future<void> upsertRow(Map<String, dynamic> row) async {
-    // No-op: approve() solo necesita que esto no toque sqflite.
+    if (row['description'] == failForDescription) {
+      throw StateError('transaction write failed');
+    }
+    rows.add(row);
+  }
+
+  @override
+  Future<List<String>> queryTopCategoryIds({
+    String? accountId,
+    int limit = 5,
+  }) async {
+    final counts = <String, int>{};
+    for (final row in rows) {
+      if (accountId != null && row['account_id'] != accountId) continue;
+      final categoryId = row['category_id'] as String?;
+      if (categoryId != null) {
+        counts[categoryId] = (counts[categoryId] ?? 0) + 1;
+      }
+    }
+    final ids = counts.keys.toList()
+      ..sort((a, b) => counts[b]!.compareTo(counts[a]!));
+    return ids.take(limit).toList();
   }
 }
 
@@ -380,4 +632,9 @@ class FakeSyncOutbox extends SyncOutbox {
   }) async {
     payloads.add(payload);
   }
+}
+
+class FakeNotificationPermissionService extends NotificationPermissionService {
+  @override
+  Future<bool> isPermissionGranted() async => true;
 }

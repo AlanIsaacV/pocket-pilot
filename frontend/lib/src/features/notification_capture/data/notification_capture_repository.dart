@@ -380,6 +380,80 @@ class NotificationCaptureRepository {
     );
   }
 
+  /// Approves every pending suggestion resolved by the capture pipeline.
+  ///
+  /// Each item deliberately follows [approve]'s normal path so learning,
+  /// outbox writes, and parser feedback stay identical to a manual approval.
+  /// A failed item remains pending and does not prevent later items from being
+  /// approved, allowing the next batch to retry only the failures.
+  Future<({int approved, int failed})> approveAllResolved() async {
+    final pendings = await _pending.listPending();
+    int approved = 0;
+    int failed = 0;
+
+    for (final pending in pendings) {
+      final accountId = pending.suggestedAccountId;
+      final categoryId = pending.suggestedCategoryId;
+      if (accountId == null || categoryId == null) continue;
+
+      try {
+        final (bankId, _) = PendingTransactionModel.splitParserId(
+          pending.parserId,
+        );
+        await approve(
+          pending: pending,
+          accountId: accountId,
+          bankId: bankId,
+          categoryId: categoryId,
+        );
+        approved++;
+      } catch (error, stackTrace) {
+        failed++;
+        developer.log(
+          'Could not batch-approve pending transaction ${pending.id}',
+          name: 'NotificationCaptureRepository',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+    }
+
+    return (approved: approved, failed: failed);
+  }
+
+  /// Returns at most three category IDs for a suggestion whose account has
+  /// already been resolved. Prefix-matching learned rules win by specificity;
+  /// the account's historical category usage fills any remaining slots.
+  Future<List<String>> candidateCategoriesFor(
+    PendingTransactionModel pending,
+  ) async {
+    final categoryIds = <String>[];
+    final description = pending.merchantDescription;
+    if (description != null && description.trim().isNotEmpty) {
+      final rules = await _rules.findRulesForDescriptionPrefix(description);
+      for (final rule in rules) {
+        if (!categoryIds.contains(rule.categoryId)) {
+          categoryIds.add(rule.categoryId);
+          if (categoryIds.length == 3) return categoryIds;
+        }
+      }
+    }
+
+    final accountId = pending.suggestedAccountId;
+    if (accountId == null) return categoryIds;
+    final mostUsed = await _transactions.getTopCategoryIdsForAccount(
+      accountId,
+      limit: 3,
+    );
+    for (final categoryId in mostUsed) {
+      if (!categoryIds.contains(categoryId)) {
+        categoryIds.add(categoryId);
+        if (categoryIds.length == 3) break;
+      }
+    }
+    return categoryIds;
+  }
+
   Future<void> dismiss(
     PendingTransactionModel pending, {
     bool? wasHelpful,

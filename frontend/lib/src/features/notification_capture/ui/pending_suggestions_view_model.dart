@@ -34,9 +34,9 @@ class PendingSuggestionsViewModel extends ChangeNotifier {
     required PendingTransactionLocalStore pending,
     required NotificationCaptureRepository repository,
     required NotificationPermissionService permission,
-  })  : _pending = pending,
-        _repository = repository,
-        _permission = permission;
+  }) : _pending = pending,
+       _repository = repository,
+       _permission = permission;
 
   void loadOnAppear() {
     unawaited(refresh());
@@ -82,8 +82,9 @@ class PendingSuggestionsViewModel extends ChangeNotifier {
     bool? wasHelpful,
   }) async {
     await _repository.dismiss(pending, wasHelpful: wasHelpful);
-    pendingTransactions =
-        pendingTransactions.where((p) => p.id != pending.id).toList();
+    pendingTransactions = pendingTransactions
+        .where((p) => p.id != pending.id)
+        .toList();
     _safeNotify();
   }
 
@@ -98,8 +99,9 @@ class PendingSuggestionsViewModel extends ChangeNotifier {
     DateTime? dateOverride,
     bool? wasHelpful,
   }) async {
-    final (resolvedBankId, _) =
-        PendingTransactionModel.splitParserId(pending.parserId);
+    final (resolvedBankId, _) = PendingTransactionModel.splitParserId(
+      pending.parserId,
+    );
     await _repository.approve(
       pending: pending,
       accountId: accountId,
@@ -111,10 +113,22 @@ class PendingSuggestionsViewModel extends ChangeNotifier {
       dateOverride: dateOverride,
       wasHelpful: wasHelpful,
     );
-    pendingTransactions =
-        pendingTransactions.where((p) => p.id != pending.id).toList();
+    pendingTransactions = pendingTransactions
+        .where((p) => p.id != pending.id)
+        .toList();
     _safeNotify();
   }
+
+  Future<({int approved, int failed})> approveAllResolved() async {
+    final result = await _repository.approveAllResolved();
+    pendingTransactions = await _pending.listPending();
+    _safeNotify();
+    return result;
+  }
+
+  Future<List<String>> candidateCategoriesFor(
+    PendingTransactionModel pending,
+  ) => _repository.candidateCategoriesFor(pending);
 
   @override
   void dispose() {

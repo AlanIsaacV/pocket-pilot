@@ -248,7 +248,8 @@ class _TransactionsListTabState extends State<_TransactionsListTab> {
       builder: (context, vm, _) {
         final filterVM = context.watch<TransactionFilterViewModel>();
         final pendingVM = context.watch<PendingSuggestionsViewModel>();
-        final hasFilters = filterVM.resolvedFilter.hasAdvancedFilters ||
+        final hasFilters =
+            filterVM.resolvedFilter.hasAdvancedFilters ||
             filterVM.activePageIndex != 0 ||
             filterVM.quickSelection != QuickRange.d30;
 
@@ -264,8 +265,8 @@ class _TransactionsListTabState extends State<_TransactionsListTab> {
             .where((t) => t.status != 'pending')
             .toList(growable: false);
         final pendingSuggestions = pendingVM.pendingTransactions;
-        final hasAnyData = vm.transactions.isNotEmpty ||
-            pendingSuggestions.isNotEmpty;
+        final hasAnyData =
+            vm.transactions.isNotEmpty || pendingSuggestions.isNotEmpty;
 
         return Stack(
           children: [
@@ -350,10 +351,23 @@ class _TransactionList extends StatelessWidget {
     }
 
     final children = <Widget>[];
-    final pendingTotal =
-        pendingSuggestions.length + pendingOccurrences.length;
+    final pendingTotal = pendingSuggestions.length + pendingOccurrences.length;
+    final resolvedSuggestionCount = pendingSuggestions
+        .where(
+          (suggestion) =>
+              suggestion.suggestedAccountId != null &&
+              suggestion.suggestedCategoryId != null,
+        )
+        .length;
     if (pendingTotal > 0) {
-      children.add(_PendingConfirmHeader(count: pendingTotal));
+      children.add(
+        _PendingConfirmHeader(
+          count: pendingTotal,
+          resolvedSuggestionCount: resolvedSuggestionCount,
+          onApproveAllResolved: () =>
+              _approveAllResolved(context, resolvedSuggestionCount),
+        ),
+      );
       for (final s in pendingSuggestions) {
         children.add(_buildSuggestionRow(context, s));
       }
@@ -403,9 +417,9 @@ class _TransactionList extends StatelessWidget {
           }
         } catch (e) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('No se pudo eliminar: $e')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('No se pudo eliminar: $e')));
           }
         }
       },
@@ -440,9 +454,9 @@ class _TransactionList extends StatelessWidget {
           }
         } catch (e) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('No se pudo descartar: $e')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('No se pudo descartar: $e')));
           }
         }
       },
@@ -450,8 +464,68 @@ class _TransactionList extends StatelessWidget {
         suggestion: suggestion,
         onTap: () => _openReviewSheet(context, suggestion),
         onConfirm: () => _openReviewSheet(context, suggestion),
+        candidateCategories: () => pendingVM.candidateCategoriesFor(suggestion),
+        categoryMap: categoryMap,
+        onCategorySelected: (categoryId) =>
+            _approveWithCategory(context, suggestion, categoryId),
       ),
     );
+  }
+
+  Future<void> _approveAllResolved(
+    BuildContext context,
+    int resolvedSuggestionCount,
+  ) async {
+    final confirmed = await _confirmApproveAllResolved(
+      context,
+      resolvedSuggestionCount,
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      final result = await pendingVM.approveAllResolved();
+      if (!context.mounted) return;
+      final message = result.failed == 0
+          ? '${result.approved} aprobadas'
+          : '${result.approved} aprobadas, ${result.failed} con error';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudieron aprobar: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _approveWithCategory(
+    BuildContext context,
+    PendingTransactionModel suggestion,
+    String categoryId,
+  ) async {
+    final accountId = suggestion.suggestedAccountId;
+    if (accountId == null) return;
+
+    try {
+      await pendingVM.approvePending(
+        pending: suggestion,
+        accountId: accountId,
+        categoryId: categoryId,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Sugerencia aprobada')));
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('No se pudo aprobar: $error')));
+      }
+    }
   }
 
   Future<void> _openReviewSheet(
@@ -492,15 +566,15 @@ class _TransactionList extends StatelessWidget {
         linkedTransactionId: transaction.linkedTransactionId,
       );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Transacción confirmada')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Transacción confirmada')));
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo confirmar: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('No se pudo confirmar: $e')));
       }
     }
   }
@@ -960,6 +1034,28 @@ Future<bool?> _confirmDismissSuggestion(
   );
 }
 
+Future<bool?> _confirmApproveAllResolved(BuildContext context, int count) {
+  return showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Aprobar sugerencias resueltas'),
+      content: Text(
+        'Se aprobarán $count sugerencias con cuenta y categoría asignadas.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: const Text('Aprobar'),
+        ),
+      ],
+    ),
+  );
+}
+
 Future<bool?> _confirmDelete(BuildContext context, TransactionModel t) {
   final isTransfer = t.isTransfer;
   final label = t.description.isNotEmpty
@@ -1035,8 +1131,14 @@ class _DeleteBackground extends StatelessWidget {
 
 class _PendingConfirmHeader extends StatelessWidget {
   final int count;
+  final int resolvedSuggestionCount;
+  final VoidCallback onApproveAllResolved;
 
-  const _PendingConfirmHeader({required this.count});
+  const _PendingConfirmHeader({
+    required this.count,
+    required this.resolvedSuggestionCount,
+    required this.onApproveAllResolved,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1051,35 +1153,94 @@ class _PendingConfirmHeader extends StatelessWidget {
             color: cs.onSurfaceVariant,
           ),
           const SizedBox(width: 6),
-          Text(
-            'POR CONFIRMAR ($count)',
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.2,
-              color: cs.onSurfaceVariant,
+          Expanded(
+            child: Text(
+              'POR CONFIRMAR ($count)',
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.2,
+                color: cs.onSurfaceVariant,
+              ),
             ),
           ),
+          if (resolvedSuggestionCount > 0)
+            TextButton(
+              onPressed: onApproveAllResolved,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 28),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                'Aprobar $resolvedSuggestionCount resueltas',
+                style: GoogleFonts.ibmPlexSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-class _SuggestionTile extends StatelessWidget {
+class _SuggestionTile extends StatefulWidget {
   final PendingTransactionModel suggestion;
   final VoidCallback onTap;
   final VoidCallback onConfirm;
+  final Future<List<String>> Function() candidateCategories;
+  final Map<String, CategoryModel> categoryMap;
+  final ValueChanged<String> onCategorySelected;
 
   const _SuggestionTile({
     required this.suggestion,
     required this.onTap,
     required this.onConfirm,
+    required this.candidateCategories,
+    required this.categoryMap,
+    required this.onCategorySelected,
   });
+
+  @override
+  State<_SuggestionTile> createState() => _SuggestionTileState();
+}
+
+class _SuggestionTileState extends State<_SuggestionTile> {
+  Future<List<String>>? _candidateCategories;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCandidateCategories();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SuggestionTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.suggestion.id != widget.suggestion.id ||
+        oldWidget.suggestion.suggestedAccountId !=
+            widget.suggestion.suggestedAccountId ||
+        oldWidget.suggestion.suggestedCategoryId !=
+            widget.suggestion.suggestedCategoryId) {
+      _loadCandidateCategories();
+    }
+  }
+
+  void _loadCandidateCategories() {
+    final suggestion = widget.suggestion;
+    _candidateCategories =
+        suggestion.suggestedAccountId != null &&
+            suggestion.suggestedCategoryId == null
+        ? widget.candidateCategories()
+        : null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final suggestion = widget.suggestion;
     final isIncome = suggestion.transactionType == 'income';
     final amountColor = isIncome ? cs.onTertiary : cs.error;
     final iconBg = isIncome
@@ -1104,7 +1265,7 @@ class _SuggestionTile extends StatelessWidget {
           borderRadius: AppTheme.radiusMedium,
         ),
         child: InkWell(
-          onTap: onTap,
+          onTap: widget.onTap,
           borderRadius: const BorderRadius.all(Radius.circular(12)),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1185,7 +1346,7 @@ class _SuggestionTile extends StatelessWidget {
                           ),
                           const Spacer(),
                           TextButton.icon(
-                            onPressed: onConfirm,
+                            onPressed: widget.onConfirm,
                             icon: const Icon(
                               Icons.check_circle_outline,
                               size: 16,
@@ -1204,12 +1365,44 @@ class _SuggestionTile extends StatelessWidget {
                                 vertical: 0,
                               ),
                               minimumSize: const Size(0, 28),
-                              tapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                           ),
                         ],
                       ),
+                      if (suggestion.suggestedAccountId != null &&
+                          suggestion.suggestedCategoryId == null)
+                        FutureBuilder<List<String>>(
+                          future: _candidateCategories!,
+                          builder: (context, snapshot) {
+                            final categoryIds = snapshot.data;
+                            if (categoryIds == null || categoryIds.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  for (final categoryId in categoryIds)
+                                    ChoiceChip(
+                                      label: Text(
+                                        widget.categoryMap[categoryId]?.name ??
+                                            categoryId,
+                                      ),
+                                      selected: false,
+                                      onSelected: (selected) {
+                                        if (selected) {
+                                          widget.onCategorySelected(categoryId);
+                                        }
+                                      },
+                                    ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                     ],
                   ),
                 ),

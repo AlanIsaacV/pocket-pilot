@@ -25,8 +25,10 @@ Backend: `internal/transaction` (`TransactionService` — List/Upsert/Delete). C
 - `features/transactions/domain/` — `TransactionModel` (`tags`, optional `templateId`, nullable
   `categoryId`), `transaction_filter.dart` (`TransactionFilter` value object).
 - `features/transactions/data/` — `transaction_local_store.dart` (SQL incl. `queryRowsFiltered`,
-  `queryTopCategoryIds`), `transaction_repository.dart` (`createTransfer`, `softDelete(id, linkedId)`),
-  sync handler + remote service.
+  `queryTopCategoryIds` — optionally scoped by `accountId` since frictionless-capture f2),
+  `transaction_repository.dart` (`createTransfer`, `softDelete(id, linkedId)`,
+  `getTopCategoryIdsForAccount(accountId, {limit})` — consumed cross-feature by
+  notification-capture's quick-pick category chips), sync handler + remote service.
 - `features/transactions/ui/` — `transactions_view_model.dart`, `transaction_filter_view_model.dart`,
   `transactions_screen.dart`, plus the form screens documented in
   [transaction-forms.md](transaction-forms.md).

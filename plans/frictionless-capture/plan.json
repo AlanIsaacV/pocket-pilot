@@ -1,0 +1,165 @@
+{
+  "schema_version": "1",
+  "feature": "frictionless-capture",
+  "created_at": "2026-07-18",
+  "updated_at": "2026-07-18",
+  "owner": null,
+  "status": "in-progress",
+  "current_phase": 1,
+  "phases": [
+    {
+      "id": 1,
+      "name": "smart-resolution",
+      "file": "phase-1-smart-resolution.md",
+      "goal": "Make suggestions arrive with account and category correctly resolved, so review becomes a",
+      "status": "completed",
+      "started_at": "2026-07-18",
+      "completed_at": "2026-07-18",
+      "tasks": [
+        {
+          "id": "1.1",
+          "title": "Add pattern_id (field 8) to AccountCardMapping proto message and run make proto",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.2",
+          "title": "Dual migrations: backend 019_account_card_mappings_pattern.sql (column + non-unique index) + frontend 017.sql + bump DatabaseHelper._version to 17",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.3",
+          "title": "Thread pattern_id through backend cardmapping module (Mapping struct, scan, Upsert SQL, toProto/fromProto)",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.4",
+          "title": "Frontend mapping model + store: pattern_id field, map/proto conversions, findByBankAndPattern lookup",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.5",
+          "title": "Capture repository: digits-then-pattern resolution fallback, learn-on-approval for pattern mappings via linked matched_pattern_id, longest-prefix rule learning + LENGTH(match_text) DESC matching",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.6",
+          "title": "Tests: digit-less TDC resolves after one approval; DIDI/DIDI FOOD longest-prefix; existing digit path and fixtures stay green",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.7",
+          "title": "Relax last_digits to nullable in unpublished migrations 019/017 (PG DROP NOT NULL, SQLite table-rebuild, CHECK at least one of last_digits/pattern_id) and update backend validator + tests",
+          "status": "done",
+          "notes": null
+        }
+      ],
+      "deviations": [
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Tasks 1.1-1.3 implemented via Codex (codex:codex-rescue) instead of the apply sub-agent. Full 'go test ./...' blocked in Codex sandbox by IPv6 bind restrictions in unrelated internal/marketprice httptest; internal/cardmapping tests pass."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "scope-change",
+          "note": "Codex batch 2 (1.4-1.6) was partial: model/store/resolution-fallback/longest-prefix done, but approval-time pattern learning blocked by last_digits NOT NULL constraint (schema conflict the plan missed) and flutter test blocked by Codex sandbox. Remainder handed to apply sub-agent (Sonnet) building on Codex's working tree."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "scope-change",
+          "note": "Relaxed last_digits nullability inside unpublished migrations: PG 019 got ALTER COLUMN DROP NOT NULL + CHECK(last_digits IS NOT NULL OR pattern_id IS NOT NULL); SQLite 017 required a full table rebuild (CREATE new table, INSERT SELECT, DROP, RENAME) since SQLite can't drop a NOT NULL/CHECK column constraint in place. cardmapping.Mapping.LastDigits changed from string to *string; fromProto/toProto updated; backend validator now accepts last_digits OR pattern_id."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Frontend AccountCardMappingModel.lastDigits made nullable (was required String) to allow pattern-only mappings; account_card_mapping_remote_service.upsertMapping was also silently missing pattern_id forwarding to the outbound proto since the 1.4 batch -- fixed as part of this change (bug, not spec-driven)."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "flutter test: 1 pre-existing failure unrelated to this phase (statistics_category_list_row_test.dart expects text containing 'prom' that category_list_row.dart no longer renders after an earlier stats refactor, commits be4af04/e602009). Not touched -- out of scope for smart-resolution. All notification_capture/cardmapping tests and the rest of the suite (247/248) are green; go test ./... is fully green."
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "fast-review",
+      "file": "phase-2-fast-review.md",
+      "goal": "Turn the accumulated \"Por confirmar\" backlog from a dreaded session into a few taps: approve all",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "tasks": [],
+      "deviations": []
+    },
+    {
+      "id": 3,
+      "name": "auto-confirm",
+      "file": "phase-3-auto-confirm.md",
+      "goal": "Suggestions that pass a conservative confidence gate become real transactions with zero user",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "tasks": [],
+      "deviations": []
+    },
+    {
+      "id": 4,
+      "name": "cash-account",
+      "file": "phase-4-cash-account.md",
+      "goal": "Cover cash with two automatic/cheap mechanisms instead of manual per-expense entry: ATM",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "tasks": [],
+      "deviations": []
+    },
+    {
+      "id": 5,
+      "name": "statement-reconciliation",
+      "file": "phase-5-statement-reconciliation.md",
+      "goal": "Make monthly statement import the reliable channel for accounts that don't notify (RappiCard",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "tasks": [],
+      "deviations": []
+    },
+    {
+      "id": 6,
+      "name": "background-capture",
+      "file": "phase-6-background-capture.md",
+      "goal": "Remove the last dependency on opening the app: run the capture pipeline (parse \u2192 resolve \u2192",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "tasks": [],
+      "deviations": []
+    }
+  ],
+  "decisions": [
+    {
+      "date": "2026-07-18",
+      "note": "Phase 1: no uniqueness guard on (user_id, bank_id, pattern_id) \u2014 pattern mappings follow the same insert-new-row + latest-active-by-updated_at semantics as digits mappings (LWW-friendly); only a non-unique index on (bank_id, pattern_id) for lookup speed.",
+      "adr_candidate": false
+    },
+    {
+      "date": "2026-07-18",
+      "note": "Phase 1: relax account_card_mappings.last_digits to nullable in the unpublished 019/017 migrations (PostgreSQL DROP NOT NULL; SQLite table-rebuild), with a CHECK that at least one of last_digits/pattern_id is present; backend validator accepts 4-digit last_digits OR non-empty pattern_id. Chosen over sentinel value and separate table.",
+      "adr_candidate": false
+    }
+  ],
+  "references": [],
+  "preferences": {
+    "auto_update_plan": true,
+    "update_docs": true,
+    "commit": true,
+    "next_phase_prompt": true
+  }
+}

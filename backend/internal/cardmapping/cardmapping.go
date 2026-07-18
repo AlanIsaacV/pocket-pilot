@@ -1,5 +1,6 @@
-// Package cardmapping persiste el mapeo (banco, últimos 4 dígitos) → cuenta
-// que aprende automáticamente del flujo de aprobación de PendingTransactions.
+// Package cardmapping persiste el mapeo (banco, últimos 4 dígitos o patrón) →
+// cuenta que aprende automáticamente del flujo de aprobación de
+// PendingTransactions.
 //
 // El usuario nunca crea estos registros explícitamente: cuando aprueba una
 // sugerencia derivada de una notificación bancaria que incluyó dígitos de
@@ -31,19 +32,20 @@ type Mapping struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID
 	BankID     string
-	LastDigits string
+	LastDigits *string
+	PatternID  *string
 	AccountID  uuid.UUID
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 	DeletedAt  *time.Time
 }
 
-const scanColumns = `id, user_id, bank_id, last_digits, account_id, created_at, updated_at, deleted_at`
+const scanColumns = `id, user_id, bank_id, last_digits, pattern_id, account_id, created_at, updated_at, deleted_at`
 
 func scan(row pgx.Row) (*Mapping, error) {
 	m := &Mapping{}
 	err := row.Scan(
-		&m.ID, &m.UserID, &m.BankID, &m.LastDigits, &m.AccountID,
+		&m.ID, &m.UserID, &m.BankID, &m.LastDigits, &m.PatternID, &m.AccountID,
 		&m.CreatedAt, &m.UpdatedAt, &m.DeletedAt,
 	)
 	if err != nil {
@@ -118,8 +120,8 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID, updatedSince *t
 }
 
 // Upsert applies LWW. Same id collision → newer updated_at wins. Multiple
-// active rows for the same (user_id, bank_id, last_digits) are allowed; the
-// resolution at read time picks the most recently updated.
+// active rows for the same lookup dimensions are allowed; the resolution at
+// read time picks the most recently updated.
 func (r *Repository) Upsert(ctx context.Context, m *Mapping) (*Mapping, bool, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -131,19 +133,20 @@ func (r *Repository) Upsert(ctx context.Context, m *Mapping) (*Mapping, bool, er
 		ctx,
 		`
 		INSERT INTO account_card_mappings (
-			id, user_id, bank_id, last_digits, account_id,
+			id, user_id, bank_id, last_digits, pattern_id, account_id,
 			created_at, updated_at, deleted_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (id) DO UPDATE SET
 			bank_id     = EXCLUDED.bank_id,
 			last_digits = EXCLUDED.last_digits,
+			pattern_id  = EXCLUDED.pattern_id,
 			account_id  = EXCLUDED.account_id,
 			updated_at  = EXCLUDED.updated_at,
 			deleted_at  = EXCLUDED.deleted_at
 		WHERE account_card_mappings.updated_at < EXCLUDED.updated_at
 		RETURNING `+scanColumns,
-		m.ID, m.UserID, m.BankID, m.LastDigits, m.AccountID,
+		m.ID, m.UserID, m.BankID, m.LastDigits, m.PatternID, m.AccountID,
 		m.CreatedAt, m.UpdatedAt, m.DeletedAt,
 	)
 
@@ -241,34 +244,56 @@ func nextPageToken(offset, limit, count int) string {
 
 func toProto(m *Mapping) *pb.AccountCardMapping {
 	proto := &pb.AccountCardMapping{
-		Id:         m.ID.String(),
-		BankId:     m.BankID,
-		LastDigits: m.LastDigits,
-		AccountId:  m.AccountID.String(),
-		CreatedAt:  timestamppb.New(m.CreatedAt),
-		UpdatedAt:  timestamppb.New(m.UpdatedAt),
+		Id:        m.ID.String(),
+		BankId:    m.BankID,
+		AccountId: m.AccountID.String(),
+		CreatedAt: timestamppb.New(m.CreatedAt),
+		UpdatedAt: timestamppb.New(m.UpdatedAt),
+	}
+	if m.LastDigits != nil {
+		proto.LastDigits = *m.LastDigits
 	}
 	if m.DeletedAt != nil {
 		proto.DeletedAt = timestamppb.New(*m.DeletedAt)
 	}
+	if m.PatternID != nil {
+		proto.PatternId = m.PatternID
+	}
 	return proto
 }
 
+// fromProto validates and copies wire data into m. A mapping must carry at
+// least one resolution dimension: 4-digit last_digits (card-based lookup) or
+// a non-empty pattern_id (fallback for notifications without card digits,
+// e.g. BBVA "COMPRA TDC"). last_digits is a plain (non-optional) proto3
+// string field — an empty string means "absent", mirroring how pattern_id
+// (optional) signals absence via HasPatternId().
 func fromProto(p *pb.AccountCardMapping, m *Mapping) error {
 	bankID := strings.TrimSpace(p.BankId)
 	if bankID == "" {
 		return status.Error(codes.InvalidArgument, "mapping.bank_id is required")
 	}
 	digits := strings.TrimSpace(p.LastDigits)
-	if !isFourDigits(digits) {
+	patternID := strings.TrimSpace(p.GetPatternId())
+	if digits != "" && !isFourDigits(digits) {
 		return status.Error(codes.InvalidArgument, "mapping.last_digits must be 4 numeric digits")
+	}
+	if digits == "" && patternID == "" {
+		return status.Error(codes.InvalidArgument, "mapping requires last_digits or pattern_id")
 	}
 	accountID, err := parseUUID(p.AccountId, "mapping.account_id")
 	if err != nil {
 		return err
 	}
 	m.BankID = bankID
-	m.LastDigits = digits
+	m.LastDigits = nil
+	if digits != "" {
+		m.LastDigits = &digits
+	}
+	m.PatternID = nil
+	if patternID != "" {
+		m.PatternID = &patternID
+	}
 	m.AccountID = accountID
 	m.CreatedAt = p.CreatedAt.AsTime()
 	m.UpdatedAt = p.UpdatedAt.AsTime()

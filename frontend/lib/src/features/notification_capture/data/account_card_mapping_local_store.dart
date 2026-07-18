@@ -27,6 +27,24 @@ class AccountCardMappingLocalStore {
     return AccountCardMappingModel.fromMap(rows.first);
   }
 
+  /// Resolución para notificaciones sin dígitos: la fila activa más reciente
+  /// para (bank_id, pattern_id), con la misma semántica LWW que dígitos.
+  Future<AccountCardMappingModel?> findByBankAndPattern({
+    required String bankId,
+    required String patternId,
+  }) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'account_card_mappings',
+      where: 'bank_id = ? AND pattern_id = ? AND deleted_at IS NULL',
+      whereArgs: [bankId, patternId],
+      orderBy: 'updated_at DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return AccountCardMappingModel.fromMap(rows.first);
+  }
+
   Future<void> upsert(AccountCardMappingModel model) async {
     final db = await _db.database;
     await db.insert(

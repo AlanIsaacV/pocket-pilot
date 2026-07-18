@@ -78,20 +78,20 @@ class NotificationCaptureRepository {
     ParserEngine? engine,
     ParserRemoteService? parserRemote,
     NotificationCapturePreferences? preferences,
-  })  : _captured = captured,
-        _pending = pending,
-        _parsers = parsers,
-        _accounts = accounts,
-        _cardMappings = cardMappings,
-        _rules = rules,
-        _feedback = feedback,
-        _bankAliases = bankAliases,
-        _bankPackages = bankPackages,
-        _transactions = transactions,
-        _outbox = outbox,
-        _engine = engine ?? ParserEngine(),
-        _parserRemote = parserRemote,
-        _preferences = preferences;
+  }) : _captured = captured,
+       _pending = pending,
+       _parsers = parsers,
+       _accounts = accounts,
+       _cardMappings = cardMappings,
+       _rules = rules,
+       _feedback = feedback,
+       _bankAliases = bankAliases,
+       _bankPackages = bankPackages,
+       _transactions = transactions,
+       _outbox = outbox,
+       _engine = engine ?? ParserEngine(),
+       _parserRemote = parserRemote,
+       _preferences = preferences;
 
   /// Procesa cada notificación pendiente:
   ///   - intenta match con parsers locales
@@ -125,7 +125,10 @@ class NotificationCaptureRepository {
       }
 
       if (match != null) {
-        final pendingTx = await _createPendingFromLocalMatch(notification, match);
+        final pendingTx = await _createPendingFromLocalMatch(
+          notification,
+          match,
+        );
         await _captured.updateStatus(
           notification.id,
           'matched_local',
@@ -164,6 +167,7 @@ class NotificationCaptureRepository {
     final accountId = await _resolveAccount(
       bankId: match.parser.bankId,
       cardLastDigits: match.cardLastDigits,
+      patternId: match.pattern.id,
     );
     final categoryId = match.merchantDescription != null
         ? await _resolveCategory(match.merchantDescription!)
@@ -215,8 +219,9 @@ class NotificationCaptureRepository {
 
       // El LLM no resuelve account ni category — los buscamos con la misma
       // lógica que para parsers locales (mappings y rules aprendidas).
-      final bankId =
-          await _bankIdForPackage(notification.packageName as String);
+      final bankId = await _bankIdForPackage(
+        notification.packageName as String,
+      );
       final accountId = outcome.cardLastDigits.isNotEmpty
           ? await _resolveAccount(
               bankId: bankId,
@@ -264,14 +269,20 @@ class NotificationCaptureRepository {
       );
       return _LlmOutcome.matched;
     } on ParserQuotaExceededException catch (e) {
-      developer.log('LLM quota exceeded: ${e.message}',
-          name: 'NotificationCapture');
+      developer.log(
+        'LLM quota exceeded: ${e.message}',
+        name: 'NotificationCapture',
+      );
       return _LlmOutcome.quotaExceeded;
     } catch (e, st) {
       // Red, 5xx, parsing — no bloquea el inbox. La noti queda unparseable
       // y el botón "Reintentar no parseables" volverá a intentar.
-      developer.log('LLM fallback failed: $e',
-          name: 'NotificationCapture', error: e, stackTrace: st);
+      developer.log(
+        'LLM fallback failed: $e',
+        name: 'NotificationCapture',
+        error: e,
+        stackTrace: st,
+      );
       return _LlmOutcome.error;
     }
   }
@@ -320,10 +331,11 @@ class NotificationCaptureRepository {
   }) async {
     final amount = amountCentsOverride ?? pending.amountCents;
     final currency = currencyCodeOverride ?? pending.currencyCode;
-    final description = (descriptionOverride ??
-            pending.merchantDescription ??
-            'Sin descripción')
-        .trim();
+    final description =
+        (descriptionOverride ??
+                pending.merchantDescription ??
+                'Sin descripción')
+            .trim();
     final date = (dateOverride ?? pending.occurredAt).toLocal();
 
     await _transactions.createTransaction(
@@ -341,16 +353,14 @@ class NotificationCaptureRepository {
 
     await _pending.updateStatus(pending.id, 'approved');
     if (pending.capturedNotificationId != null) {
-      await _captured.updateStatus(
-        pending.capturedNotificationId!,
-        'consumed',
-      );
+      await _captured.updateStatus(pending.capturedNotificationId!, 'consumed');
     }
 
     // Aprendizaje implícito ──────────────────────────────────────────────
     await _learnCardMapping(
       bankId: bankId,
       cardLastDigits: pending.cardLastDigits,
+      parserId: pending.parserId,
       accountId: accountId,
     );
     await _learnRule(
@@ -376,10 +386,7 @@ class NotificationCaptureRepository {
   }) async {
     await _pending.updateStatus(pending.id, 'dismissed');
     if (pending.capturedNotificationId != null) {
-      await _captured.updateStatus(
-        pending.capturedNotificationId!,
-        'ignored',
-      );
+      await _captured.updateStatus(pending.capturedNotificationId!, 'ignored');
     }
     await _persistFeedback(
       pending: pending,
@@ -406,8 +413,9 @@ class NotificationCaptureRepository {
     final feedback = _feedback;
     if (feedback == null) return; // legacy/test sin DI
 
-    final (bankId, patternId) =
-        PendingTransactionModel.splitParserId(pending.parserId);
+    final (bankId, patternId) = PendingTransactionModel.splitParserId(
+      pending.parserId,
+    );
     final extractionMethod = switch (pending.source) {
       'parser_local' => 'local',
       'llm' || 'parser_llm' => 'llm',
@@ -482,11 +490,19 @@ class NotificationCaptureRepository {
   Future<String?> _resolveAccount({
     required String bankId,
     String? cardLastDigits,
+    String? patternId,
   }) async {
-    if (cardLastDigits == null || cardLastDigits.length != 4) return null;
-    final mapping = await _cardMappings.findActiveLatest(
+    if (cardLastDigits != null && cardLastDigits.length == 4) {
+      final mapping = await _cardMappings.findActiveLatest(
+        bankId: bankId,
+        lastDigits: cardLastDigits,
+      );
+      return mapping?.accountId;
+    }
+    if (patternId == null || patternId.isEmpty) return null;
+    final mapping = await _cardMappings.findByBankAndPattern(
       bankId: bankId,
-      lastDigits: cardLastDigits,
+      patternId: patternId,
     );
     return mapping?.accountId;
   }
@@ -496,14 +512,42 @@ class NotificationCaptureRepository {
     return rule?.categoryId;
   }
 
+  /// Aprende el mapeo (banco, dígitos) → cuenta cuando la notificación traía
+  /// dígitos de tarjeta. Si no los traía (ej. BBVA "COMPRA TDC"), cae al
+  /// fallback por (bank_id, pattern_id) — el `pattern_id` se extrae de
+  /// `parserId` (formato `bank_id/pattern_id`, ver `splitParserId`), que ya
+  /// viaja en el `PendingTransaction` para trazabilidad (fase LLM).
   Future<void> _learnCardMapping({
     required String? bankId,
     required String? cardLastDigits,
+    required String? parserId,
     required String accountId,
   }) async {
-    if (bankId == null || cardLastDigits == null || cardLastDigits.length != 4) {
+    if (bankId == null) return;
+
+    if (cardLastDigits != null && cardLastDigits.length == 4) {
+      await _learnDigitsMapping(
+        bankId: bankId,
+        cardLastDigits: cardLastDigits,
+        accountId: accountId,
+      );
       return;
     }
+
+    final (_, patternId) = PendingTransactionModel.splitParserId(parserId);
+    if (patternId == null || patternId.isEmpty) return;
+    await _learnPatternMapping(
+      bankId: bankId,
+      patternId: patternId,
+      accountId: accountId,
+    );
+  }
+
+  Future<void> _learnDigitsMapping({
+    required String bankId,
+    required String cardLastDigits,
+    required String accountId,
+  }) async {
     final existing = await _cardMappings.findActiveLatest(
       bankId: bankId,
       lastDigits: cardLastDigits,
@@ -530,6 +574,41 @@ class NotificationCaptureRepository {
     );
   }
 
+  /// Mismo aprendizaje que dígitos, pero para notificaciones sin card
+  /// digits: la clave de resolución es (bank_id, pattern_id). Conocido
+  /// caveat (aceptado): no distingue dos tarjetas de crédito del mismo
+  /// banco.
+  Future<void> _learnPatternMapping({
+    required String bankId,
+    required String patternId,
+    required String accountId,
+  }) async {
+    final existing = await _cardMappings.findByBankAndPattern(
+      bankId: bankId,
+      patternId: patternId,
+    );
+    if (existing != null && existing.accountId == accountId) {
+      // Ya conocíamos este mapeo: nada que persistir.
+      return;
+    }
+    final now = DateTime.now().toUtc();
+    final mapping = AccountCardMappingModel(
+      id: _uuid.v4(),
+      bankId: bankId,
+      patternId: patternId,
+      accountId: accountId,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await _cardMappings.upsert(mapping);
+    await _outbox.enqueue(
+      entityType: 'account_card_mapping',
+      entityId: mapping.id,
+      operation: 'upsert',
+      payload: jsonEncode(mapping.toServerMap()),
+    );
+  }
+
   Future<void> _learnRule({
     required String? merchantDescription,
     required String? categoryId,
@@ -540,33 +619,40 @@ class NotificationCaptureRepository {
       return;
     }
 
-    // Heurística: primera palabra del merchant. Suficientemente específica
-    // para "STARBUCKS REFORMA 222" → rule "STARBUCKS" que también matchea
-    // "STARBUCKS POLANCO". Si el usuario quiere reglas más finas, las
-    // editaremos en una pantalla dedicada en el futuro.
+    // Heurística: primera palabra del merchant. Si esa regla ya pertenece a
+    // otra categoría, conserva la regla existente y aprende los dos primeros
+    // tokens para que, por ejemplo, DIDI y DIDI FOOD puedan coexistir.
     final firstWord = _firstWord(merchantDescription);
     if (firstWord == null) return;
 
-    final existing = await _rules.findByExactMatchText(firstWord);
+    var matchText = firstWord;
+    var existing = await _rules.findByExactMatchText(matchText);
     if (existing != null && existing.categoryId == categoryId) {
       return; // ya conocíamos esta regla
+    }
+
+    if (existing != null) {
+      final twoWordPrefix = _firstTwoWords(merchantDescription);
+      if (twoWordPrefix == null) return;
+      matchText = twoWordPrefix;
+      existing = await _rules.findByExactMatchText(matchText);
+      if (existing != null && existing.categoryId == categoryId) {
+        return; // ya conocíamos esta regla más específica
+      }
     }
 
     final now = DateTime.now().toUtc();
     final rule = existing == null
         ? TransactionRuleModel(
             id: _uuid.v4(),
-            matchText: firstWord,
+            matchText: matchText,
             categoryId: categoryId,
             priority: 0,
             matchCount: 0,
             createdAt: now,
             updatedAt: now,
           )
-        : existing.copyWith(
-            categoryId: categoryId,
-            updatedAt: now,
-          );
+        : existing.copyWith(categoryId: categoryId, updatedAt: now);
 
     await _rules.upsert(rule);
     await _outbox.enqueue(
@@ -586,16 +672,23 @@ class NotificationCaptureRepository {
   }
 
   String? _firstWord(String text) {
-    final cleaned = text.trim();
-    if (cleaned.isEmpty) return null;
-    // Splittea por espacios, comas, puntos: la primera palabra alfanumérica.
-    final tokens = cleaned.split(RegExp(r'[\s,.\-]+'));
-    for (final t in tokens) {
-      final candidate = t.trim();
-      if (candidate.length >= 2) return candidate;
-    }
+    final tokens = _merchantTokens(text);
+    if (tokens.isNotEmpty) return tokens.first;
     return null;
   }
+
+  String? _firstTwoWords(String text) {
+    final tokens = _merchantTokens(text);
+    if (tokens.length < 2) return null;
+    return '${tokens[0]} ${tokens[1]}';
+  }
+
+  List<String> _merchantTokens(String text) => text
+      .trim()
+      .split(RegExp(r'[\s,.\-]+'))
+      .map((token) => token.trim())
+      .where((token) => token.length >= 2)
+      .toList(growable: false);
 
   String _formatDate(DateTime date) {
     final m = date.month.toString().padLeft(2, '0');
@@ -605,9 +698,9 @@ class NotificationCaptureRepository {
 }
 
 enum _LlmOutcome {
-  matched,        // PendingTransaction creada — seguir al siguiente
-  notMatched,     // LLM dijo "no es transacción" → unparseable
-  quotaExceeded,  // cuota agotada — abortar el resto del batch
-  error,          // red/5xx/parse → unparseable, log
-  skipped,        // dependencias no inyectadas (tests/legacy callers)
+  matched, // PendingTransaction creada — seguir al siguiente
+  notMatched, // LLM dijo "no es transacción" → unparseable
+  quotaExceeded, // cuota agotada — abortar el resto del batch
+  error, // red/5xx/parse → unparseable, log
+  skipped, // dependencias no inyectadas (tests/legacy callers)
 }

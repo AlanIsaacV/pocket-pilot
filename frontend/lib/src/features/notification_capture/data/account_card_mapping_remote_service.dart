@@ -41,7 +41,9 @@ class AccountCardMappingRemoteService {
       final mapping = AccountCardMapping(
         id: map['id'] as String,
         bankId: map['bank_id'] as String,
-        lastDigits: map['last_digits'] as String,
+        // last_digits es un campo proto3 no-opcional: "" representa
+        // ausencia, igual que pattern_id (optional) usa HasPatternId().
+        lastDigits: (map['last_digits'] as String?) ?? '',
         accountId: map['account_id'] as String,
         createdAt: Timestamp.fromDateTime(
           map['created_at'] != null
@@ -54,6 +56,10 @@ class AccountCardMappingRemoteService {
               : now,
         ),
       );
+      final patternId = map['pattern_id'] as String?;
+      if (patternId != null && patternId.isNotEmpty) {
+        mapping.patternId = patternId;
+      }
       if (map['deleted_at'] != null) {
         mapping.deletedAt = Timestamp.fromDateTime(
           DateTime.parse(map['deleted_at'] as String).toUtc(),

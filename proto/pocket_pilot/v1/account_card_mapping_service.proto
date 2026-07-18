@@ -30,6 +30,9 @@ message AccountCardMapping {
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
   google.protobuf.Timestamp deleted_at = 7;
+
+  // Identificador opcional del patrón que originó la notificación.
+  optional string pattern_id = 8;
 }
 
 service AccountCardMappingService {

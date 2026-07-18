@@ -10,15 +10,19 @@ class TransactionRuleLocalStore {
 
   /// Devuelve la categoría sugerida para una description dada.
   /// Match: substring case-insensitive de match_text en description.
-  /// Empate: mayor priority, luego más reciente.
-  Future<TransactionRuleModel?> findRuleForDescription(String description) async {
+  /// Prefiere el texto coincidente más largo; empate: mayor priority, luego
+  /// más reciente.
+  Future<TransactionRuleModel?> findRuleForDescription(
+    String description,
+  ) async {
     if (description.trim().isEmpty) return null;
     final db = await _db.database;
     final rows = await db.query(
       'transaction_rules',
-      where: "deleted_at IS NULL AND lower(?) LIKE '%' || lower(match_text) || '%'",
+      where:
+          "deleted_at IS NULL AND lower(?) LIKE '%' || lower(match_text) || '%'",
       whereArgs: [description],
-      orderBy: 'priority DESC, updated_at DESC',
+      orderBy: 'LENGTH(match_text) DESC, priority DESC, updated_at DESC',
       limit: 1,
     );
     if (rows.isEmpty) return null;

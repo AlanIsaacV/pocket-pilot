@@ -68,6 +68,13 @@
 - **Migration process**: (1) update `.proto` if needed → (2) add `backend/migrations/NNN_*.sql`
   → (3) add `frontend/assets/migrations/NNN.sql` + bump `DatabaseHelper._version` → (4) update the
   `Handler` and `LocalStore` for the new fields.
+- **Dropping constraints in SQLite**: SQLite cannot `ALTER` away a `NOT NULL`/`CHECK`; rebuild the
+  table instead — CREATE the new table → `INSERT … SELECT` → DROP old → RENAME → recreate
+  indexes/triggers. First use: `frontend/assets/migrations/017.sql` (the PostgreSQL side is a plain
+  `ALTER COLUMN … DROP NOT NULL`).
+- **Unpublished-migration exception**: a migration created in the current, not-yet-shipped session
+  may be edited in place instead of adding a repair migration — "never modify a published .sql"
+  applies from the moment it ships to a device.
 - **MVP baseline exception**: while no production data exists, editing baseline `001_*.sql` directly
   to add required columns is acceptable.
 

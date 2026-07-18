@@ -35,7 +35,12 @@ class CsvImportService {
 
   static const _validTypes = {'EXPENSE', 'INCOME', 'TRANSFER'};
   static const _validNatures = {
-    'required', 'obligation', 'lifestyle', 'active', 'passive', 'windfall',
+    'required',
+    'obligation',
+    'lifestyle',
+    'active',
+    'passive',
+    'windfall',
   };
 
   // ----------------------------------------------------------
@@ -54,8 +59,9 @@ class CsvImportService {
     }
 
     // Validar encabezados.
-    final headers =
-        parsed.first.map((h) => h.toString().trim().toLowerCase()).toList();
+    final headers = parsed.first
+        .map((h) => h.toString().trim().toLowerCase())
+        .toList();
     if (headers.length < _expectedHeaders.length) {
       throw FormatException(
         'Encabezados incompletos. Esperados: ${_expectedHeaders.join(", ")}',
@@ -133,9 +139,7 @@ class CsvImportService {
       final amountRaw = raw[2].toString().trim();
       final amount = double.tryParse(amountRaw);
       if (amount == null) {
-        throw FormatException(
-          'Fila $rowNum: monto inválido "$amountRaw".',
-        );
+        throw FormatException('Fila $rowNum: monto inválido "$amountRaw".');
       }
 
       // Parse optional nature column.
@@ -163,19 +167,21 @@ class CsvImportService {
         }
       }
 
-      rows.add(CsvTransactionRow(
-        date: raw[0].toString().trim(),
-        type: type,
-        amount: amount,
-        currencyCode: raw[3].toString().trim(),
-        accountName: accountName,
-        destinationAccountName: destinationAccountName,
-        categoryName: categoryName,
-        tagNames: parsedTags,
-        notes: raw[8].toString().trim(),
-        nature: nature,
-        installmentsCount: installmentsCount,
-      ));
+      rows.add(
+        CsvTransactionRow(
+          date: raw[0].toString().trim(),
+          type: type,
+          amount: amount,
+          currencyCode: raw[3].toString().trim(),
+          accountName: accountName,
+          destinationAccountName: destinationAccountName,
+          categoryName: categoryName,
+          tagNames: parsedTags,
+          notes: raw[8].toString().trim(),
+          nature: nature,
+          installmentsCount: installmentsCount,
+        ),
+      );
 
       // Recolectar nombres únicos.
       accountNames.add(accountName);
@@ -237,12 +243,7 @@ class CsvImportService {
       }
 
       final tagIds = row.tagNames
-          .map((name) => _resolveMapping(
-                mapping.tagIdMap,
-                name,
-                'tag',
-                rowNum,
-              ))
+          .map((name) => _resolveMapping(mapping.tagIdMap, name, 'tag', rowNum))
           .toList();
 
       // --- Conversión de monto ---
@@ -269,6 +270,7 @@ class CsvImportService {
           'nature': row.nature,
           'currency_code': row.currencyCode,
           'status': 'cleared',
+          'source': 'import_csv',
           'tags': jsonEncode(tagIds),
           'description': row.notes,
           'date': row.date,
@@ -313,6 +315,7 @@ class CsvImportService {
           'nature': row.nature,
           'currency_code': row.currencyCode,
           'status': 'cleared',
+          'source': 'import_csv',
           'tags': jsonEncode(tagIds),
           'description': row.notes,
           'date': row.date,

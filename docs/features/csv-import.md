@@ -3,8 +3,9 @@
 ## What it does
 
 Imports transactions from a CSV file into the app through a 3-phase pipeline —
-**Extract → Map → Insert** — with interactive mapping of accounts/categories and silent
-auto-creation of tags. The CSV format is the same one produced by the
+**Extract → Map → Insert** — with interactive mapping of accounts/categories, silent
+auto-creation of tags, and duplicate detection against existing transactions (safe monthly
+re-import). The CSV format is the same one produced by the
 [bank statement parsers](bank-statement-parser.md).
 
 ## Entry points
@@ -17,6 +18,9 @@ through the usual paths.
 
 - `features/csv_import/` — `CsvImportService`, `CsvImportRepository`, `CsvImportViewModel`
   (holds `CategoryNode` tree), `CsvMappingScreen`.
+- `features/csv_import/domain/csv_duplicate_matcher.dart` — pure duplicate matcher (see below).
+- `CsvImportLocalStore.getTransactionsForAccounts()` — fetches existing (non-deleted)
+  transactions per mapped account to feed the matcher.
 - Depends on `AccountLocalStore`, `CategoryLocalStore`, `TagLocalStore`, `TagRepository`,
   `AccountRepository`, `CategoryRepository`, `SyncOutbox` (all injected via `CsvImportRouteScope`).
 - Shares `form_widgets.dart` with the transaction/transfer forms.
@@ -60,6 +64,30 @@ Both buttons navigate to the entity form passing `initialName` as route extra:
 built recursively from the flat list by `parentId`. Expand/collapse state
 (`Set<String> _expandedCategoryIds`) lives in `_CsvMappingScreenState`: tap row → select, tap
 chevron → expand/collapse.
+
+## Duplicate detection (frictionless-capture f5)
+
+During the Map phase, once a row's account is mapped, the view model fetches that account's
+existing transactions and runs the pure matcher in
+`domain/csv_duplicate_matcher.dart`:
+
+- **Heuristic**: same account + same amount in cents + date within ±3 days.
+- **One-to-one**: one existing transaction absorbs at most one CSV row — contested rows are
+  paired greedily by closest date; matches are returned sorted by CSV row index.
+- Soft-deleted transactions are never considered.
+
+Flagged rows show a duplicate chip in `CsvMappingScreen` and **default to skip**; the user can
+include a row individually (per-row toggle) or all flagged rows at once (bulk "include anyway").
+Explicit user exclusions survive subsequent duplicate refreshes (re-mapping an account does not
+silently re-include rows). After importing, the summary shows imported vs skipped-as-duplicate
+counts.
+
+### Provenance
+
+`importBatch()` stamps `source='import_csv'` on every transaction it creates, and the value is
+forwarded through the outbox payload and the remote seam (regression-tested — see the
+field-forwarding hazard in
+[decisions/0004-transaction-source-provenance.md](../decisions/0004-transaction-source-provenance.md)).
 
 ## Edge cases
 

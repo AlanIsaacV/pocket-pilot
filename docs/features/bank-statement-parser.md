@@ -58,7 +58,8 @@ a default account in `parse_statement.py`.
 
 ## Related docs
 
-- [csv-import.md](csv-import.md) — the in-app importer that consumes this output.
+- [csv-import.md](csv-import.md) — the in-app importer that consumes this output; since
+  frictionless-capture f5 it detects duplicates, so re-importing a monthly statement is safe.
 - Historical design: `docs/specs/2026-04-11-bank-statement-parser-design.md`.
 - `scripts/dump_captured_notifications.sh` (adb + sqlite3, debug builds) extracts notification
   fixtures — see [notification-capture.md](notification-capture.md).

@@ -15,6 +15,8 @@ import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/csv_import/data/csv_import_repository.dart';
 import 'package:pocket_pilot/src/features/csv_import/data/csv_import_service.dart';
 import 'package:pocket_pilot/src/features/csv_import/domain/csv_extraction_result.dart';
+import 'package:pocket_pilot/src/features/csv_import/domain/csv_duplicate_matcher.dart';
+import 'package:pocket_pilot/src/features/csv_import/domain/csv_transaction_row.dart';
 import 'package:pocket_pilot/src/features/csv_import/domain/mapping_dictionary.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_repository.dart';
@@ -23,6 +25,32 @@ import 'package:pocket_pilot/src/features/tags/data/tag_repository.dart';
 import 'package:pocket_pilot/src/features/tags/domain/tag.dart';
 
 enum CsvImportStatus { idle, parsing, readyToMap, importing, done, error }
+
+/// Returns only the CSV rows selected for insertion by their original index.
+List<CsvTransactionRow> rowsIncludedForImport(
+  List<CsvTransactionRow> rows,
+  Set<int> includedRowIndices,
+) => [
+  for (var index = 0; index < rows.length; index++)
+    if (includedRowIndices.contains(index)) rows[index],
+];
+
+/// Reconciles duplicate flags without discarding deliberate row exclusions.
+Set<int> reconcileIncludedRowIndices({
+  required Set<int> includedRowIndices,
+  required Set<int> previousDuplicateRowIndices,
+  required Set<int> matchedRowIndices,
+  required int rowCount,
+  required bool initializeIncludedRows,
+}) {
+  final included = Set<int>.from(includedRowIndices);
+  if (initializeIncludedRows) {
+    included.addAll(List.generate(rowCount, (index) => index));
+  }
+  return included
+    ..addAll(previousDuplicateRowIndices.difference(matchedRowIndices))
+    ..removeAll(matchedRowIndices.difference(previousDuplicateRowIndices));
+}
 
 class CsvImportViewModel extends ChangeNotifier {
   final CsvImportService _service;
@@ -43,14 +71,14 @@ class CsvImportViewModel extends ChangeNotifier {
     required TagRepository tagRepository,
     required AccountRepository accountRepository,
     required CategoryRepository categoryRepository,
-  })  : _service = service,
-        _repository = repository,
-        _accountStore = accountStore,
-        _categoryStore = categoryStore,
-        _tagStore = tagStore,
-        _tagRepository = tagRepository,
-        _accountRepository = accountRepository,
-        _categoryRepository = categoryRepository;
+  }) : _service = service,
+       _repository = repository,
+       _accountStore = accountStore,
+       _categoryStore = categoryStore,
+       _tagStore = tagStore,
+       _tagRepository = tagRepository,
+       _accountRepository = accountRepository,
+       _categoryRepository = categoryRepository;
 
   // ----------------------------------------------------------
   // State
@@ -78,26 +106,36 @@ class CsvImportViewModel extends ChangeNotifier {
   List<TagModel> _existingTags = [];
   List<TagModel> get existingTags => _existingTags;
 
+  final Set<int> _duplicateRowIndices = {};
+  final Set<int> _includedRowIndices = {};
+  bool _includedRowsInitialized = false;
+  int _lastImportedRowCount = 0;
+  int _lastSkippedDuplicateRowCount = 0;
+
+  Set<int> get duplicateRowIndices => Set.unmodifiable(_duplicateRowIndices);
+  bool isDuplicateRow(int rowIndex) => _duplicateRowIndices.contains(rowIndex);
+  bool isRowIncluded(int rowIndex) => _includedRowIndices.contains(rowIndex);
+  int get duplicateRowCount => _duplicateRowIndices.length;
+  int get skippedDuplicateRowCount =>
+      _duplicateRowIndices.difference(_includedRowIndices).length;
+  int get includedRowCount => _includedRowIndices.length;
+  int get lastImportedRowCount => _lastImportedRowCount;
+  int get lastSkippedDuplicateRowCount => _lastSkippedDuplicateRowCount;
+
   // ----------------------------------------------------------
   // Summary getters
   // ----------------------------------------------------------
 
   int get totalRows => _extractionResult?.rows.length ?? 0;
 
-  int get expenseCount => _extractionResult?.rows
-          .where((r) => r.type == 'EXPENSE')
-          .length ??
-      0;
+  int get expenseCount =>
+      _extractionResult?.rows.where((r) => r.type == 'EXPENSE').length ?? 0;
 
-  int get incomeCount => _extractionResult?.rows
-          .where((r) => r.type == 'INCOME')
-          .length ??
-      0;
+  int get incomeCount =>
+      _extractionResult?.rows.where((r) => r.type == 'INCOME').length ?? 0;
 
-  int get transferCount => _extractionResult?.rows
-          .where((r) => r.type == 'TRANSFER')
-          .length ??
-      0;
+  int get transferCount =>
+      _extractionResult?.rows.where((r) => r.type == 'TRANSFER').length ?? 0;
 
   // ----------------------------------------------------------
   // Mapping status getters
@@ -154,6 +192,9 @@ class CsvImportViewModel extends ChangeNotifier {
       }
 
       _extractionResult = extraction;
+      _duplicateRowIndices.clear();
+      _includedRowIndices.clear();
+      _includedRowsInitialized = false;
       _status = CsvImportStatus.readyToMap;
       notifyListeners();
     } on FormatException catch (e) {
@@ -177,6 +218,7 @@ class CsvImportViewModel extends ChangeNotifier {
     _existingTags = await _tagStore.getTags();
 
     _autoMatch();
+    await _refreshDuplicateMatches();
     notifyListeners();
   }
 
@@ -215,8 +257,24 @@ class CsvImportViewModel extends ChangeNotifier {
   // Mapping updates
   // ----------------------------------------------------------
 
-  void updateAccountMapping(String csvName, String accountId) {
+  Future<void> updateAccountMapping(String csvName, String accountId) async {
     accountIdMap[csvName] = accountId;
+    await _refreshDuplicateMatches();
+    notifyListeners();
+  }
+
+  /// Phase 5.3 UI will expose this for the per-row include toggle.
+  void setRowIncluded(int rowIndex, bool included) {
+    if (included) {
+      _includedRowIndices.add(rowIndex);
+    } else {
+      _includedRowIndices.remove(rowIndex);
+    }
+    notifyListeners();
+  }
+
+  void includeAllDuplicateRows() {
+    _includedRowIndices.addAll(_duplicateRowIndices);
     notifyListeners();
   }
 
@@ -233,7 +291,54 @@ class CsvImportViewModel extends ChangeNotifier {
   Future<void> refreshAccounts() async {
     _existingAccounts = await _accountStore.getAccounts();
     _autoMatch();
+    await _refreshDuplicateMatches();
     notifyListeners();
+  }
+
+  Future<void> _refreshDuplicateMatches() async {
+    final rows = _extractionResult?.rows;
+    if (rows == null) return;
+
+    final candidates = <CsvDuplicateCandidate>[];
+    for (var index = 0; index < rows.length; index++) {
+      final accountId = accountIdMap[rows[index].accountName];
+      if (accountId != null) {
+        candidates.add(
+          CsvDuplicateCandidate(
+            rowIndex: index,
+            row: rows[index],
+            accountId: accountId,
+          ),
+        );
+      }
+    }
+
+    final transactions = await _repository.getTransactionsForAccounts(
+      candidates.map((candidate) => candidate.accountId).toSet(),
+    );
+    final matches = findCsvDuplicateMatches(
+      csvRows: candidates,
+      existingTransactions: transactions,
+    );
+
+    final previousDuplicates = Set<int>.from(_duplicateRowIndices);
+    final matchedRowIndices = matches.map((match) => match.rowIndex).toSet();
+    // New duplicate flags default to skip; an explicit include choice for an
+    // already flagged row survives later refreshes.
+    final reconciledIncludedRows = reconcileIncludedRowIndices(
+      includedRowIndices: _includedRowIndices,
+      previousDuplicateRowIndices: previousDuplicates,
+      matchedRowIndices: matchedRowIndices,
+      rowCount: rows.length,
+      initializeIncludedRows: !_includedRowsInitialized,
+    );
+    _includedRowIndices
+      ..clear()
+      ..addAll(reconciledIncludedRows);
+    _includedRowsInitialized = true;
+    _duplicateRowIndices
+      ..clear()
+      ..addAll(matchedRowIndices);
   }
 
   Future<void> refreshCategories() async {
@@ -312,11 +417,13 @@ class CsvImportViewModel extends ChangeNotifier {
 
     List<CategoryNode> buildChildren(String? parentId, int depth) {
       return (byParent[parentId] ?? [])
-          .map((cat) => CategoryNode(
-                category: cat,
-                children: buildChildren(cat.id, depth + 1),
-                depth: depth,
-              ))
+          .map(
+            (cat) => CategoryNode(
+              category: cat,
+              children: buildChildren(cat.id, depth + 1),
+              depth: depth,
+            ),
+          )
           .toList();
     }
 
@@ -333,6 +440,7 @@ class CsvImportViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      await _refreshDuplicateMatches();
       // Auto-create entities that didn't get manually mapped.
       final result = _extractionResult;
       if (result != null) {
@@ -366,10 +474,13 @@ class CsvImportViewModel extends ChangeNotifier {
         tagIdMap: Map.unmodifiable(tagIdMap),
       );
 
-      final batch = _service.buildInsertBatch(
+      final includedRows = rowsIncludedForImport(
         _extractionResult!.rows,
-        mapping,
+        _includedRowIndices,
       );
+      _lastImportedRowCount = includedRows.length;
+      _lastSkippedDuplicateRowCount = skippedDuplicateRowCount;
+      final batch = _service.buildInsertBatch(includedRows, mapping);
 
       await _repository.importTransactions(batch);
 

@@ -26,7 +26,7 @@ Add a synced `transactions.source` column:
   `ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`.
 - **Allowed values:** `'manual'` (default — forms, voice assistant, and *human-approved*
   suggestions), `'auto_notification'` (created by the auto-confirm gate), `'import_csv'`
-  (reserved; frictionless-capture f5 will use it for CSV-import dedup transparency).
+  (stamped by the CSV importer since frictionless-capture f5, for dedup transparency).
 - Backend threads the field through struct/scan/Upsert/`toProto`/`fromProto`; `fromProto`
   defaults an absent field to `'manual'` (old clients). Frontend threads it through
   `TransactionModel` maps, `createTransaction` (defaults `'manual'`), and — critically — the
@@ -42,8 +42,8 @@ provenance is auditability, which must survive sync.
 
 ### Positive
 - Provenance survives sync/reinstall and is visible on every device.
-- Phase 5 (statement reconciliation) reuses the same column (`'import_csv'`) for dedup
-  transparency instead of inventing a second mechanism.
+- Phase 5 (statement reconciliation) reused the same column (`'import_csv'`, stamped by
+  `importBatch()`) for dedup transparency instead of inventing a second mechanism.
 - `NOT NULL DEFAULT 'manual'` backfills all existing rows with the correct value for free.
 
 ### Negative

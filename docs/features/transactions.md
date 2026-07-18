@@ -95,8 +95,8 @@ The top of `/transactions` unifies pending suggestions from two sources: `Pendin
 
 `transactions.source` records how a transaction was created: `'manual'` (default — forms, voice,
 human-approved suggestions), `'auto_notification'` (auto-confirmed by the notification-capture
-gate; rendered as an "Auto" badge in `_TransactionTile`), and `'import_csv'` reserved for the CSV
-importer's dedup (frictionless-capture f5). Synced end-to-end: proto field 21, PG mig 020 /
+gate; rendered as an "Auto" badge in `_TransactionTile`), and `'import_csv'` (stamped by the CSV
+importer's `importBatch()` — see [csv-import.md](csv-import.md)). Synced end-to-end: proto field 21, PG mig 020 /
 SQLite mig 018 (`TEXT NOT NULL DEFAULT 'manual'`). `createTransaction` defaults it to `'manual'`;
 `confirmTransaction` and `updateTransaction` preserve the existing value. See
 [decisions/0004-transaction-source-provenance.md](../decisions/0004-transaction-source-provenance.md).

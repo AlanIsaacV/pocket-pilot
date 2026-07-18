@@ -1,6 +1,45 @@
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/notifications/in_app_notification.dart';
+import 'package:pocket_pilot/src/core/notifications/statement_import_preferences.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/domain/schedule_date_math.dart';
+
+/// Pure statement-import projection used by the SQLite-backed repository.
+List<InAppNotification> projectStatementImportEvents({
+  required List<StatementImportReminder> reminders,
+  required Map<String, String> activeAccountNames,
+  required DateTime windowStart,
+  required DateTime windowEnd,
+}) {
+  final events = <InAppNotification>[];
+  for (final reminder in reminders) {
+    final accountName = activeAccountNames[reminder.accountId];
+    if (accountName == null) continue;
+    for (var year = windowStart.year, month = windowStart.month; ;) {
+      final maxDay = DateTime(year, month + 1, 0).day;
+      final date = DateTime(year, month, reminder.dayOfMonth.clamp(1, maxDay));
+      if (!date.isBefore(windowStart) && !date.isAfter(windowEnd)) {
+        events.add(
+          InAppNotification(
+            id: '',
+            title: 'Importa el estado de cuenta de $accountName',
+            subtitle: 'Mantén tus movimientos al día.',
+            date: date,
+            type: 'STATEMENT_IMPORT',
+            sourceId: reminder.accountId,
+            createdAt: DateTime.now(),
+          ),
+        );
+      }
+      if (year == windowEnd.year && month == windowEnd.month) break;
+      month++;
+      if (month == 13) {
+        month = 1;
+        year++;
+      }
+    }
+  }
+  return events;
+}
 
 /// Read-only repository that projects future financial events from SQLite.
 ///
@@ -8,8 +47,13 @@ import 'package:pocket_pilot/src/features/transaction_templates/domain/schedule_
 /// because it is a cross-cutting read-only projection. Never writes.
 class NotificationRepository {
   final DatabaseHelper _db;
+  final StatementImportPreferences _statementImportPreferences;
 
-  NotificationRepository({required DatabaseHelper db}) : _db = db;
+  NotificationRepository({
+    required DatabaseHelper db,
+    required StatementImportPreferences statementImportPreferences,
+  }) : _db = db,
+       _statementImportPreferences = statementImportPreferences;
 
   // ---------------------------------------------------------------------------
   // Internal helpers
@@ -119,6 +163,16 @@ class NotificationRepository {
     return results;
   }
 
+  Future<Map<String, String>> _queryActiveAccountNames() async {
+    final db = await _db.database;
+    final rows = await db.rawQuery('''
+      SELECT id, name
+      FROM accounts
+      WHERE deleted_at IS NULL
+    ''');
+    return {for (final row in rows) row['id'] as String: row['name'] as String};
+  }
+
   // ---------------------------------------------------------------------------
   // Template projection (shared by subscriptions and obligations)
   // ---------------------------------------------------------------------------
@@ -170,15 +224,17 @@ class NotificationRepository {
       final dueDay = card['payment_due_day'] as int;
       final name = card['name'] as String;
       for (final date in _projectCreditCardDates(dueDay, fromDate, windowEnd)) {
-        events.add(InAppNotification(
-          id: '',
-          title: '$name vence el ${date.day}',
-          subtitle: '',
-          date: date,
-          type: 'CREDIT_CARD',
-          sourceId: card['id'] as String,
-          createdAt: DateTime.now(),
-        ));
+        events.add(
+          InAppNotification(
+            id: '',
+            title: '$name vence el ${date.day}',
+            subtitle: '',
+            date: date,
+            type: 'CREDIT_CARD',
+            sourceId: card['id'] as String,
+            createdAt: DateTime.now(),
+          ),
+        );
       }
     }
 
@@ -196,18 +252,20 @@ class NotificationRepository {
         windowEnd,
       );
       for (final date in occurrences) {
-        events.add(InAppNotification(
-          id: '',
-          title: 'Cargo de $name',
-          subtitle: amountCents != null
-              ? '\$${(amountCents / 100).toStringAsFixed(2)}'
-              : '',
-          date: date,
-          type: 'SUBSCRIPTION',
-          amountCents: amountCents,
-          sourceId: sourceId,
-          createdAt: DateTime.now(),
-        ));
+        events.add(
+          InAppNotification(
+            id: '',
+            title: 'Cargo de $name',
+            subtitle: amountCents != null
+                ? '\$${(amountCents / 100).toStringAsFixed(2)}'
+                : '',
+            date: date,
+            type: 'SUBSCRIPTION',
+            amountCents: amountCents,
+            sourceId: sourceId,
+            createdAt: DateTime.now(),
+          ),
+        );
       }
     }
 
@@ -225,19 +283,35 @@ class NotificationRepository {
         windowEnd,
       );
       for (final date in occurrences) {
-        events.add(InAppNotification(
-          id: '',
-          title: 'Pago de $name',
-          subtitle: amountCents != null
-              ? '\$${(amountCents / 100).toStringAsFixed(2)}'
-              : '',
-          date: date,
-          type: 'OBLIGATION',
-          amountCents: amountCents,
-          sourceId: sourceId,
-          createdAt: DateTime.now(),
-        ));
+        events.add(
+          InAppNotification(
+            id: '',
+            title: 'Pago de $name',
+            subtitle: amountCents != null
+                ? '\$${(amountCents / 100).toStringAsFixed(2)}'
+                : '',
+            date: date,
+            type: 'OBLIGATION',
+            amountCents: amountCents,
+            sourceId: sourceId,
+            createdAt: DateTime.now(),
+          ),
+        );
       }
+    }
+
+    // 4. Statement-import reminders, configured locally per account.
+    final reminders = await _statementImportPreferences.getReminders();
+    if (reminders.isNotEmpty) {
+      final accountNames = await _queryActiveAccountNames();
+      events.addAll(
+        projectStatementImportEvents(
+          reminders: reminders,
+          activeAccountNames: accountNames,
+          windowStart: fromDate,
+          windowEnd: windowEnd,
+        ),
+      );
     }
 
     events.sort((a, b) => a.date.compareTo(b.date));
@@ -271,13 +345,15 @@ class NotificationRepository {
 
     final subs = await _querySubscriptions();
     for (final sub in subs) {
-      dates.addAll(_projectTemplateOccurrences(
-        sub['next_date'] as String,
-        sub['frequency'] as String,
-        sub['end_date'] as String?,
-        fromDate,
-        windowEnd,
-      ));
+      dates.addAll(
+        _projectTemplateOccurrences(
+          sub['next_date'] as String,
+          sub['frequency'] as String,
+          sub['end_date'] as String?,
+          fromDate,
+          windowEnd,
+        ),
+      );
     }
 
     return dates;
@@ -293,15 +369,33 @@ class NotificationRepository {
 
     final obligations = await _queryObligations();
     for (final ob in obligations) {
-      dates.addAll(_projectTemplateOccurrences(
-        ob['next_date'] as String,
-        ob['frequency'] as String,
-        ob['end_date'] as String?,
-        fromDate,
-        windowEnd,
-      ));
+      dates.addAll(
+        _projectTemplateOccurrences(
+          ob['next_date'] as String,
+          ob['frequency'] as String,
+          ob['end_date'] as String?,
+          fromDate,
+          windowEnd,
+        ),
+      );
     }
 
     return dates;
+  }
+
+  /// Returns date-only statement-import reminder dates within the window.
+  Future<Set<DateTime>> getStatementImportDates(
+    DateTime fromDate,
+    int daysAhead,
+  ) async {
+    final windowEnd = fromDate.add(Duration(days: daysAhead));
+    final reminders = await _statementImportPreferences.getReminders();
+    final activeAccounts = await _queryActiveAccountNames();
+    return projectStatementImportEvents(
+      reminders: reminders,
+      activeAccountNames: activeAccounts,
+      windowStart: fromDate,
+      windowEnd: windowEnd,
+    ).map((event) => event.date).toSet();
   }
 }

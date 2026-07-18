@@ -116,8 +116,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _SettingsItem(
                 icon: Icons.notifications_none_rounded,
                 label: 'Notificaciones',
-                // TODO: abrir configuración de notificaciones
-                onTap: () {},
+                onTap: () =>
+                    context.push('/settings/statement-import-reminders'),
               ),
             ],
           ),

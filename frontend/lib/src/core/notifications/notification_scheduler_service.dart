@@ -56,7 +56,8 @@ class NotificationSchedulerService {
     // 3. Check iOS permissions — graceful degradation.
     final iosImpl = _plugin
         .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>();
+          IOSFlutterLocalNotificationsPlugin
+        >();
     if (iosImpl != null) {
       final granted = await iosImpl.requestPermissions(
         alert: true,
@@ -91,14 +92,21 @@ class NotificationSchedulerService {
       64,
     );
     final obligationDates = await _repository.getObligationDates(tomorrow, 64);
+    final statementImportDates = await _repository.getStatementImportDates(
+      tomorrow,
+      64,
+    );
 
     // 4. Apply anticipation offsets and collect unique notification days.
     final daysToNotify = <DateTime>{};
 
     for (final date in creditCardDates) {
       final alertDay = date.subtract(const Duration(days: 3));
-      final alertDayOnly =
-          DateTime(alertDay.year, alertDay.month, alertDay.day);
+      final alertDayOnly = DateTime(
+        alertDay.year,
+        alertDay.month,
+        alertDay.day,
+      );
       if (!alertDayOnly.isBefore(tomorrow)) {
         daysToNotify.add(alertDayOnly);
       }
@@ -106,14 +114,25 @@ class NotificationSchedulerService {
 
     for (final date in subscriptionDates) {
       final alertDay = date.subtract(const Duration(days: 1));
-      final alertDayOnly =
-          DateTime(alertDay.year, alertDay.month, alertDay.day);
+      final alertDayOnly = DateTime(
+        alertDay.year,
+        alertDay.month,
+        alertDay.day,
+      );
       if (!alertDayOnly.isBefore(tomorrow)) {
         daysToNotify.add(alertDayOnly);
       }
     }
 
     for (final date in obligationDates) {
+      final alertDayOnly = DateTime(date.year, date.month, date.day);
+      if (!alertDayOnly.isBefore(tomorrow)) {
+        daysToNotify.add(alertDayOnly);
+      }
+    }
+
+    // Statement imports are reminders for that same day.
+    for (final date in statementImportDates) {
       final alertDayOnly = DateTime(date.year, date.month, date.day);
       if (!alertDayOnly.isBefore(tomorrow)) {
         daysToNotify.add(alertDayOnly);
@@ -146,7 +165,8 @@ class NotificationSchedulerService {
       await _plugin.zonedSchedule(
         id: id,
         title: 'Tienes movimientos próximos',
-        body: 'Abre la aplicación para revisar tus pagos u obligaciones pendientes.',
+        body:
+            'Abre la aplicación para revisar tus pagos u obligaciones pendientes.',
         scheduledDate: scheduledDate,
         notificationDetails: notificationDetails,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,

@@ -85,6 +85,7 @@ import 'screens/settings/settings_screen.dart';
 import 'package:pocket_pilot/src/features/csv_import/ui/csv_import_route_scope.dart';
 import 'package:pocket_pilot/src/features/csv_import/ui/csv_import_screen.dart';
 import 'package:pocket_pilot/src/features/csv_import/ui/csv_mapping_screen.dart';
+import 'package:pocket_pilot/src/core/notifications/statement_import_reminder_settings_screen.dart';
 import 'screens/notifications/notifications_screen.dart';
 import 'screens/settings/sync_status_screen.dart';
 
@@ -101,10 +102,7 @@ GoRouter buildRouter(AuthProvider authProvider) {
       return null;
     },
     routes: [
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       // ----------------------------------------------------------
       // ShellRoute: tabs con NavigationBar persistente
       // ----------------------------------------------------------
@@ -123,14 +121,13 @@ GoRouter buildRouter(AuthProvider authProvider) {
                     path: 'statistics/categories',
                     builder: (context, state) =>
                         const StatisticsCategoriesRouteScope(
-                      child: CategoriesTab(),
-                    ),
+                          child: CategoriesTab(),
+                        ),
                   ),
                   GoRoute(
                     path: 'statistics/cashflow',
-                    builder: (context, state) => const CashflowRouteScope(
-                      child: CashflowTab(),
-                    ),
+                    builder: (context, state) =>
+                        const CashflowRouteScope(child: CashflowTab()),
                   ),
                   GoRoute(
                     path: 'statistics/category/:categoryId',
@@ -262,8 +259,9 @@ GoRouter buildRouter(AuthProvider authProvider) {
               // --- Rendimientos (antes en /yields) ---
               GoRoute(
                 path: 'yields/new',
-                builder: (context, state) =>
-                    const YieldConfigFormRouteScope(child: YieldConfigFormScreen()),
+                builder: (context, state) => const YieldConfigFormRouteScope(
+                  child: YieldConfigFormScreen(),
+                ),
               ),
               GoRoute(
                 path: 'yields/:yieldId/edit',
@@ -336,9 +334,8 @@ GoRouter buildRouter(AuthProvider authProvider) {
               ),
               GoRoute(
                 path: 'holdings/new',
-                builder: (context, state) => const AccountsRouteScope(
-                  child: HoldingFormScreen(),
-                ),
+                builder: (context, state) =>
+                    const AccountsRouteScope(child: HoldingFormScreen()),
               ),
               GoRoute(
                 path: 'holdings/:holdingId',
@@ -534,6 +531,11 @@ GoRouter buildRouter(AuthProvider authProvider) {
         path: '/settings/currency',
         builder: (context, state) =>
             const UserPreferencesRouteScope(child: CurrencyPreferencesScreen()),
+      ),
+      GoRoute(
+        path: '/settings/statement-import-reminders',
+        builder: (context, state) =>
+            const StatementImportReminderSettingsScreen(),
       ),
       GoRoute(
         path: '/notifications',

@@ -127,6 +127,7 @@ import 'package:pocket_pilot/src/core/notifications/notification_center_view_mod
 import 'package:pocket_pilot/src/core/notifications/notification_local_store.dart';
 import 'package:pocket_pilot/src/core/notifications/notification_repository.dart';
 import 'package:pocket_pilot/src/core/notifications/notification_scheduler_service.dart';
+import 'package:pocket_pilot/src/core/notifications/statement_import_preferences.dart';
 import 'package:pocket_pilot/src/ui/app.dart';
 import 'package:pocket_pilot/src/ui/router.dart';
 
@@ -397,7 +398,13 @@ Future<void> main() async {
   );
 
   // Notification scheduling (offline-first, no backend).
-  final notificationRepo = NotificationRepository(db: dbHelper);
+  final statementImportPreferences = StatementImportPreferences(
+    store: userPreferenceLocalStore,
+  );
+  final notificationRepo = NotificationRepository(
+    db: dbHelper,
+    statementImportPreferences: statementImportPreferences,
+  );
   final notificationLocalStore = NotificationLocalStore(db: dbHelper);
   final notificationCenterRepo = NotificationCenterRepository(
     projection: notificationRepo,
@@ -503,10 +510,12 @@ Future<void> main() async {
     preferences: ncPreferences,
   );
   // Seed asset es fire-and-forget; el engine lo recoge en la próxima refresh.
-  unawaited(ncParsers.seedFromAssetIfMissing(
-    bankId: 'bbva_mx',
-    assetPath: 'assets/parsers/bbva_mx.json',
-  ));
+  unawaited(
+    ncParsers.seedFromAssetIfMissing(
+      bankId: 'bbva_mx',
+      assetPath: 'assets/parsers/bbva_mx.json',
+    ),
+  );
   final pendingSuggestionsVM = PendingSuggestionsViewModel(
     pending: ncPending,
     repository: ncRepository,
@@ -531,6 +540,12 @@ Future<void> main() async {
         Provider<TokenStore>.value(value: tokenStore),
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         Provider<NotificationRepository>.value(value: notificationRepo),
+        Provider<NotificationSchedulerService>.value(
+          value: notificationScheduler,
+        ),
+        Provider<StatementImportPreferences>.value(
+          value: statementImportPreferences,
+        ),
         ChangeNotifierProvider<NotificationCenterViewModel>.value(
           value: notificationCenterVM,
         ),

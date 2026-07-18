@@ -47,49 +47,52 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       body: vm.isLoading
           ? const Center(child: CircularProgressIndicator())
           : vm.notifications.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.notifications_off_outlined,
-                          size: 64, color: theme.colorScheme.outline),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No hay notificaciones',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.outline,
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.notifications_off_outlined,
+                    size: 64,
+                    color: theme.colorScheme.outline,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No hay notificaciones',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.outline,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.only(bottom: 32),
+              itemCount: _buildItems(vm.notifications).length,
+              itemBuilder: (context, index) {
+                final item = _buildItems(vm.notifications)[index];
+                if (item is _SectionHeader) {
+                  return _SectionHeaderTile(label: item.label);
+                }
+                final notification = item as InAppNotification;
+                return _NotificationTile(
+                  notification: notification,
+                  onTap: () => vm.markAsRead(notification.id),
+                  onDismissed: () {
+                    vm.delete(notification.id);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Notificacion eliminada'),
+                        action: SnackBarAction(
+                          label: 'Deshacer',
+                          onPressed: () => vm.restore(notification.id),
                         ),
                       ),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 32),
-                  itemCount: _buildItems(vm.notifications).length,
-                  itemBuilder: (context, index) {
-                    final item = _buildItems(vm.notifications)[index];
-                    if (item is _SectionHeader) {
-                      return _SectionHeaderTile(label: item.label);
-                    }
-                    final notification = item as InAppNotification;
-                    return _NotificationTile(
-                      notification: notification,
-                      onTap: () => vm.markAsRead(notification.id),
-                      onDismissed: () {
-                        vm.delete(notification.id);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Notificacion eliminada'),
-                            action: SnackBarAction(
-                              label: 'Deshacer',
-                              onPressed: () => vm.restore(notification.id),
-                            ),
-                          ),
-                        );
-                      },
                     );
                   },
-                ),
+                );
+              },
+            ),
     );
   }
 
@@ -208,7 +211,9 @@ class _NotificationTile extends StatelessWidget {
         title: Text(
           notification.title,
           style: TextStyle(
-            fontWeight: notification.isRead ? FontWeight.normal : FontWeight.w600,
+            fontWeight: notification.isRead
+                ? FontWeight.normal
+                : FontWeight.w600,
           ),
         ),
         subtitle: notification.subtitle.isNotEmpty
@@ -249,6 +254,8 @@ class _NotificationTile extends StatelessWidget {
         return Icons.autorenew;
       case 'OBLIGATION':
         return Icons.payments_outlined;
+      case 'STATEMENT_IMPORT':
+        return Icons.upload_file;
       default:
         return Icons.notifications_outlined;
     }

@@ -10,10 +10,10 @@ import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/features/budgets/data/budget_local_store.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_local_store.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/statistics_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_view_model.dart';
 
 class StatisticsCategoriesRouteScope extends StatelessWidget {
   final Widget child;

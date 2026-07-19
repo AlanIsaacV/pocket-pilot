@@ -3,10 +3,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/window_math.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_view_model.dart';
 
 class StatisticsViewModel extends ChangeNotifier {
   final StatisticsRepository _repository;

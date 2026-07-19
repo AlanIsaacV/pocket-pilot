@@ -36,5 +36,7 @@ behavior change; only file paths and import lines moved.
   `TemporalPageView`) are born in `lib/src/ui/` next to their building blocks.
 - `categories/data/category_seeder.dart` now imports `ui/widgets/category_icon_data.dart` — a
   data→ui import kept deliberately (pre-existing shape, single consumer).
-- Remaining known exception: `dashboard_filter_sheet.dart`/`DashboardFilterViewModel` are still
-  imported cross-feature by statistics/cashflow; their final home is decided in phase 4.
+- Exception resolved by phase 4 (2026-07-19): `dashboard_filter_sheet.dart` and
+  `dashboard_filter_view_model.dart` moved (`git mv`) to `ui/widgets/` — they were imported
+  cross-feature by 11 files in statistics/cashflow/dashboard-summary, violating the layering rule;
+  16 import sites updated, class names unchanged.

@@ -11,13 +11,13 @@ import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/tag_category_slice_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/tag_history_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/widgets/category_monthly_bar_chart.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/widgets/stat_delta_row.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_sheet.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_view_model.dart';
 
 class TagHistoryScreen extends StatefulWidget {
   final String tagName;

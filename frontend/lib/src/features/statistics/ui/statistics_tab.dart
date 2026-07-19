@@ -10,7 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_sheet.dart';
 
 class StatisticsTab extends StatelessWidget {
   const StatisticsTab({super.key});

@@ -10,10 +10,10 @@ import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/tag_summary_dto.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_sheet.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_view_model.dart';
 
 class TagListScreen extends StatefulWidget {
   const TagListScreen({super.key});

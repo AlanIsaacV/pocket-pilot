@@ -14,7 +14,7 @@ import 'package:pocket_pilot/src/features/cashflow/domain/cashflow_snapshot.dart
 import 'package:pocket_pilot/src/features/cashflow/ui/cashflow_view_model.dart';
 import 'package:pocket_pilot/src/features/cashflow/ui/widgets/cashflow_summary_cards.dart';
 import 'package:pocket_pilot/src/features/cashflow/ui/widgets/cashflow_waterfall_chart.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_sheet.dart';
 
 class CashflowTab extends StatelessWidget {
   const CashflowTab({super.key});

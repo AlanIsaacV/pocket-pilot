@@ -10,8 +10,9 @@ import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
+import 'package:pocket_pilot/src/features/transactions/ui/transaction_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/widgets/advanced_filters.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/widgets/temporal_page_view.dart';
+import 'package:pocket_pilot/src/ui/widgets/temporal_page_view.dart';
 
 class FilterSheet extends StatefulWidget {
   const FilterSheet({super.key});
@@ -107,7 +108,9 @@ class _FilterSheetState extends State<FilterSheet> {
                 ),
               ),
               // Temporal filters (always visible)
-              const TemporalPageView(),
+              TemporalPageView(
+                state: context.watch<TransactionFilterViewModel>(),
+              ),
               // Advanced filters (visible when expanded)
               if (_loaded)
                 AdvancedFilters(

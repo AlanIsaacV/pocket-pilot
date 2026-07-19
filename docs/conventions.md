@@ -19,7 +19,10 @@
 
 ### Dart (frontend)
 
-- **Formatting**: run `flutter format` (a.k.a. `dart format`) before committing.
+- **Formatting**: format *new* files with `dart format`; do **not** run it on existing files — the
+  current formatter (Dart 3.12+) reformats the repo's checked-in style wholesale, drowning the
+  logical diff. Match the surrounding style by hand when editing (found in widget-unification
+  phase 4; revisit if the repo is ever reformatted wholesale as its own commit).
 - **Typing**: avoid `dynamic`; prefer strong typing and generics.
 - **Naming**: `camelCase` for variables/methods, `PascalCase` for classes.
 - **Models**: every syncable model MUST implement `toMap()`, `fromMap()`, `fromProto()`, and
@@ -109,7 +112,11 @@
   currency selection through `showCurrencyPicker()` (`ui/widgets/currency_picker.dart`) — no
   per-form currency sheets (grep: `_showCurrencySheet|__preferences__` returns nothing); account
   selection through `showAccountPicker()` (`ui/widgets/account_picker.dart`) — no per-form account
-  sheets (grep: `_showAccountSheet|_showAccountPicker` returns nothing). Two documented dropdown
+  sheets (grep: `_showAccountSheet|_showAccountPicker` returns nothing); date-range filter UI
+  through the shared `TemporalPageView` + `TemporalFilterState` interface
+  (`ui/widgets/temporal_page_view.dart`) — exactly one `temporal_page_view.dart` in the repo, and
+  the canonical `QuickRange`/`PeriodGranularity` enums live there (consumers import them
+  explicitly; no re-exports from view models). Two documented dropdown
   exceptions: `advanced_filters.dart` (filter context needs a "Todas" option) and
   `pending_review_sheet.dart` (dense sheet-within-sheet with a `FormField` validator).
   See [decisions/0009](decisions/0009-intentional-behavior-convergence.md).

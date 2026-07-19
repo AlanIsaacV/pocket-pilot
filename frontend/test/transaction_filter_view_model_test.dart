@@ -1,6 +1,7 @@
 // frontend/test/transaction_filter_view_model_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_filter_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/temporal_page_view.dart';
 
 void main() {
   late TransactionFilterViewModel vm;

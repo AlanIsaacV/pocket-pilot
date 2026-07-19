@@ -44,6 +44,14 @@ counterpart account per leg, and `advanced_filters`' EN labels converged to ES (
 Two dropdown sites stay dropdowns as documented exceptions (`advanced_filters` needs an "all"
 option; `pending_review_sheet` is a dense sheet-within-sheet with a `FormField` validator).
 
+Phase 4 (2026-07-19): a single shared `TemporalPageView` (`ui/widgets/temporal_page_view.dart`)
+replaced the two ~340-LOC wholesale copies in transactions and dashboard. The widget is driven by a
+`TemporalFilterState` interface (implements `Listenable`, passed as an explicit constructor param)
+that both filter view models implement; the canonical `QuickRange`/`PeriodGranularity` enums moved
+into the shared file (the VM-local duplicates were deleted; consumers import them explicitly). The
+transactions filter's EN granularity labels converged to ES ("Semana"/"Mes"/"Año") — a visible
+intended behavior change. Net −298 lib LOC.
+
 ## Alternatives considered
 
 - **Behavior-preserving refactor** (parameterize every existing divergence) — rejected: the
@@ -59,5 +67,4 @@ option; `pending_review_sheet` is a dense sheet-within-sheet with a `FormField` 
 - New grep-enforced invariants (see `docs/conventions.md` § Frontend UI conventions): no inline
   `showDialog<bool>` confirms, no inline swipe backgrounds, no raw `showDatePicker` outside
   `form_date_utils.dart`.
-- Phases 2–5 (currency/account pickers, `TemporalPageView`, list/tab dedup) follow the same
-  convergence contract.
+- Phase 5 (list/tab dedup) follows the same convergence contract.

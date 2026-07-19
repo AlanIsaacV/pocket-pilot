@@ -9,10 +9,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
-import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/statistics_view_model.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/widgets/category_list_row.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_sheet.dart';
 
 class CategoriesTab extends StatelessWidget {
   const CategoriesTab({super.key});

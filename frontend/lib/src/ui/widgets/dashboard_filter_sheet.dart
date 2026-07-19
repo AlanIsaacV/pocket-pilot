@@ -6,8 +6,8 @@ import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/widgets/temporal_page_view.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/temporal_page_view.dart';
 
 class DashboardFilterSheet extends StatelessWidget {
   const DashboardFilterSheet({super.key});
@@ -15,6 +15,7 @@ class DashboardFilterSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final filterVM = context.watch<DashboardFilterViewModel>();
 
     return DraggableScrollableSheet(
       initialChildSize: 0.12,
@@ -52,7 +53,7 @@ class DashboardFilterSheet extends StatelessWidget {
                   ),
                 ),
               ),
-              const TemporalPageView(),
+              TemporalPageView(state: filterVM),
               const _ScopeFilters(),
             ],
           ),

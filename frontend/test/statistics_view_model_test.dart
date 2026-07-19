@@ -2,12 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/features/budgets/data/budget_local_store.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_local_store.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/category_series_dto.dart';
 import 'package:pocket_pilot/src/features/statistics/domain/trend.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/statistics_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/temporal_page_view.dart';
 
 void main() {
   test('initial load with no currency emits empty list', () async {

@@ -3,20 +3,14 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:pocket_pilot/src/features/transactions/domain/transaction_filter.dart';
-
-// ----------------------------------------------------------
-// Enums
-// ----------------------------------------------------------
-
-enum QuickRange { d7, d30, m6, y1 }
-
-enum PeriodGranularity { week, month, year }
+import 'package:pocket_pilot/src/ui/widgets/temporal_page_view.dart';
 
 // ----------------------------------------------------------
 // ViewModel
 // ----------------------------------------------------------
 
-class TransactionFilterViewModel extends ChangeNotifier {
+class TransactionFilterViewModel extends ChangeNotifier
+    implements TemporalFilterState {
   // --- Temporal state ---
   int _activePageIndex = 0;
   QuickRange _quickSelection = QuickRange.d30;
@@ -33,11 +27,16 @@ class TransactionFilterViewModel extends ChangeNotifier {
   String? _currencyCode;
 
   // --- Getters ---
+  @override
   int get activePageIndex => _activePageIndex;
+  @override
   QuickRange get quickSelection => _quickSelection;
+  @override
   PeriodGranularity get periodGranularity => _periodGranularity;
   int get periodOffset => _periodOffset;
+  @override
   DateTime get customFrom => _customFrom;
+  @override
   DateTime get customTo => _customTo;
   String? get accountId => _accountId;
   List<String> get categoryIds => List.unmodifiable(_categoryIds);
@@ -49,17 +48,20 @@ class TransactionFilterViewModel extends ChangeNotifier {
   // Temporal setters
   // ----------------------------------------------------------
 
+  @override
   void setActivePageIndex(int index) {
     _activePageIndex = index;
     notifyListeners();
   }
 
+  @override
   void setQuickSelection(QuickRange range) {
     _quickSelection = range;
     _activePageIndex = 0;
     notifyListeners();
   }
 
+  @override
   void setPeriodGranularity(PeriodGranularity g) {
     _periodGranularity = g;
     _periodOffset = 0;
@@ -67,11 +69,13 @@ class TransactionFilterViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  @override
   void navigatePeriod(int delta) {
     _periodOffset += delta;
     notifyListeners();
   }
 
+  @override
   void setCustomRange(DateTime from, DateTime to) {
     _customFrom = from;
     _customTo = to;
@@ -215,6 +219,7 @@ class TransactionFilterViewModel extends ChangeNotifier {
   // Period label for display
   // ----------------------------------------------------------
 
+  @override
   String get periodLabel {
     if (_periodOffset == 0) return _periodGranularityLabel;
     final now = DateTime.now();
@@ -235,11 +240,11 @@ class TransactionFilterViewModel extends ChangeNotifier {
   String get _periodGranularityLabel {
     switch (_periodGranularity) {
       case PeriodGranularity.week:
-        return 'Week';
+        return 'Semana';
       case PeriodGranularity.month:
-        return 'Month';
+        return 'Mes';
       case PeriodGranularity.year:
-        return 'Year';
+        return 'Año';
     }
   }
 

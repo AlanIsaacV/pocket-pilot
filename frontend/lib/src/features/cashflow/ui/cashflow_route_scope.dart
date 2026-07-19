@@ -11,7 +11,7 @@ import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/features/cashflow/data/cashflow_local_store.dart';
 import 'package:pocket_pilot/src/features/cashflow/data/cashflow_repository.dart';
 import 'package:pocket_pilot/src/features/cashflow/ui/cashflow_view_model.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_view_model.dart';
 
 class CashflowRouteScope extends StatelessWidget {
   final Widget child;

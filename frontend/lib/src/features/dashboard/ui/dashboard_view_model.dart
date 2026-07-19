@@ -8,7 +8,7 @@ import 'package:pocket_pilot/src/features/dashboard/domain/credit_card_payment_d
 import 'package:pocket_pilot/src/features/dashboard/domain/dashboard_metrics.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/nature_spend_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/domain/tag_spend_dto.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_view_model.dart';
 
 class DashboardViewModel extends ChangeNotifier {
   final DashboardRepository _repository;

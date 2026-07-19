@@ -78,9 +78,12 @@ both legs. FX: matching currencies mirror the amount; differing currencies use M
 
 `TransactionFilter` (immutable: `dateFrom`/`dateTo` YYYY-MM-DD, `accountId`, `categoryIds`, `type`,
 `status`, `currencyCode`; `defaultFilter()` = last 30 days; `typeValues` expands `"transfer"` →
-`['transfer_out','transfer_in']`). `TransactionFilterViewModel` drives the persistent
-`DraggableScrollableSheet` (Quick 7D/30D/6M/1Y, Period week/month/year with ←/→, Custom dates;
-expanded: account/type/status/currency + top-5 category chips + `CategoryMultiPicker`).
+`['transfer_out','transfer_in']`). `TransactionFilterViewModel` (implements `TemporalFilterState`;
+the `QuickRange`/`PeriodGranularity` enums now live in `ui/widgets/temporal_page_view.dart`) drives
+the persistent `DraggableScrollableSheet`, whose temporal picker is the shared `TemporalPageView`
+(Quick 7D/30D/6M/1Y, Period Semana/Mes/Año with ←/→ — labels converged EN→ES in widget-unification
+phase 4 — Custom dates; expanded: account/type/status/currency + top-5 category chips +
+`CategoryMultiPicker`).
 `TransactionsViewModel` listens and re-queries on every change (listener removed in `dispose()`).
 `queryRowsFiltered` builds a dynamic `WHERE`; empty state is filter-aware.
 

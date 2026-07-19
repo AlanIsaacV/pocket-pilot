@@ -17,9 +17,9 @@ The whole list is wrapped in a `Stack` with `DashboardFilterSheet` overlayed at 
 
 ## Unified Filter Sheet
 
-A persistent `DraggableScrollableSheet` (`DashboardFilterSheet`) lives at the bottom of the Dashboard, the Estadísticas hub, and every Statistics sub-screen. It owns the single source of truth for range / currency / multi-select accounts via `DashboardFilterViewModel`.
+A persistent `DraggableScrollableSheet` (`DashboardFilterSheet`) lives at the bottom of the Dashboard, the Estadísticas hub, and every Statistics sub-screen. It owns the single source of truth for range / currency / multi-select accounts via `DashboardFilterViewModel`. Both the sheet and the VM live in `lib/src/ui/widgets/` since widget-unification phase 4 (class names unchanged).
 
-- **Temporal picker** (`TemporalPageView`, 3 pages with dot indicator): Quick (7D/30D/6M/1Y) / Period (Semana | Mes | Año with ←/→ navigation) / Custom (range via the shared `pickDate()`).
+- **Temporal picker** (the shared `TemporalPageView` from `ui/widgets/temporal_page_view.dart`, passed the VM explicitly as `TemporalFilterState`; 3 pages with dot indicator): Quick (7D/30D/6M/1Y) / Period (Semana | Mes | Año with ←/→ navigation) / Custom (range via the shared `pickDate()`).
 - **Currency** (`ChoiceChip` row, visible when >1 currency exists).
 - **Cuentas** (`FilterChip` row, multi-select) — loaded directly from `AccountLocalStore.getAccounts()` (excluding `type=='contact'`), **not** from `DashboardViewModel.accountBalances`. The balances list is re-filtered when `accountIds` changes, which would make other accounts "disappear" after one is selected. Loading from the store keeps the full list visible so multi-select works.
 

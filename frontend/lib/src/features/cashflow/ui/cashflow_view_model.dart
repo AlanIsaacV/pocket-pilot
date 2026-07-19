@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:pocket_pilot/src/features/cashflow/data/cashflow_repository.dart';
 import 'package:pocket_pilot/src/features/cashflow/domain/cashflow_snapshot.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_view_model.dart';
 
 class CashflowViewModel extends ChangeNotifier {
   final CashflowRepository _repository;

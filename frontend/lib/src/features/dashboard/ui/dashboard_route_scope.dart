@@ -5,7 +5,6 @@ import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/features/budgets/data/budget_local_store.dart';
 import 'package:pocket_pilot/src/features/dashboard/data/dashboard_local_store.dart';
 import 'package:pocket_pilot/src/features/dashboard/data/dashboard_repository.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_view_model.dart';
 import 'package:pocket_pilot/src/features/investments/data/investment_holding_local_store.dart';
 import 'package:pocket_pilot/src/features/investments/data/investment_lot_local_store.dart';
@@ -14,6 +13,7 @@ import 'package:pocket_pilot/src/features/investments/data/market_price_local_st
 import 'package:pocket_pilot/src/features/statistics/data/statistics_local_store.dart';
 import 'package:pocket_pilot/src/features/statistics/data/statistics_repository.dart';
 import 'package:pocket_pilot/src/features/statistics/ui/statistics_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_view_model.dart';
 
 class DashboardRouteScope extends StatelessWidget {
   final Widget child;

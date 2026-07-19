@@ -5,7 +5,7 @@
   "updated_at": "2026-07-19",
   "owner": null,
   "status": "in-progress",
-  "current_phase": 3,
+  "current_phase": 4,
   "phases": [
     {
       "id": 0,
@@ -279,11 +279,88 @@
       "name": "temporal-page-view",
       "file": "phase-4-temporal-page-view.md",
       "goal": "Collapse the two wholesale copies of `temporal_page_view.dart` (~340 LOC each, transactions vs",
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "tasks": [],
-      "deviations": []
+      "status": "completed",
+      "started_at": "2026-07-19",
+      "completed_at": "2026-07-19",
+      "tasks": [
+        {
+          "id": "4.1",
+          "title": "Create lib/src/ui/widgets/temporal_page_view.dart: TemporalFilterState interface (implements Listenable) + canonical QuickRange/PeriodGranularity enums + unified widget (explicit state param, Spanish labels from dashboard donor) + widget test",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "4.2",
+          "title": "Implement TemporalFilterState in both view models; delete their duplicated enum definitions; update external enum consumers' imports (transactions_screen, advanced_filters, 2 tests)",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "4.3",
+          "title": "Wire filter_sheet.dart + dashboard_filter_sheet.dart to the shared widget (state: param); delete both feature-local temporal_page_view.dart copies",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "4.4",
+          "title": "Move dashboard_filter_sheet.dart + DashboardFilterViewModel to lib/src/ui/; update ~14 import sites (statistics, cashflow, dashboard summary, tests)",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "4.5",
+          "title": "Verification pass: success-criteria greps (single temporal_page_view.dart, no English granularity labels), flutter analyze, flutter test, net LOC <= -300",
+          "status": "done",
+          "notes": null
+        }
+      ],
+      "deviations": [
+        {
+          "date": "2026-07-19",
+          "kind": "scope-change",
+          "note": "Converged TransactionFilterViewModel's private _periodGranularityLabel getter to Spanish (Semana/Mes/A\u00f1o) while implementing TemporalFilterState, ahead of the 4.3 widget-wiring step, since it's the same VM file already being touched and the phase goal requires Spanish labels everywhere; no test asserted the old English strings."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Confirmed the survey diff: the two temporal_page_view.dart copies differ only in header comment, VM import/type, dart-format whitespace, and quick-range labels (dashboard uses Spanish Semana/Mes/A\u00f1o; transactions used English Week/Month/Year)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Both feature-local temporal_page_view.dart copies (dashboard, transactions) got a scoped 'show QuickRange, PeriodGranularity' import of the new shared file to stay compilable after the VM-local enum definitions were deleted; no other lines in those two files were touched. (An initial pass ran dart format on these copies, which reformatted them wholesale under the current Dart 3.12 formatter -- a different style than the rest of the checked-in repo; that was reverted via git checkout and the edits were reapplied by hand to avoid unrelated formatting churn.)"
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Batch 1 (4.1-4.2): Codex run stalled (30+ min silent, zero edits) and was cancelled; implemented via the apply sub-agent on Sonnet (fallback per user instruction). Orchestrator-confirmed: flutter analyze clean (1 pre-existing info), flutter test 312/313 (sole failure is the documented pre-existing statistics_category_list_row_test, be4af04)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "filter_sheet.dart and dashboard_filter_sheet.dart now pass state: context.watch<TransactionFilterViewModel>()/DashboardFilterViewModel() explicitly to the shared TemporalPageView (previously the feature-local wrappers did this context.watch internally); both feature-local temporal_page_view.dart copies deleted."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "dashboard_filter_sheet.dart + dashboard_filter_view_model.dart moved (git mv) from features/dashboard/ui/ to lib/src/ui/widgets/, per the phase-4 decision on their final home. Updated 16 import sites (statistics: categories_route_scope, statistics_tab, categories_tab, tag_history_screen, tag_list_screen, statistics_view_model, category_history_screen; cashflow: cashflow_route_scope, cashflow_view_model, cashflow_tab; dashboard: dashboard_route_scope, dashboard_view_model; ui/screens/dashboard/dashboard_summary_tab.dart; tests: statistics_view_model_test, statistics_tab_smoke_test, dashboard_view_model_currency_seed_test), re-sorting the pocket_pilot import block alphabetically in each touched file where the old position broke ordering. Class names unchanged."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Batch 2 (4.3-4.4) implemented via the apply sub-agent. Task 4.5 (verification pass) delegated to the verify sub-agent, per phase 0-3 precedent."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Batch 2 (4.3-4.4) implemented via the apply sub-agent on Sonnet: the second Codex attempt was also a clean failure (rescue agent resumed a zombie job stuck 50 min in 'starting' instead of forwarding the new batch; cancelled). Sheets pass state: context.watch<VM>() to the shared widget; dashboard_filter_sheet + dashboard_filter_view_model moved via git mv to lib/src/ui/widgets/ with 16 import sites updated. Task 4.5's flutter test delegated to the verify sub-agent (phase 0-3 precedent)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Task 4.5 executed by the verify sub-agent (phase 0-3 precedent): verdict ready-to-close, 0 CRITICAL. Net LOC: -298 lib-only (-171 including the new required widget test) \u2014 the >=~300 criterion met on production code. Sole test failure remains the documented pre-existing statistics_category_list_row_test (be4af04). Verify SUGGESTION left open: quick human smoke of pager + custom-range pages on device."
+        }
+      ]
     },
     {
       "id": 5,
@@ -331,6 +408,16 @@
     {
       "date": "2026-07-19",
       "note": "Phase 3: row chrome converges to accountIconForType always (debt's and lot's hardcoded icons removed); new selectedAccountId param renders a trailing check on the current selection (uniform improvement, none showed it before); showCurrency flag (default false) keeps lot's 'name \u00b7 CODE' label as an explicit parameter.",
+      "adr_candidate": false
+    },
+    {
+      "date": "2026-07-19",
+      "note": "Phase 4: TemporalFilterState interface + the canonical QuickRange/PeriodGranularity enums live in the new lib/src/ui/widgets/temporal_page_view.dart. The duplicated enum definitions in both view models are deleted; external enum consumers (transactions_screen, advanced_filters, 2 test files) update their imports explicitly (no re-exports). The widget receives the state as an explicit constructor param \u2014 TemporalFilterState implements Listenable (both VMs are ChangeNotifier) and the widget rebuilds via an internal ListenableBuilder \u2014 instead of provider generics (context.watch<T>).",
+      "adr_candidate": false
+    },
+    {
+      "date": "2026-07-19",
+      "note": "Phase 4: dashboard_filter_sheet.dart and DashboardFilterViewModel move to lib/src/ui/ (consumed by statistics, cashflow and ui/screens/dashboard \u2014 11 files outside features/dashboard/ \u2014 violating the 'features/<f>/ui/ never imports another feature's ui/' rule). ~14 import sites update; mechanical churn accepted within this phase.",
       "adr_candidate": false
     }
   ],

@@ -54,11 +54,13 @@ The test `router_single_root_shell_test` still passes because only the outermost
 
 Derived: `resolvedDateRange: (String, String)` returns `(dateFrom, dateTo)` as YYYY-MM-DD. `dateFrom` / `dateTo` are shortcut getters.
 
+The `QuickRange`/`PeriodGranularity` enums are the canonical definitions in `ui/widgets/temporal_page_view.dart` (widget-unification phase 4); `DashboardFilterViewModel` implements the `TemporalFilterState` interface defined there and itself lives in `ui/widgets/dashboard_filter_view_model.dart` since the same phase (class name unchanged).
+
 ## UI — Filter Sheet
 
-`DashboardFilterSheet` is a `DraggableScrollableSheet` (collapsed 0.12, expanded 0.55, snapped). Contents from top to bottom:
+`DashboardFilterSheet` (in `ui/widgets/dashboard_filter_sheet.dart` since widget-unification phase 4) is a `DraggableScrollableSheet` (collapsed 0.12, expanded 0.55, snapped). Contents from top to bottom:
 1. Drag handle.
-2. `TemporalPageView` — a 3-page `PageView` with dot indicator: **Quick** (7D/30D/6M/1Y chips) / **Period** (← [Semana|Mes|Año] → with offset navigation) / **Custom** (date range picker). Lives at `features/dashboard/ui/widgets/temporal_page_view.dart` (intentional duplicate of the transactions version — Transactions and Dashboard filters are kept independent by design).
+2. `TemporalPageView` — a 3-page `PageView` with dot indicator: **Quick** (7D/30D/6M/1Y chips) / **Period** (← [Semana|Mes|Año] → with offset navigation) / **Custom** (date range picker). Lives at `lib/src/ui/widgets/temporal_page_view.dart` — the single shared widget since widget-unification phase 4 (the former per-feature duplicates were deleted); the sheet passes it the VM explicitly as `TemporalFilterState`.
 3. `_ScopeFilters` — header + `Limpiar` when `hasFilters`, `ChoiceChip` row for currency (if >1), `FilterChip` row for accounts (multi-select).
 
 Account + currency data is loaded **directly from `AccountLocalStore.getAccounts()`** (excluding `type=='contact'`) on `initState`, not from `DashboardViewModel.accountBalances`. This is deliberate: the balances list is itself re-filtered when `accountIds` changes, which would make other accounts "disappear" after selecting one, breaking multi-select.

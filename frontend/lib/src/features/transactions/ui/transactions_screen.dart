@@ -32,6 +32,7 @@ import 'package:pocket_pilot/src/features/debts/ui/debt_view_model.dart';
 import 'package:pocket_pilot/src/features/debts/ui/debts_list_tab.dart';
 import 'package:pocket_pilot/src/ui/widgets/notification_bell.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
+import 'package:pocket_pilot/src/ui/widgets/temporal_page_view.dart';
 
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});

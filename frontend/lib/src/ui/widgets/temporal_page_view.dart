@@ -1,13 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 
+// ----------------------------------------------------------
+// Enums
+// ----------------------------------------------------------
+
+enum QuickRange { d7, d30, m6, y1 }
+
+enum PeriodGranularity { week, month, year }
+
+// ----------------------------------------------------------
+// Filter-state interface
+// ----------------------------------------------------------
+
+/// Minimal interface exposing the temporal-filter fields/callbacks that
+/// [TemporalPageView] needs from its host view model.
+///
+/// Both `TransactionFilterViewModel` and `DashboardFilterViewModel` implement
+/// this (they're already `ChangeNotifier`s, which satisfies [Listenable]); the
+/// widget rebuilds via an internal [ListenableBuilder] instead of a provider
+/// lookup.
+abstract interface class TemporalFilterState implements Listenable {
+  int get activePageIndex;
+  QuickRange get quickSelection;
+  PeriodGranularity get periodGranularity;
+  String get periodLabel;
+  DateTime get customFrom;
+  DateTime get customTo;
+
+  void setActivePageIndex(int index);
+  void setQuickSelection(QuickRange range);
+  void setPeriodGranularity(PeriodGranularity g);
+  void navigatePeriod(int delta);
+  void setCustomRange(DateTime from, DateTime to);
+}
+
 class TemporalPageView extends StatefulWidget {
-  const TemporalPageView({super.key});
+  final TemporalFilterState state;
+  const TemporalPageView({super.key, required this.state});
 
   @override
   State<TemporalPageView> createState() => _TemporalPageViewState();
@@ -19,8 +52,8 @@ class _TemporalPageViewState extends State<TemporalPageView> {
   @override
   void initState() {
     super.initState();
-    final vm = context.read<DashboardFilterViewModel>();
-    _pageController = PageController(initialPage: vm.activePageIndex);
+    _pageController =
+        PageController(initialPage: widget.state.activePageIndex);
   }
 
   @override
@@ -31,29 +64,33 @@ class _TemporalPageViewState extends State<TemporalPageView> {
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<DashboardFilterViewModel>();
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          height: 40,
-          child: PageView(
-            controller: _pageController,
-            onPageChanged: (i) => vm.setActivePageIndex(i),
-            children: [
-              _QuickPage(vm: vm),
-              _PeriodPage(vm: vm),
-              _CustomPage(vm: vm),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        _DotsIndicator(
-          count: 3,
-          activeIndex: vm.activePageIndex,
-        ),
-      ],
+    return ListenableBuilder(
+      listenable: widget.state,
+      builder: (context, _) {
+        final state = widget.state;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 40,
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (i) => state.setActivePageIndex(i),
+                children: [
+                  _QuickPage(state: state),
+                  _PeriodPage(state: state),
+                  _CustomPage(state: state),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            _DotsIndicator(
+              count: 3,
+              activeIndex: state.activePageIndex,
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -63,8 +100,8 @@ class _TemporalPageViewState extends State<TemporalPageView> {
 // ----------------------------------------------------------
 
 class _QuickPage extends StatelessWidget {
-  final DashboardFilterViewModel vm;
-  const _QuickPage({required this.vm});
+  final TemporalFilterState state;
+  const _QuickPage({required this.state});
 
   @override
   Widget build(BuildContext context) {
@@ -72,13 +109,13 @@ class _QuickPage extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: QuickRange.values.map((range) {
         final isSelected =
-            vm.quickSelection == range && vm.activePageIndex == 0;
+            state.quickSelection == range && state.activePageIndex == 0;
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: _FilterChip(
             label: _label(range),
             isSelected: isSelected,
-            onTap: () => vm.setQuickSelection(range),
+            onTap: () => state.setQuickSelection(range),
           ),
         );
       }).toList(),
@@ -98,8 +135,8 @@ class _QuickPage extends StatelessWidget {
 // ----------------------------------------------------------
 
 class _PeriodPage extends StatelessWidget {
-  final DashboardFilterViewModel vm;
-  const _PeriodPage({required this.vm});
+  final TemporalFilterState state;
+  const _PeriodPage({required this.state});
 
   @override
   Widget build(BuildContext context) {
@@ -113,18 +150,18 @@ class _PeriodPage extends StatelessWidget {
           iconSize: 22,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          onPressed: () => vm.navigatePeriod(-1),
+          onPressed: () => state.navigatePeriod(-1),
         ),
         GestureDetector(
           onTap: () => _showGranularityPicker(context),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: vm.activePageIndex == 1
+              color: state.activePageIndex == 1
                   ? cs.primary.withValues(alpha: 0.15)
                   : cs.surfaceContainerHigh,
               borderRadius: AppTheme.radiusSmall,
-              border: vm.activePageIndex == 1
+              border: state.activePageIndex == 1
                   ? Border.all(color: cs.primary.withValues(alpha: 0.4))
                   : null,
             ),
@@ -132,7 +169,7 @@ class _PeriodPage extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  vm.periodLabel,
+                  state.periodLabel,
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -154,7 +191,7 @@ class _PeriodPage extends StatelessWidget {
           iconSize: 22,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          onPressed: () => vm.navigatePeriod(1),
+          onPressed: () => state.navigatePeriod(1),
         ),
       ],
     );
@@ -174,12 +211,12 @@ class _PeriodPage extends StatelessWidget {
             };
             return ListTile(
               title: Text(label),
-              trailing: vm.periodGranularity == g
+              trailing: state.periodGranularity == g
                   ? Icon(Icons.check_rounded,
                       color: Theme.of(context).colorScheme.primary)
                   : null,
               onTap: () {
-                vm.setPeriodGranularity(g);
+                state.setPeriodGranularity(g);
                 Navigator.of(context).pop();
               },
             );
@@ -195,8 +232,8 @@ class _PeriodPage extends StatelessWidget {
 // ----------------------------------------------------------
 
 class _CustomPage extends StatelessWidget {
-  final DashboardFilterViewModel vm;
-  const _CustomPage({required this.vm});
+  final TemporalFilterState state;
+  const _CustomPage({required this.state});
 
   @override
   Widget build(BuildContext context) {
@@ -206,7 +243,7 @@ class _CustomPage extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _DateButton(
-          date: vm.customFrom,
+          date: state.customFrom,
           cs: cs,
           onTap: () => _pickDate(context, isFrom: true),
         ),
@@ -217,7 +254,7 @@ class _CustomPage extends StatelessWidget {
                   color: cs.onSurfaceVariant, fontSize: 14)),
         ),
         _DateButton(
-          date: vm.customTo,
+          date: state.customTo,
           cs: cs,
           onTap: () => _pickDate(context, isFrom: false),
         ),
@@ -229,15 +266,15 @@ class _CustomPage extends StatelessWidget {
     final now = DateTime.now();
     final picked = await pickDate(
       context,
-      isFrom ? vm.customFrom : vm.customTo,
+      isFrom ? state.customFrom : state.customTo,
       firstDate: DateTime(2020),
       lastDate: DateTime(now.year + 5, now.month, now.day),
     );
     if (picked != null) {
       if (isFrom) {
-        vm.setCustomRange(picked, vm.customTo);
+        state.setCustomRange(picked, state.customTo);
       } else {
-        vm.setCustomRange(vm.customFrom, picked);
+        state.setCustomRange(state.customFrom, picked);
       }
     }
   }

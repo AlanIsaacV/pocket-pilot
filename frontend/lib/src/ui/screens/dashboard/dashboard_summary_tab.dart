@@ -22,7 +22,7 @@ import 'package:pocket_pilot/src/features/dashboard/domain/nature_spend_dto.dart
 import 'package:pocket_pilot/src/features/dashboard/domain/tag_spend_dto.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_view_model.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/widgets/allocation_card.dart';
-import 'package:pocket_pilot/src/features/dashboard/ui/widgets/dashboard_filter_sheet.dart';
+import 'package:pocket_pilot/src/ui/widgets/dashboard_filter_sheet.dart';
 
 class DashboardSummaryTab extends StatelessWidget {
   const DashboardSummaryTab({super.key});

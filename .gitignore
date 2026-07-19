@@ -35,3 +35,8 @@ __pycache__/
 *.csv
 
 frontend/test_data/
+
+prompt.txt
+.mcp.json
+.codegraph/
+

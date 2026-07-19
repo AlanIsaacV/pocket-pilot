@@ -459,6 +459,11 @@
       "date": "2026-07-19",
       "note": "Phase 5: each *_list_tab.dart is renamed (git mv) to *_list_body.dart with class *ListBody \u2014 the tab file already IS the embeddable body (diff shows the screen is identical plus Scaffold/AppBar/FAB). The screen becomes a thin Scaffold+AppBar+FAB wrapper around the body; the single tab caller (transactions_screen.dart) updates to the new class name. No new file is written from scratch and no embedded-flag widget is introduced.",
       "adr_candidate": false
+    },
+    {
+      "date": "2026-07-19",
+      "note": "Plan closed 2026-07-19: all 6 phases (0-5) completed same-day across separate sessions, final commit 2998df6. Total impact on frontend/lib across the 6 plan commits (9ed7d97..2998df6): +2,170/-3,927 = net -1,757 LOC, within the README's 1,500-2,000 estimate. Every phase verified by the verify sub-agent with 0 CRITICAL findings. Carried-over follow-ups OUTSIDE the plan: (1) pre-existing broken test statistics_category_list_row_test.dart (be4af04); (2) manual device smoke of the temporal pager + custom-range pages (phase 4) and the Plantillas/Rendimientos tabs (phase 5).",
+      "adr_candidate": false
     }
   ],
   "references": [],

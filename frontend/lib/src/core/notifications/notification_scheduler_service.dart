@@ -4,6 +4,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
 import 'package:pocket_pilot/src/core/notifications/notification_repository.dart';
+import 'package:pocket_pilot/src/core/notifications/in_app_notification.dart';
 
 /// The OS notification permission state known by the scheduler.
 enum NotificationPermissionStatus { granted, denied, undetermined }
@@ -13,7 +14,8 @@ enum NotificationPermissionStatus { granted, denied, undetermined }
 ///
 /// Uses a "clean slate" approach: [rescheduleAllNotifications] cancels all
 /// existing notifications and re-schedules from scratch. At most one
-/// notification per day, generic message, ID derived from YYYYMMDD.
+/// notification per day, with event-specific content and an ID derived from
+/// YYYYMMDD.
 class NotificationSchedulerService {
   final NotificationRepository _repository;
   final FlutterLocalNotificationsPlugin _plugin;
@@ -124,7 +126,7 @@ class NotificationSchedulerService {
   }
 
   /// Cancels all previously scheduled notifications, then re-schedules
-  /// one generic notification per day that has upcoming financial events.
+  /// one notification per alert day that has upcoming financial events.
   ///
   /// Call on app startup and after modifying templates or credit card accounts.
   Future<void> rescheduleAllNotifications() async {
@@ -133,81 +135,33 @@ class NotificationSchedulerService {
     // 1. Clean slate.
     await _plugin.cancelAll();
 
-    // 2. Compute the window: tomorrow through tomorrow + 63 = 64 days.
+    // 2. Compute the inclusive 64-calendar-day window: tomorrow through
+    // tomorrow + 63.
     final now = DateTime.now();
     final tomorrow = DateTime(now.year, now.month, now.day + 1);
 
-    // 3. Fetch projected event dates by type.
-    final creditCardDates = await _repository.getCreditCardDueDates(
-      tomorrow,
-      64,
-    );
-    final subscriptionDates = await _repository.getSubscriptionDates(
-      tomorrow,
-      64,
-    );
-    final obligationDates = await _repository.getObligationDates(tomorrow, 64);
-    final statementImportDates = await _repository.getStatementImportDates(
-      tomorrow,
-      64,
-    );
-
-    // 4. Apply anticipation offsets and collect unique notification days.
-    final daysToNotify = <DateTime>{};
-
-    for (final date in creditCardDates) {
-      final alertDay = date.subtract(const Duration(days: 3));
-      final alertDayOnly = DateTime(
-        alertDay.year,
-        alertDay.month,
-        alertDay.day,
-      );
-      if (!alertDayOnly.isBefore(tomorrow)) {
-        daysToNotify.add(alertDayOnly);
+    // 3. Fetch full projected events, then bucket them by their alert day.
+    final events = await _repository.getUpcomingEvents(tomorrow, 63);
+    final eventsByAlertDay = <DateTime, List<InAppNotification>>{};
+    for (final event in events) {
+      final alertDay = _alertDayFor(event);
+      if (!alertDay.isBefore(tomorrow)) {
+        eventsByAlertDay.putIfAbsent(alertDay, () => []).add(event);
       }
     }
 
-    for (final date in subscriptionDates) {
-      final alertDay = date.subtract(const Duration(days: 1));
-      final alertDayOnly = DateTime(
-        alertDay.year,
-        alertDay.month,
-        alertDay.day,
-      );
-      if (!alertDayOnly.isBefore(tomorrow)) {
-        daysToNotify.add(alertDayOnly);
-      }
-    }
-
-    for (final date in obligationDates) {
-      final alertDayOnly = DateTime(date.year, date.month, date.day);
-      if (!alertDayOnly.isBefore(tomorrow)) {
-        daysToNotify.add(alertDayOnly);
-      }
-    }
-
-    // Statement imports are reminders for that same day.
-    for (final date in statementImportDates) {
-      final alertDayOnly = DateTime(date.year, date.month, date.day);
-      if (!alertDayOnly.isBefore(tomorrow)) {
-        daysToNotify.add(alertDayOnly);
-      }
-    }
-
-    // 5. Schedule one notification per unique day at 9:00 AM local time.
-    const androidDetails = AndroidNotificationDetails(
-      'pocket_pilot_reminders',
-      'Recordatorios de pagos',
-      channelDescription: 'Alertas de pagos y obligaciones próximas',
-      importance: Importance.high,
-      priority: Priority.high,
-    );
-    const notificationDetails = NotificationDetails(
-      android: androidDetails,
-      iOS: DarwinNotificationDetails(),
-    );
-
-    for (final day in daysToNotify) {
+    // 4. Schedule one notification per alert day at 9:00 AM local time.
+    final alertDays = eventsByAlertDay.keys.toList()..sort();
+    for (final day in alertDays) {
+      final dayEvents = List<InAppNotification>.from(eventsByAlertDay[day]!)
+        ..sort((a, b) {
+          final byType = a.type.compareTo(b.type);
+          if (byType != 0) return byType;
+          final bySourceName = a.sourceName.compareTo(b.sourceName);
+          if (bySourceName != 0) return bySourceName;
+          return a.sourceId.compareTo(b.sourceId);
+        });
+      final content = _composeContent(dayEvents, day);
       final id = day.year * 10000 + day.month * 100 + day.day;
       final scheduledDate = tz.TZDateTime(
         tz.local,
@@ -217,15 +171,129 @@ class NotificationSchedulerService {
         9, // 9:00 AM
       );
 
+      final androidDetails = AndroidNotificationDetails(
+        'pocket_pilot_reminders',
+        'Recordatorios de pagos',
+        channelDescription: 'Alertas de pagos y obligaciones próximas',
+        importance: Importance.high,
+        priority: Priority.high,
+        styleInformation: dayEvents.length > 1
+            ? BigTextStyleInformation(content.body)
+            : null,
+      );
+      final notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: const DarwinNotificationDetails(),
+      );
+
       await _plugin.zonedSchedule(
         id: id,
-        title: 'Tienes movimientos próximos',
-        body:
-            'Abre la aplicación para revisar tus pagos u obligaciones pendientes.',
+        title: content.title,
+        body: content.body,
         scheduledDate: scheduledDate,
         notificationDetails: notificationDetails,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       );
     }
   }
+
+  DateTime _alertDayFor(InAppNotification event) {
+    final offset = switch (event.type) {
+      'CREDIT_CARD' => 3,
+      'SUBSCRIPTION' => 1,
+      'OBLIGATION' => 0,
+      'STATEMENT_IMPORT' => 0,
+      _ => 0,
+    };
+    final date = event.date.subtract(Duration(days: offset));
+    return DateTime(date.year, date.month, date.day);
+  }
+
+  _NotificationContent _composeContent(
+    List<InAppNotification> events,
+    DateTime alertDay,
+  ) {
+    if (events.length == 1) {
+      final event = events.single;
+      final timing = _timingFor(event, alertDay);
+      return switch (event.type) {
+        'CREDIT_CARD' => _NotificationContent(
+          '${event.sourceName} vence $timing',
+          'Toca para revisar tu pago.',
+        ),
+        'SUBSCRIPTION' => _NotificationContent(
+          'Cargo de ${event.sourceName} $timing',
+          _amountFor(event) ?? 'Toca para revisar tu pago.',
+        ),
+        'OBLIGATION' => _NotificationContent(
+          'Pago de ${event.sourceName} $timing',
+          _amountFor(event) ?? 'Toca para revisar tu pago.',
+        ),
+        'STATEMENT_IMPORT' => _NotificationContent(
+          'Importa el estado de cuenta de ${event.sourceName}',
+          'Mantén tus movimientos al día.',
+        ),
+        _ => _NotificationContent(
+          event.title,
+          event.subtitle.isNotEmpty
+              ? event.subtitle
+              : 'Toca para revisar tu pago.',
+        ),
+      };
+    }
+
+    final lines = events
+        .map((event) {
+          final timing = _timingFor(event, alertDay);
+          final amount = _amountFor(event);
+          final fragment = switch (event.type) {
+            'CREDIT_CARD' => '${event.sourceName} vence $timing',
+            'SUBSCRIPTION' =>
+              '${event.sourceName} se cobra $timing'
+                  '${amount != null ? ' · $amount' : ''}',
+            'OBLIGATION' =>
+              '${event.sourceName} vence $timing'
+                  '${amount != null ? ' · $amount' : ''}',
+            'STATEMENT_IMPORT' =>
+              'Importa el estado de cuenta de ${event.sourceName}',
+            _ => event.title,
+          };
+          return '• $fragment';
+        })
+        .join('\n');
+    return _NotificationContent(
+      'Tienes ${events.length} movimientos próximos',
+      lines,
+    );
+  }
+
+  String _timingFor(InAppNotification event, DateTime alertDay) {
+    final eventDay = DateTime(
+      event.date.year,
+      event.date.month,
+      event.date.day,
+    );
+    final daysUntil = eventDay.difference(alertDay).inDays;
+    return switch (daysUntil) {
+      0 => 'hoy',
+      1 => 'mañana',
+      _ => 'en $daysUntil días',
+    };
+  }
+
+  String? _amountFor(InAppNotification event) {
+    if (event.type == 'CREDIT_CARD') return null;
+    if (event.subtitle.isNotEmpty) return event.subtitle;
+    final amountCents = event.amountCents;
+    return amountCents == null
+        ? null
+        : '\$${(amountCents / 100).toStringAsFixed(2)}';
+  }
+}
+
+class _NotificationContent {
+  final String title;
+  final String body;
+
+  const _NotificationContent(this.title, this.body);
 }

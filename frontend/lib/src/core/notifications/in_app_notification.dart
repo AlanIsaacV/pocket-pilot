@@ -13,6 +13,12 @@ class InAppNotification {
 
   /// ID of the source account or template that generated this notification.
   final String sourceId;
+
+  /// Display name of the source entity, used for OS notification copy only.
+  ///
+  /// This is intentionally not persisted so the in-app notification center's
+  /// stored representation remains unchanged.
+  final String sourceName;
   final bool isRead;
   final DateTime? deletedAt;
   final DateTime createdAt;
@@ -25,6 +31,7 @@ class InAppNotification {
     required this.type,
     this.amountCents,
     required this.sourceId,
+    this.sourceName = '',
     this.isRead = false,
     this.deletedAt,
     required this.createdAt,
@@ -71,6 +78,7 @@ class InAppNotification {
       type: type,
       amountCents: amountCents,
       sourceId: sourceId,
+      sourceName: sourceName,
       isRead: isRead ?? this.isRead,
       deletedAt: deletedAt ?? this.deletedAt,
       createdAt: createdAt,

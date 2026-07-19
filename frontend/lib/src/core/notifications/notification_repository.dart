@@ -26,6 +26,7 @@ List<InAppNotification> projectStatementImportEvents({
             date: date,
             type: 'STATEMENT_IMPORT',
             sourceId: reminder.accountId,
+            sourceName: accountName,
             createdAt: DateTime.now(),
           ),
         );
@@ -232,6 +233,7 @@ class NotificationRepository {
             date: date,
             type: 'CREDIT_CARD',
             sourceId: card['id'] as String,
+            sourceName: name,
             createdAt: DateTime.now(),
           ),
         );
@@ -263,6 +265,7 @@ class NotificationRepository {
             type: 'SUBSCRIPTION',
             amountCents: amountCents,
             sourceId: sourceId,
+            sourceName: name,
             createdAt: DateTime.now(),
           ),
         );
@@ -294,6 +297,7 @@ class NotificationRepository {
             type: 'OBLIGATION',
             amountCents: amountCents,
             sourceId: sourceId,
+            sourceName: name,
             createdAt: DateTime.now(),
           ),
         );
@@ -316,86 +320,5 @@ class NotificationRepository {
 
     events.sort((a, b) => a.date.compareTo(b.date));
     return events;
-  }
-
-  /// Returns date-only DateTimes of all credit card due dates within the window.
-  Future<Set<DateTime>> getCreditCardDueDates(
-    DateTime fromDate,
-    int daysAhead,
-  ) async {
-    final windowEnd = fromDate.add(Duration(days: daysAhead));
-    final dates = <DateTime>{};
-
-    final cards = await _queryCreditCards();
-    for (final card in cards) {
-      final dueDay = card['payment_due_day'] as int;
-      dates.addAll(_projectCreditCardDates(dueDay, fromDate, windowEnd));
-    }
-
-    return dates;
-  }
-
-  /// Returns date-only DateTimes of all subscription charge dates within the window.
-  Future<Set<DateTime>> getSubscriptionDates(
-    DateTime fromDate,
-    int daysAhead,
-  ) async {
-    final windowEnd = fromDate.add(Duration(days: daysAhead));
-    final dates = <DateTime>{};
-
-    final subs = await _querySubscriptions();
-    for (final sub in subs) {
-      dates.addAll(
-        _projectTemplateOccurrences(
-          sub['next_date'] as String,
-          sub['frequency'] as String,
-          sub['end_date'] as String?,
-          fromDate,
-          windowEnd,
-        ),
-      );
-    }
-
-    return dates;
-  }
-
-  /// Returns date-only DateTimes of all obligation dates within the window.
-  Future<Set<DateTime>> getObligationDates(
-    DateTime fromDate,
-    int daysAhead,
-  ) async {
-    final windowEnd = fromDate.add(Duration(days: daysAhead));
-    final dates = <DateTime>{};
-
-    final obligations = await _queryObligations();
-    for (final ob in obligations) {
-      dates.addAll(
-        _projectTemplateOccurrences(
-          ob['next_date'] as String,
-          ob['frequency'] as String,
-          ob['end_date'] as String?,
-          fromDate,
-          windowEnd,
-        ),
-      );
-    }
-
-    return dates;
-  }
-
-  /// Returns date-only statement-import reminder dates within the window.
-  Future<Set<DateTime>> getStatementImportDates(
-    DateTime fromDate,
-    int daysAhead,
-  ) async {
-    final windowEnd = fromDate.add(Duration(days: daysAhead));
-    final reminders = await _statementImportPreferences.getReminders();
-    final activeAccounts = await _queryActiveAccountNames();
-    return projectStatementImportEvents(
-      reminders: reminders,
-      activeAccountNames: activeAccounts,
-      windowStart: fromDate,
-      windowEnd: windowEnd,
-    ).map((event) => event.date).toSet();
   }
 }

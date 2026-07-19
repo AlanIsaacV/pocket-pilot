@@ -5,6 +5,9 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'package:pocket_pilot/src/core/notifications/notification_repository.dart';
 
+/// The OS notification permission state known by the scheduler.
+enum NotificationPermissionStatus { granted, denied, undetermined }
+
 /// Wraps [FlutterLocalNotificationsPlugin] to schedule OS-level notifications
 /// for upcoming financial events.
 ///
@@ -16,7 +19,8 @@ class NotificationSchedulerService {
   final FlutterLocalNotificationsPlugin _plugin;
   final void Function()? onNotificationTap;
 
-  bool _permissionGranted = true;
+  NotificationPermissionStatus _permissionStatus =
+      NotificationPermissionStatus.undetermined;
 
   NotificationSchedulerService({
     required NotificationRepository repository,
@@ -24,6 +28,9 @@ class NotificationSchedulerService {
     FlutterLocalNotificationsPlugin? plugin,
   }) : _repository = repository,
        _plugin = plugin ?? FlutterLocalNotificationsPlugin();
+
+  /// The most recently observed OS notification permission state.
+  NotificationPermissionStatus get permissionStatus => _permissionStatus;
 
   /// Initializes timezone data and the notification plugin.
   /// Must be called once before [rescheduleAllNotifications].
@@ -56,11 +63,14 @@ class NotificationSchedulerService {
 
     // Android 13+ requires this runtime permission before posting either
     // scheduled reminders or capture notifications.
-    await _plugin
+    final androidImpl = _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.requestNotificationsPermission();
+        >();
+    if (androidImpl != null) {
+      final granted = await androidImpl.requestNotificationsPermission();
+      _permissionStatus = _statusFromNullableBool(granted);
+    }
 
     // 3. Check iOS permissions — graceful degradation.
     final iosImpl = _plugin
@@ -73,8 +83,44 @@ class NotificationSchedulerService {
         badge: true,
         sound: true,
       );
-      _permissionGranted = granted ?? false;
+      _permissionStatus = _statusFromNullableBool(granted);
     }
+  }
+
+  /// Re-reads the live OS notification permission state.
+  Future<NotificationPermissionStatus> refreshPermissionStatus() async {
+    final androidImpl = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (androidImpl != null) {
+      _permissionStatus = _statusFromNullableBool(
+        await androidImpl.areNotificationsEnabled(),
+      );
+      return _permissionStatus;
+    }
+
+    final iosImpl = _plugin
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >();
+    if (iosImpl != null) {
+      final permissions = await iosImpl.checkPermissions();
+      _permissionStatus = permissions == null
+          ? NotificationPermissionStatus.undetermined
+          : permissions.isEnabled
+          ? NotificationPermissionStatus.granted
+          : NotificationPermissionStatus.denied;
+    }
+
+    return _permissionStatus;
+  }
+
+  NotificationPermissionStatus _statusFromNullableBool(bool? granted) {
+    if (granted == null) return NotificationPermissionStatus.undetermined;
+    return granted
+        ? NotificationPermissionStatus.granted
+        : NotificationPermissionStatus.denied;
   }
 
   /// Cancels all previously scheduled notifications, then re-schedules
@@ -82,7 +128,7 @@ class NotificationSchedulerService {
   ///
   /// Call on app startup and after modifying templates or credit card accounts.
   Future<void> rescheduleAllNotifications() async {
-    if (!_permissionGranted) return;
+    if (_permissionStatus != NotificationPermissionStatus.granted) return;
 
     // 1. Clean slate.
     await _plugin.cancelAll();

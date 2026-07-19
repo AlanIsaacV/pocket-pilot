@@ -129,13 +129,17 @@ The `NotificationCenterViewModel` is loaded at startup (fire-and-forget) and pro
 ## Platform Configuration
 
 ### Android
-- `SCHEDULE_EXACT_ALARM` and `RECEIVE_BOOT_COMPLETED` permissions in AndroidManifest
+- `RECEIVE_BOOT_COMPLETED` is declared in AndroidManifest. `SCHEDULE_EXACT_ALARM` is deliberately
+  not declared: reminders use `AndroidScheduleMode.inexactAllowWhileIdle`, where Doze batching is
+  acceptable for 9:00 AM reminders and avoids the Android 14+ exact-alarm Play-policy gate.
 - `POST_NOTIFICATIONS` (Android 13+) declared in AndroidManifest and requested at app start in
   `NotificationSchedulerService.init()` via the plugin's `requestNotificationsPermission()` — no
   `permission_handler` dependency. Before frictionless-capture f6 session B this was missing, so
   scheduled reminders were silently undelivered on API 33+.
 - `FlutterLocalNotificationsPlugin` is constructor-injectable in `NotificationSchedulerService`
   (testability seam added in f6 session B).
+- Battery optimization is document/deep-link only. The app does not request a blanket
+  `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` exemption.
 - Core library desugaring enabled in `build.gradle.kts` (required by `flutter_local_notifications` v19+)
 
 ### iOS

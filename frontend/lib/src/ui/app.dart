@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/sync/scheduled_generation_orchestrator.dart';
+import 'package:pocket_pilot/src/core/notifications/notification_scheduler_service.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/core/theme/theme_preference_controller.dart';
 import 'package:pocket_pilot/src/features/ai_assistant/ui/ai_overlay.dart';
@@ -37,6 +40,10 @@ class _PocketPilotAppState extends State<PocketPilotApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      final notificationScheduler = context
+          .read<NotificationSchedulerService>();
+      unawaited(_refreshNotificationPermission(notificationScheduler));
+
       final now = DateTime.now();
       if (_lastSyncTime == null ||
           now.difference(_lastSyncTime!) >= _syncThrottle) {
@@ -48,6 +55,15 @@ class _PocketPilotAppState extends State<PocketPilotApp>
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
       context.read<AISessionController>().endSession();
+    }
+  }
+
+  Future<void> _refreshNotificationPermission(
+    NotificationSchedulerService scheduler,
+  ) async {
+    final status = await scheduler.refreshPermissionStatus();
+    if (status == NotificationPermissionStatus.granted) {
+      await scheduler.rescheduleAllNotifications();
     }
   }
 
@@ -64,13 +80,9 @@ class _PocketPilotAppState extends State<PocketPilotApp>
       routerConfig: widget.router,
       builder: (context, child) {
         return Stack(
-          children: [
-            child ?? const SizedBox.shrink(),
-            const AIOverlay(),
-          ],
+          children: [child ?? const SizedBox.shrink(), const AIOverlay()],
         );
       },
     );
   }
 }
-

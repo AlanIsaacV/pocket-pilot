@@ -15,7 +15,6 @@ import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
-import 'package:pocket_pilot/src/ui/widgets/account_icon.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
@@ -26,6 +25,7 @@ import 'package:pocket_pilot/src/features/user_preferences/data/currency_prefere
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/account_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/currency_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
@@ -41,8 +41,6 @@ class TransactionFormScreen extends StatefulWidget {
   @override
   State<TransactionFormScreen> createState() => _TransactionFormScreenState();
 }
-
-enum _AccountSheetSelection { addNew }
 
 class _TransactionFormScreenState extends State<TransactionFormScreen> {
   static const _uuid = Uuid();
@@ -63,7 +61,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   CategoryModel? _selectedCategory;
   final List<TagModel> _selectedTags = [];
 
-  List<AccountModel> _accounts = [];
   List<CategoryModel> _allCategories = [];
   List<TagModel> _allTags = [];
 
@@ -115,22 +112,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       return;
     }
 
-    // En modo edición, si la cuenta original está archivada inyectarla para
-    // que el usuario pueda guardar cambios sin obligarlo a cambiar de cuenta
-    // o restaurarla.
-    if (_isEditMode) {
-      final originalId = widget.transaction!.accountId;
-      final hasOriginal = accounts.any((a) => a.id == originalId);
-      if (!hasOriginal) {
-        final archived = await accountStore.getByIdIncludingArchived(
-          originalId,
-        );
-        if (archived != null && archived.type != 'contact') {
-          accounts.add(archived);
-        }
-      }
-    }
-
     var selectedCurrencyCode = currencySnapshot.defaultCode;
     AccountModel? selectedAccount;
     CategoryModel? selectedCategory;
@@ -152,6 +133,15 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         if (account.id == t.accountId) {
           selectedAccount = account;
           break;
+        }
+      }
+      if (selectedAccount == null) {
+        final archived = await accountStore.getByIdIncludingArchived(
+          t.accountId,
+        );
+        if (!mounted) return;
+        if (archived != null && archived.type != 'contact') {
+          selectedAccount = archived;
         }
       }
       for (final category in categories) {
@@ -200,7 +190,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     _amountCalculator.reset(initialAmount);
 
     setState(() {
-      _accounts = accounts;
       _allCategories = categories;
       _allTags = tags;
       _currencyCode = selectedCurrencyCode;
@@ -211,10 +200,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   }
 
   Future<void> _redirectToCreateAccount() async {
-    await _openCreateAccountFlow(closeIfNoAccounts: true);
-  }
-
-  Future<void> _openCreateAccountFlow({required bool closeIfNoAccounts}) async {
     final created = await context.push<bool>('/accounts/new');
     if (!mounted) return;
 
@@ -223,12 +208,13 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       return;
     }
 
-    final accounts = (await context.read<AccountLocalStore>().getAccounts())
+    final accountStore = context.read<AccountLocalStore>();
+    final accounts = (await accountStore.getAccounts())
         .where((a) => a.type != 'contact')
         .toList();
     if (!mounted) return;
 
-    if (accounts.isEmpty && closeIfNoAccounts) {
+    if (accounts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -310,42 +296,21 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   // Selectores
   // ----------------------------------------------------------
 
-  void _showAccountSheet() {
+  Future<void> _pickAccount() async {
     _commitPendingAmountIfAny();
 
-    showFormBottomSheet<Object>(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: 'Seleccionar cuenta',
-        children: [
-          SheetItem(
-            icon: Icons.add_circle_outline_rounded,
-            label: 'Agregar cuenta',
-            onTap: () => Navigator.pop(ctx, _AccountSheetSelection.addNew),
-          ),
-          ..._accounts.map(
-            (a) => SheetItem(
-              icon: accountIconForType(a.type),
-              label: a.name,
-              onTap: () => Navigator.pop(ctx, a),
-            ),
-          ),
-        ],
-      ),
-    ).then((selection) async {
-      if (selection is AccountModel) {
-        setState(() {
-          _selectedAccount = selection;
-          _currencyCode = selection.currencyCode;
-          if (!_canUseInstallments) {
-            _installmentsCount = 1;
-          }
-        });
-        return;
-      }
+    final selection = await showAccountPicker(
+      context,
+      mustIncludeAccountId: _isEditMode ? widget.transaction!.accountId : null,
+      selectedAccountId: _selectedAccount?.id,
+    );
+    if (!mounted || selection == null) return;
 
-      if (selection == _AccountSheetSelection.addNew) {
-        await _openCreateAccountFlow(closeIfNoAccounts: false);
+    setState(() {
+      _selectedAccount = selection;
+      _currencyCode = selection.currencyCode;
+      if (!_canUseInstallments) {
+        _installmentsCount = 1;
       }
     });
   }
@@ -827,7 +792,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                     icon: Icons.account_balance_wallet_outlined,
                     label: 'Cuenta',
                     value: _selectedAccount?.name ?? 'Sin cuenta',
-                    onTap: _showAccountSheet,
+                    onTap: _pickAccount,
                   ),
 
                   // Categoría (hidden for adjustments / initial balances)

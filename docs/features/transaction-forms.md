@@ -23,6 +23,7 @@ lib/src/ui/widgets/               # shared widget library (used by 10+ features)
 ├── dismissible_background.dart   # DismissibleBackground — canonical swipe background
 ├── form_section_label.dart       # FormSectionLabel — 13px form section label
 ├── currency_picker.dart          # showCurrencyPicker() — canonical currency selection flow
+├── account_picker.dart           # showAccountPicker() — canonical account selection sheet
 └── account_icon.dart             # accountIconForType() (used by 5 features)
 ```
 
@@ -98,6 +99,37 @@ opening; the transfer form re-syncs amounts when both currencies match.
 
 ---
 
+#### `ui/widgets/account_picker.dart` (~150 lines)
+**Purpose:** Canonical account selection sheet (widget-unification phase 3, 2026-07-19 — see ADR
+0009). Replaced the ~8 per-form `_showAccountSheet()`/`_showAccountPicker()` implementations across
+transaction, transfer, template (both sheets), debt, yield-config, lot, and CSV-mapping forms.
+
+**Exports:**
+- `showAccountPicker(context, {title, filter, excludeAccountId, mustIncludeAccountId,
+  selectedAccountId, showCurrency, showCreateRow, topAction, createRouteExtra})` →
+  `Future<AccountModel?>` — opens the shared bottom sheet with `accountIconForType` row icons.
+  Fully self-contained: reads `AccountLocalStore` from the caller's context *before* opening the
+  sheet (bottom-sheet routes don't inherit providers). The "Agregar cuenta" row handles the
+  `/accounts/new` round-trip internally (push with optional `createRouteExtra` pre-fill, reload,
+  re-open the sheet with the fresh list). Returns the selected account, or `null` when dismissed.
+- `AccountPickerTopAction({icon, label, onTap})` — optional extra row rendered first; tapping it
+  closes the sheet, awaits `onTap`, and resolves the picker with `null` (the caller's side effect
+  runs in the callback — the CSV-mapping quick-create uses this).
+
+**Parameter semantics:** `filter` defaults to excluding `type == 'contact'`; `excludeAccountId`
+wins over `mustIncludeAccountId` (regression-tested — a transfer's excluded counterpart never
+reappears via edit-mode re-injection); `mustIncludeAccountId` re-injects an archived account in
+edit mode (fetched via `getByIdIncludingArchived`); `selectedAccountId` renders a trailing check on
+the current selection; `showCurrency` appends `· CODE` to labels (used by the lot form).
+
+**Call-site contract:** callers only apply a non-null result; ALL post-selection side effects stay
+at the call site (`_pickAccount*` wrapper methods): currency propagation (transaction/transfer/
+debt/template), installment reset (transaction), amount re-sync (transfer), calculator commit
+before opening (transaction). yield/lot pass `showCreateRow: false` explicitly (no create row, as
+before).
+
+---
+
 ### Screen-Specific Components
 
 #### `transfer_form_screen.dart` (~939 lines)
@@ -117,8 +149,9 @@ opening; the transfer form re-syncs amounts when both currencies match.
 - `_loadData()` — Fetch accounts, tags, currency prefs; pre-fill for edit mode
 - `_onNumKey(String key)` — Handle numpad: routes to amount or rate based on `_activeField`
 - `_swapAccounts()` — Swap source/destination (including amounts and currencies)
-- `_showAccountSheet()` — Bottom sheet picker; currency selection goes through the shared
-  `showCurrencyPicker()` (per leg, with the leg's account currency as `mustIncludeCode`)
+- `_pickAccount({isSource})` — Shared `showAccountPicker()` per leg (counterpart excluded via
+  `excludeAccountId`); currency selection goes through the shared `showCurrencyPicker()` (per leg,
+  with the leg's account currency as `mustIncludeCode`)
 - `_recalcDestFromRate()`, `_syncAmountsIfSameCurrency()` — Amount sync logic
 - `_onSave()`, `_onDelete()` — Persist or delete via `TransactionRepository`
 
@@ -148,8 +181,9 @@ opening; the transfer form re-syncs amounts when both currencies match.
 **Key Methods:**
 - `_loadData()` — Fetch accounts, categories, tags, currency prefs
 - `_onNumpad(String digit)`, `_onNumpadOperation(CalcOperator)` — Delegate to calculator
-- `_showAccountSheet()` — Bottom sheet picker; currency selection goes through the shared
-  `showCurrencyPicker()` (commits any pending calculator expression before opening)
+- `_pickAccount()` — Shared `showAccountPicker()` (commits any pending calculator expression
+  before opening; resets installments when the picked account can't use them); currency selection
+  goes through the shared `showCurrencyPicker()`
 - `_openCategoryPicker()` — Navigate to category picker screen
 - `_onSave()`, `_onDelete()` — Persist or delete via `TransactionRepository`
 
@@ -282,9 +316,11 @@ in `lib/src/ui/widgets/` as of 2026-07-19; the graph's relationships are unchang
 
 When testing these forms, ensure:
 1. **Numpad behavior** — digits, decimal, backspace all work correctly
-2. **Account/Currency selection** — account bottom sheets display and update state; currency
-   selection goes through the shared `showCurrencyPicker()` (covered by
-   `test/currency_picker_test.dart`, incl. the preferences-reconciliation fallback)
+2. **Account/Currency selection** — account selection goes through the shared
+   `showAccountPicker()` (covered by `test/account_picker_test.dart`: filter/exclusion, selected
+   check, top action, exclude-wins-over-mustInclude regression); currency selection goes through
+   the shared `showCurrencyPicker()` (covered by `test/currency_picker_test.dart`, incl. the
+   preferences-reconciliation fallback)
 3. **Date picking** — both single and split dates work
 4. **Tag adding** — recent tags appear and new tags can be created
 5. **Save/Delete** — correctly invoke repository and trigger sync
@@ -296,5 +332,5 @@ When testing these forms, ensure:
 
 1. **Form State Abstraction** — Both screens manage similar state; consider a mixin or ChangeNotifier
 2. **Amount Input Unification** — TransactionFormScreen uses a calculator; TransferFormScreen uses manual entry. Could unify with a mode switch
-3. **Bottom Sheet Consolidation** — Currency selection is done (`showCurrencyPicker`, widget-unification phase 2); account selection is next (phase 3). Other screens (settings) still use raw `showModalBottomSheet`
+3. **Bottom Sheet Consolidation** — Currency selection (`showCurrencyPicker`, phase 2) and account selection (`showAccountPicker`, phase 3) are done. Other screens (settings) still use raw `showModalBottomSheet`
 4. **Widget Key Parameters** — All extracted widgets should add named `key` parameter to satisfy linter

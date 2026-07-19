@@ -13,6 +13,7 @@ import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/debts/data/debt_repository.dart';
 import 'package:pocket_pilot/src/features/debts/domain/contact_balance.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/ui/widgets/account_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/transfer_form_widgets.dart';
@@ -52,7 +53,6 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
 
   String? _contactAccountId;
   AccountModel? _myAccount;
-  List<AccountModel> _myAccounts = [];
   List<Map<String, dynamic>> _contactSuggestions = [];
 
   String _amountSourceInput = '0';
@@ -175,7 +175,6 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
     }
 
     setState(() {
-      _myAccounts = myAccounts;
       _sourceCurrency = sourceCurrency;
       _destinationCurrency = destinationCurrency;
       _amountSourceInput = amountSource;
@@ -330,7 +329,7 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
                                       ),
                                     );
                                   }
-                                : () => _showAccountSheet(isSource: true),
+                                : () => _pickAccount(isSource: true),
                             onCurrencyTap: () =>
                                 _showCurrencyPicker(isSource: true),
                             onAmountTap: () => setState(
@@ -372,7 +371,7 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
                             isActive: _activeField == _ActiveField.destination,
                             trailing: null,
                             onAccountTap: _isContactAsSource
-                                ? () => _showAccountSheet(isSource: false)
+                                ? () => _pickAccount(isSource: false)
                                 : () {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
@@ -506,49 +505,24 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
     setState(() => _contactSuggestions = results);
   }
 
-  void _showAccountSheet({required bool isSource}) {
-    showFormBottomSheet<Object>(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: isSource ? 'Cuenta origen' : 'Cuenta destino',
-        children: [
-          SheetItem(
-            icon: Icons.add_circle_outline_rounded,
-            label: 'Agregar cuenta',
-            onTap: () => Navigator.of(ctx).pop('__add_new__'),
-          ),
-          for (final account in _myAccounts)
-            SheetItem(
-              icon: Icons.account_balance_outlined,
-              label: account.name,
-              onTap: () => Navigator.of(ctx).pop(account),
-            ),
-        ],
-      ),
-    ).then((selection) async {
-      if (selection == null || !mounted) return;
+  Future<void> _pickAccount({required bool isSource}) async {
+    final selection = await showAccountPicker(
+      context,
+      title: isSource ? 'Cuenta origen' : 'Cuenta destino',
+      selectedAccountId: _myAccount?.id,
+    );
+    if (!mounted || selection == null) return;
 
-      if (selection is String && selection == '__add_new__') {
-        final created = await context.push<bool>('/accounts/new');
-        if (created == true && mounted) {
-          await _loadData();
+    setState(() {
+      _myAccount = selection;
+      if (_isContactAsSource) {
+        if (!isSource) {
+          _destinationCurrency = selection.currencyCode;
         }
-        return;
-      }
-
-      if (selection is AccountModel) {
-        setState(() {
-          _myAccount = selection;
-          if (_isContactAsSource) {
-            if (!isSource) {
-              _destinationCurrency = selection.currencyCode;
-            }
-          } else {
-            if (isSource) {
-              _sourceCurrency = selection.currencyCode;
-            }
-          }
-        });
+      } else {
+        if (isSource) {
+          _sourceCurrency = selection.currencyCode;
+        }
       }
     });
   }

@@ -13,13 +13,13 @@ import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
-import 'package:pocket_pilot/src/ui/widgets/account_icon.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_repository.dart';
 import 'package:pocket_pilot/src/features/tags/domain/tag.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/account_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/transfer_form_widgets.dart';
@@ -59,7 +59,6 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
   // ----------------------------------------------------------
   AccountModel? _fromAccount;
   AccountModel? _toAccount;
-  List<AccountModel> _accounts = [];
 
   // ----------------------------------------------------------
   // Montos (como strings igual que TransactionFormScreen)
@@ -155,24 +154,6 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
       return;
     }
 
-    // En modo edición, si alguna de las cuentas origen/destino está archivada
-    // inyectarla para permitir guardar cambios sin forzar al usuario a
-    // restaurarla o cambiar de cuenta.
-    if (_isEditMode) {
-      final originalIds = <String>{
-        widget.transferOut!.accountId,
-        widget.transferIn!.accountId,
-      };
-      for (final id in originalIds) {
-        if (accounts.any((a) => a.id == id)) continue;
-        final archived = await accountStore.getByIdIncludingArchived(id);
-        if (archived != null && archived.type != 'contact') {
-          accounts.add(archived);
-        }
-      }
-      if (!mounted) return;
-    }
-
     AccountModel? fromAccount;
     AccountModel? toAccount;
     var amountOutInput = '0';
@@ -201,6 +182,24 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
         if (account.id == inTx.accountId) {
           toAccount = account;
           break;
+        }
+      }
+      if (fromAccount == null) {
+        final archived = await accountStore.getByIdIncludingArchived(
+          out.accountId,
+        );
+        if (!mounted) return;
+        if (archived != null && archived.type != 'contact') {
+          fromAccount = archived;
+        }
+      }
+      if (toAccount == null) {
+        final archived = await accountStore.getByIdIncludingArchived(
+          inTx.accountId,
+        );
+        if (!mounted) return;
+        if (archived != null && archived.type != 'contact') {
+          toAccount = archived;
         }
       }
 
@@ -281,7 +280,6 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
     }
 
     setState(() {
-      _accounts = accounts;
       _allTags = tags;
       _fromAccount = fromAccount;
       _toAccount = toAccount;
@@ -415,45 +413,29 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
   // Selector de cuenta (origen o destino)
   // ----------------------------------------------------------
 
-  void _showAccountSheet({required bool isSource}) {
-    showFormBottomSheet<Object>(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: isSource ? 'Cuenta origen' : 'Cuenta destino',
-        children: [
-          SheetItem(
-            icon: Icons.add_circle_outline_rounded,
-            label: 'Agregar cuenta',
-            onTap: () => Navigator.of(ctx).pop('__add_new__'),
-          ),
-          for (final account in _accounts)
-            SheetItem(
-              icon: accountIconForType(account.type),
-              label: account.name,
-              onTap: () => Navigator.of(ctx).pop(account),
-            ),
-        ],
-      ),
-    ).then((selection) async {
-      if (selection == null || !mounted) return;
+  Future<void> _pickAccount({required bool isSource}) async {
+    final selection = await showAccountPicker(
+      context,
+      title: isSource ? 'Cuenta origen' : 'Cuenta destino',
+      excludeAccountId: isSource ? _toAccount?.id : _fromAccount?.id,
+      mustIncludeAccountId: _isEditMode
+          ? (isSource
+                ? widget.transferOut!.accountId
+                : widget.transferIn!.accountId)
+          : null,
+      selectedAccountId: isSource ? _fromAccount?.id : _toAccount?.id,
+    );
+    if (!mounted || selection == null) return;
 
-      if (selection is String && selection == '__add_new__') {
-        await _openCreateAccountFlow();
-        return;
+    setState(() {
+      if (isSource) {
+        _fromAccount = selection;
+        _currencyOut = selection.currencyCode;
+      } else {
+        _toAccount = selection;
+        _currencyIn = selection.currencyCode;
       }
-
-      if (selection is AccountModel) {
-        setState(() {
-          if (isSource) {
-            _fromAccount = selection;
-            _currencyOut = selection.currencyCode;
-          } else {
-            _toAccount = selection;
-            _currencyIn = selection.currencyCode;
-          }
-          _syncAmountsIfSameCurrency();
-        });
-      }
+      _syncAmountsIfSameCurrency();
     });
   }
 
@@ -467,7 +449,8 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
     }
 
     // Si no creó cuenta, verificar si sigue sin cuentas
-    final accounts = (await context.read<AccountLocalStore>().getAccounts())
+    final accountStore = context.read<AccountLocalStore>();
+    final accounts = (await accountStore.getAccounts())
         .where((a) => a.type != 'contact')
         .toList();
     if (!mounted) return;
@@ -485,14 +468,6 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
     }
 
     await _loadData();
-  }
-
-  Future<void> _openCreateAccountFlow() async {
-    final created = await context.push<bool>('/accounts/new');
-    if (!mounted) return;
-    if (created == true) {
-      await _loadData();
-    }
   }
 
   // ----------------------------------------------------------
@@ -782,7 +757,7 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
                           currencyCode: _currencyOut,
                           isActive: _activeField == _ActiveField.source,
                           trailing: null,
-                          onAccountTap: () => _showAccountSheet(isSource: true),
+                          onAccountTap: () => _pickAccount(isSource: true),
                           onCurrencyTap: () =>
                               _showCurrencyPicker(isSource: true),
                           onAmountTap: () => setState(
@@ -837,7 +812,7 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
                               ? '1 $_currencyOut = $_rateInput $_currencyIn'
                               : null,
                           onAccountTap: () =>
-                              _showAccountSheet(isSource: false),
+                              _pickAccount(isSource: false),
                           onCurrencyTap: () =>
                               _showCurrencyPicker(isSource: false),
                           onAmountTap: () => setState(

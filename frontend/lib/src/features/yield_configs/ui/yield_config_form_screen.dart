@@ -17,7 +17,7 @@ import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
-import 'package:pocket_pilot/src/ui/widgets/account_icon.dart';
+import 'package:pocket_pilot/src/ui/widgets/account_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
@@ -53,7 +53,6 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
   // ----------------------------------------------------------
 
   AccountModel? _selectedAccount;
-  List<AccountModel> _accounts = [];
   String _payoutFrequency = 'monthly';
   DateTime? _nextDate;
   DateTime? _maturityDate;
@@ -129,7 +128,6 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
       }
 
       setState(() {
-        _accounts = accounts;
         _selectedAccount = selectedAccount;
         _payoutFrequency = c.payoutFrequency;
         _nextDate = DateTime.tryParse(c.nextDate);
@@ -145,7 +143,6 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
         selectedAccount = accounts.first;
       }
       setState(() {
-        _accounts = accounts;
         _selectedAccount = selectedAccount;
         _nextDate = DateTime.now();
         _dataLoaded = true;
@@ -290,26 +287,16 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
   // Bottom sheets
   // ----------------------------------------------------------
 
-  void _showAccountSheet() {
-    showFormBottomSheet<AccountModel>(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: 'Cuenta',
-        children: _accounts
-            .map(
-              (a) => SheetItem(
-                icon: accountIconForType(a.type),
-                label: a.name,
-                onTap: () => Navigator.pop(ctx, a),
-              ),
-            )
-            .toList(),
-      ),
-    ).then((selection) {
-      if (selection != null) {
-        setState(() => _selectedAccount = selection);
-      }
-    });
+  Future<void> _pickAccount() async {
+    final selection = await showAccountPicker(
+      context,
+      title: 'Cuenta',
+      selectedAccountId: _selectedAccount?.id,
+      showCreateRow: false,
+    );
+    if (!mounted || selection == null) return;
+
+    setState(() => _selectedAccount = selection);
   }
 
   void _showPayoutFrequencySheet() {
@@ -479,7 +466,7 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
                     icon: Icons.account_balance_wallet_outlined,
                     label: 'Cuenta',
                     value: _selectedAccount?.name ?? 'Sin cuenta',
-                    onTap: _showAccountSheet,
+                    onTap: _pickAccount,
                   ),
 
                   // ── 3. Monto ───────────────────────────────────

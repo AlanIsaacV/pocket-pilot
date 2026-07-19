@@ -35,6 +35,15 @@ per-form `_showCurrencySheet()` implementations across all 8 currency-selecting 
 templates form's flow was the canonical donor — and the private
 `_ScrollableBottomSheet`/`_SheetItem` copies in accounts/budgets/goals were deleted (net −429 LOC).
 
+Phase 3 (2026-07-19): `showAccountPicker` (`ui/widgets/account_picker.dart`) replaced the ~8
+per-form account sheets (transaction, transfer, template ×2, debt, yield-config, lot, CSV-mapping).
+Converged intentionally: `accountIconForType` row icons everywhere (debt's and lot's hardcoded
+icons removed), a new uniform trailing check on the selected account, a contact-excluding default
+filter (fixes CSV-mapping's oversight of listing contacts), the transfer form now excludes the
+counterpart account per leg, and `advanced_filters`' EN labels converged to ES ("Cuenta"/"Todas").
+Two dropdown sites stay dropdowns as documented exceptions (`advanced_filters` needs an "all"
+option; `pending_review_sheet` is a dense sheet-within-sheet with a `FormField` validator).
+
 ## Alternatives considered
 
 - **Behavior-preserving refactor** (parameterize every existing divergence) — rejected: the

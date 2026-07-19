@@ -36,10 +36,10 @@ class AdvancedFilters extends StatelessWidget {
           children: [
             Expanded(
               child: _DropdownField(
-                label: 'Account',
+                label: 'Cuenta',
                 value: vm.accountId,
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('All')),
+                  const DropdownMenuItem(value: null, child: Text('Todas')),
                   ...accounts.map((a) => DropdownMenuItem(
                         value: a.id,
                         child: Text(a.name, overflow: TextOverflow.ellipsis),

@@ -20,7 +20,6 @@ import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
-import 'package:pocket_pilot/src/ui/widgets/account_icon.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
@@ -29,6 +28,7 @@ import 'package:pocket_pilot/src/features/tags/domain/tag.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/data/transaction_template_repository.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/domain/transaction_template.dart';
 import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/account_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/currency_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
@@ -36,8 +36,6 @@ import 'package:pocket_pilot/src/features/user_preferences/data/currency_prefere
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
-
-enum _AccountSheetSelection { addNew }
 
 class TransactionTemplateFormScreen extends StatefulWidget {
   final TransactionTemplateModel? template;
@@ -75,7 +73,6 @@ class _TransactionTemplateFormScreenState
   CategoryModel? _selectedCategory;
   List<TagModel> _selectedTags = [];
   List<TagModel> _allTags = [];
-  List<AccountModel> _accounts = [];
   String _currencyCode = kInitialDefaultCurrency;
 
   String? _frequency;
@@ -297,7 +294,6 @@ class _TransactionTemplateFormScreenState
     }
 
     setState(() {
-      _accounts = accounts;
       _allTags = tags;
       _currencyCode = selectedCurrencyCode;
       _selectedAccount = selectedAccount;
@@ -505,87 +501,35 @@ class _TransactionTemplateFormScreenState
   // ----------------------------------------------------------
 
   // ----------------------------------------------------------
-  // Flujo creación de cuenta
-  // ----------------------------------------------------------
-
-  Future<void> _openCreateAccountFlow() async {
-    await context.push<bool>('/accounts/new');
-    if (!mounted) return;
-    await _loadData();
-  }
-
-  // ----------------------------------------------------------
   // Bottom sheets: cuentas
   // ----------------------------------------------------------
 
-  void _showAccountSheet() {
-    showFormBottomSheet<Object>(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: _type == 'transfer_out' ? 'Cuenta origen' : 'Cuenta',
-        children: [
-          SheetItem(
-            icon: Icons.add_circle_outline_rounded,
-            label: 'Agregar cuenta',
-            onTap: () => Navigator.pop(ctx, _AccountSheetSelection.addNew),
-          ),
-          ..._accounts.map(
-            (a) => SheetItem(
-              icon: accountIconForType(a.type),
-              label: a.name,
-              onTap: () => Navigator.pop(ctx, a),
-            ),
-          ),
-        ],
-      ),
-    ).then((selection) async {
-      if (selection is AccountModel) {
-        setState(() {
-          _selectedAccount = selection;
-          if (_type != 'transfer_out') {
-            _currencyCode = selection.currencyCode;
-          }
-        });
-        return;
-      }
-      if (selection == _AccountSheetSelection.addNew) {
-        await _openCreateAccountFlow();
+  Future<void> _pickAccount() async {
+    final selection = await showAccountPicker(
+      context,
+      title: _type == 'transfer_out' ? 'Cuenta origen' : 'Cuenta',
+      selectedAccountId: _selectedAccount?.id,
+    );
+    if (!mounted || selection == null) return;
+
+    setState(() {
+      _selectedAccount = selection;
+      if (_type != 'transfer_out') {
+        _currencyCode = selection.currencyCode;
       }
     });
   }
 
-  void _showToAccountSheet() {
-    final excluded = _selectedAccount?.id;
-    final filtered = _accounts.where((a) => a.id != excluded).toList();
+  Future<void> _pickToAccount() async {
+    final selection = await showAccountPicker(
+      context,
+      title: 'Cuenta destino',
+      excludeAccountId: _selectedAccount?.id,
+      selectedAccountId: _selectedToAccount?.id,
+    );
+    if (!mounted || selection == null) return;
 
-    showFormBottomSheet<Object>(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: 'Cuenta destino',
-        children: [
-          SheetItem(
-            icon: Icons.add_circle_outline_rounded,
-            label: 'Agregar cuenta',
-            onTap: () => Navigator.pop(ctx, _AccountSheetSelection.addNew),
-          ),
-          ...filtered.map(
-            (a) => SheetItem(
-              icon: accountIconForType(a.type),
-              label: a.name,
-              onTap: () => Navigator.pop(ctx, a),
-            ),
-          ),
-        ],
-      ),
-    ).then((selection) async {
-      if (selection is AccountModel) {
-        setState(() => _selectedToAccount = selection);
-        return;
-      }
-      if (selection == _AccountSheetSelection.addNew) {
-        await _openCreateAccountFlow();
-      }
-    });
+    setState(() => _selectedToAccount = selection);
   }
 
   // ----------------------------------------------------------
@@ -806,7 +750,7 @@ class _TransactionTemplateFormScreenState
                     icon: Icons.account_balance_wallet_outlined,
                     label: _type == 'transfer_out' ? 'Cuenta origen' : 'Cuenta',
                     value: _selectedAccount?.name ?? 'Sin cuenta',
-                    onTap: _showAccountSheet,
+                    onTap: _pickAccount,
                   ),
 
                   // ── 4. Cuenta destino (solo transfer) ──────────────────
@@ -815,7 +759,7 @@ class _TransactionTemplateFormScreenState
                       icon: Icons.swap_horiz_rounded,
                       label: 'Cuenta destino',
                       value: _selectedToAccount?.name ?? 'Sin cuenta destino',
-                      onTap: _showToAccountSheet,
+                      onTap: _pickToAccount,
                     ),
                   ],
 

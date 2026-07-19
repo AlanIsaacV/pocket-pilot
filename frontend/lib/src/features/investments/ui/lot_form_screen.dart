@@ -12,6 +12,7 @@ import 'package:pocket_pilot/src/features/investments/data/investment_lot_reposi
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_lot.dart';
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/account_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
@@ -315,24 +316,18 @@ class _LotFormScreenState extends State<LotFormScreen> {
     });
   }
 
-  void _showAccountSheet() {
-    showFormBottomSheet<AccountModel>(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: 'Cuenta de inversión',
-        children: _investmentAccounts
-            .map(
-              (a) => SheetItem(
-                icon: Icons.trending_up_rounded,
-                label: '${a.name} · ${a.currencyCode}',
-                onTap: () => Navigator.pop(ctx, a),
-              ),
-            )
-            .toList(),
-      ),
-    ).then((selection) {
-      if (selection != null) setState(() => _selectedAccount = selection);
-    });
+  Future<void> _pickAccount() async {
+    final selection = await showAccountPicker(
+      context,
+      title: 'Cuenta de inversión',
+      filter: (account) => account.type == 'investment',
+      selectedAccountId: _selectedAccount?.id,
+      showCurrency: true,
+      showCreateRow: false,
+    );
+    if (!mounted || selection == null) return;
+
+    setState(() => _selectedAccount = selection);
   }
 
   String _kindLabel() => _kind == 'buy' ? 'Compra' : 'Venta';
@@ -411,9 +406,7 @@ class _LotFormScreenState extends State<LotFormScreen> {
                     value: account != null
                         ? '${account.name} · ${account.currencyCode}'
                         : 'Sin cuenta',
-                    onTap: _investmentAccounts.isEmpty
-                        ? () {}
-                        : _showAccountSheet,
+                    onTap: _investmentAccounts.isEmpty ? () {} : _pickAccount,
                   ),
                   const SizedBox(height: 8),
 

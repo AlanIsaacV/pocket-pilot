@@ -40,7 +40,7 @@ date,type,amount,currency,account,destination_account,category,tags,notes[,natur
 
 | Entity | Mapping | Blocks import? | Auto-create on import? |
 |--------|---------|----------------|------------------------|
-| **Accounts** | Manual (bottom sheet: quick-create + manual create) | Yes | No |
+| **Accounts** | Manual (shared `showAccountPicker` sheet: quick-create via `topAction` + manual create; contact-type accounts excluded) | Yes | No |
 | **Categories** | Manual (hierarchical bottom sheet: quick-create + manual create) | No | Yes (inferred type, grey, "label" icon) |
 | **Tags** | Automatic (no UI) | No | Yes (silent) |
 
@@ -55,7 +55,8 @@ before building the insert batch.
 
 ### Manual create pre-fill
 
-Both buttons navigate to the entity form passing `initialName` as route extra:
+Both flows navigate to the entity form passing `initialName` as route extra — accounts via the
+shared picker's `createRouteExtra` param (widget-unification phase 3):
 `/accounts/new` (extra `String` initialName or `AccountModel` in edit mode); `/categories/new`
 (extra `CategoryModel` parent, `Map` with `initialName`+optional `parent`, or `null`).
 

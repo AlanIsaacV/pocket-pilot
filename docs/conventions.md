@@ -107,14 +107,18 @@
   labels through `FormSectionLabel` (`ui/widgets/form_section_label.dart`); all date picking
   through `pickDate()` — no raw `showDatePicker` outside `ui/widgets/form_date_utils.dart`;
   currency selection through `showCurrencyPicker()` (`ui/widgets/currency_picker.dart`) — no
-  per-form currency sheets (grep: `_showCurrencySheet|__preferences__` returns nothing).
+  per-form currency sheets (grep: `_showCurrencySheet|__preferences__` returns nothing); account
+  selection through `showAccountPicker()` (`ui/widgets/account_picker.dart`) — no per-form account
+  sheets (grep: `_showAccountSheet|_showAccountPicker` returns nothing). Two documented dropdown
+  exceptions: `advanced_filters.dart` (filter context needs a "Todas" option) and
+  `pending_review_sheet.dart` (dense sheet-within-sheet with a `FormField` validator).
   See [decisions/0009](decisions/0009-intentional-behavior-convergence.md).
 - **Widget library layering**: a widget used by 2+ features lives in `lib/src/ui/` (`widgets/` or
   `screens/`); a feature's `ui/` never imports another feature's `ui/`. See
   [decisions/0008](decisions/0008-canonical-widget-library-location.md).
 - **Providers & bottom sheets**: `showModalBottomSheet` does not inherit the widget-tree providers;
   re-provide dependencies via `MultiProvider` with `.value` — or read them from the caller's
-  context *before* opening the sheet, as `showCurrencyPicker()` does.
+  context *before* opening the sheet, as `showCurrencyPicker()` and `showAccountPicker()` do.
 
 ## Version control
 

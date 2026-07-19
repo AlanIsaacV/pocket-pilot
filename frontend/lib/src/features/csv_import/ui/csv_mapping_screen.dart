@@ -8,10 +8,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
-import 'package:pocket_pilot/src/ui/widgets/account_icon.dart';
 import 'package:pocket_pilot/src/ui/widgets/category_icon_data.dart';
 import 'package:pocket_pilot/src/features/csv_import/domain/csv_transaction_row.dart';
 import 'package:pocket_pilot/src/features/csv_import/ui/csv_import_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/account_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 
 class CsvMappingScreen extends StatefulWidget {
@@ -217,53 +217,31 @@ class _CsvMappingScreenState extends State<CsvMappingScreen> {
     return _MappingTile(
       csvName: csvName,
       matchedName: matched?.name,
-      onTap: () => _showAccountPicker(context, vm, csvName),
+      onTap: () => _pickAccountFor(context, vm, csvName),
     );
   }
 
-  Future<void> _showAccountPicker(
+  Future<void> _pickAccountFor(
     BuildContext context,
     CsvImportViewModel vm,
     String csvName,
   ) async {
-    await showFormBottomSheet(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: 'Seleccionar cuenta para "$csvName"',
-        children: [
-          SheetItem(
-            icon: Icons.bolt_rounded,
-            label: 'Crear "$csvName" como cuenta (bank)',
-            onTap: () async {
-              Navigator.of(ctx).pop();
-              await vm.quickCreateAccountAndMap(csvName);
-            },
-          ),
-          const Divider(height: 1),
-          ...vm.existingAccounts.map(
-            (account) => SheetItem(
-              icon: accountIconForType(account.type),
-              label: account.name,
-              onTap: () {
-                vm.updateAccountMapping(csvName, account.id);
-                Navigator.of(ctx).pop();
-              },
-            ),
-          ),
-          const Divider(height: 1),
-          SheetItem(
-            icon: Icons.add_circle_outline_rounded,
-            label: 'Crear cuenta manualmente',
-            onTap: () async {
-              Navigator.of(ctx).pop();
-              await context.push('/accounts/new', extra: csvName);
-              if (!mounted) return;
-              await vm.refreshAccounts();
-            },
-          ),
-        ],
+    final account = await showAccountPicker(
+      context,
+      title: 'Seleccionar cuenta para "$csvName"',
+      topAction: AccountPickerTopAction(
+        icon: Icons.bolt_rounded,
+        label: 'Crear "$csvName" como cuenta (bank)',
+        onTap: () => vm.quickCreateAccountAndMap(csvName),
       ),
+      createRouteExtra: csvName,
     );
+    if (!mounted) return;
+
+    await vm.refreshAccounts();
+    if (!mounted || account == null) return;
+
+    await vm.updateAccountMapping(csvName, account.id);
   }
 
   // ----------------------------------------------------------

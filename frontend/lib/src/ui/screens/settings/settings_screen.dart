@@ -116,6 +116,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _SettingsItem(
                 icon: Icons.notifications_none_rounded,
                 label: 'Notificaciones',
+                onTap: () => context.push('/settings/notifications'),
+              ),
+              _SettingsItem(
+                icon: Icons.upload_file_outlined,
+                label: 'Recordatorios de estados de cuenta',
                 onTap: () =>
                     context.push('/settings/statement-import-reminders'),
               ),

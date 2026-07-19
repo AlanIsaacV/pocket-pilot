@@ -1,0 +1,223 @@
+{
+  "schema_version": "1",
+  "feature": "reliable-os-notifications",
+  "created_at": "2026-07-19",
+  "updated_at": "2026-07-19",
+  "owner": null,
+  "status": "completed",
+  "current_phase": 2,
+  "phases": [
+    {
+      "id": 0,
+      "name": "delivery-reliability",
+      "file": "phase-0-delivery-reliability.md",
+      "goal": "Close the delivery holes that make scheduled notifications silently fail to appear on the phone:",
+      "status": "completed",
+      "started_at": "2026-07-19",
+      "completed_at": "2026-07-19",
+      "tasks": [
+        {
+          "id": "0.1",
+          "title": "Honor Android permission result in init() (mirror iOS assignment); make rescheduleAllNotifications early-return reflect reality on both platforms",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "0.2",
+          "title": "Expose queryable permission state: NotificationPermissionStatus enum (granted/denied/undetermined) + getter + refresh via areNotificationsEnabled (Android) / checkPermissions (iOS)",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "0.3",
+          "title": "Wire resume re-check in app.dart didChangeAppLifecycleState: refresh status on resume and reschedule if permission became granted",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "0.4",
+          "title": "Remove unused SCHEDULE_EXACT_ALARM from AndroidManifest.xml; document inexact-alarm + battery-optimization stance in docs/features/proactive-notifications.md (keep inexactAllowWhileIdle)",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "0.5",
+          "title": "Tests via plugin seam: denied -> nothing scheduled and state reports denied; granted -> schedules as before",
+          "status": "done",
+          "notes": null
+        }
+      ],
+      "deviations": [
+        {
+          "date": "2026-07-19",
+          "kind": "scope-change",
+          "note": "On-device delivery verification (real Android device, app backgrounded) is owned by the user (Alan), performed after the code lands. The automated close criterion for this phase is the unit tests (denied/granted via the plugin seam); the on-device check stays a pending user-owned task and the phase is not auto-closed over it until the user confirms."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Tasks 0.1-0.5 implemented via Codex (codex:codex-rescue) instead of the apply sub-agent. Codex wrote the denied/granted unit tests but could not RUN flutter test (its sandbox blocks writing the Flutter SDK engine.stamp cache); test execution deferred to the verify step."
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "per-event-content",
+      "file": "phase-1-per-event-content.md",
+      "goal": "Replace the single generic daily message (\"Tienes movimientos pr\u00f3ximos\") with content derived",
+      "status": "completed",
+      "started_at": "2026-07-19",
+      "completed_at": "2026-07-19",
+      "tasks": [
+        {
+          "id": "1.1",
+          "title": "Switch repo->scheduler contract to getUpcomingEvents(tomorrow, 64) over List<InAppNotification>; remove the four dead get*Dates() methods from NotificationRepository",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.2",
+          "title": "Group events by alert day (offsets: cards -3d, subs -1d, obligations/statements same-day) and compose title/body per the chosen scheme (single vs enumerated counter; en N dias/manana/hoy; amount for subs/obligations only)",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.3",
+          "title": "Schedule one notification per alert day at 9:00 AM with YYYYMMDD id using BigTextStyleInformation for multi-line bodies; keep clean-slate reschedule idempotent and iOS 64-cap respected",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.4",
+          "title": "Update tests: fake repo overrides getUpcomingEvents; assert single-event copy (card names card, sub includes amount), multi-event single enumerated notification, per-type offsets, ID determinism, <=1 per day",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.5",
+          "title": "Fix iOS 64-cap off-by-one: scheduler fetches getUpcomingEvents(tomorrow, 63) so the window spans <=64 calendar days; add a test asserting <=64 pending notifications across a fully-populated window",
+          "status": "done",
+          "notes": null
+        }
+      ],
+      "deviations": [
+        {
+          "date": "2026-07-19",
+          "kind": "scope-change",
+          "note": "Step 1.1: reuse NotificationRepository.getUpcomingEvents(tomorrow, 64) directly (it is already window-parameterized; the plan's 30-day-default concern was stale) and remove the four now-dead get*Dates() Set<DateTime> methods (used only by the scheduler). Private query helpers stay (shared by getUpcomingEvents)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Step 1.3: use Android BigTextStyleInformation for multi-line enumerated bodies so they expand fully in the shade."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "scope-change",
+          "note": "Step 1.2: add an additive, non-persisted sourceName field to InAppNotification (defaults to '', excluded from toMap/fromMap so persistence and the in-app center are unchanged), populated by getUpcomingEvents. Lets the scheduler compose '<name> vence en N dias' copy without parsing the display title."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Tasks 1.1-1.4 implemented via Codex (codex:codex-rescue) instead of the apply sub-agent. Codex wrote the content/grouping/offset/determinism tests but could not RUN flutter test (its sandbox blocks writing the Flutter SDK engine.stamp cache); test execution deferred to the verify step."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Step 1.5 (iOS 64-cap off-by-one fix) implemented via Codex; scheduler now fetches getUpcomingEvents(tomorrow, 63) so the window spans <=64 calendar days. Added a regression test (64 same-day events -> <=64 zonedSchedule calls). Codex could not run flutter test (sandbox), so the orchestrator ran it inline: 9/9 notification tests pass."
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "notification-settings",
+      "file": "phase-2-notification-settings.md",
+      "goal": "Give the user a settings screen (`/settings/notifications`) to enable/disable each reminder type,",
+      "status": "completed",
+      "started_at": "2026-07-19",
+      "completed_at": "2026-07-19",
+      "tasks": [
+        {
+          "id": "2.1",
+          "title": "NotificationPreferences model + device-local persistence (key notifications.settings, defaults = current behavior) + round-trip/defaults tests",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "2.2",
+          "title": "Scheduler consumes preferences: filter disabled types, configured notify time, per-type anticipation in _alertDayFor + tests for toggles/time/anticipation",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "2.3",
+          "title": "Settings screen /settings/notifications: per-type switches, time picker, anticipation steppers; route in router.dart + entry tile in settings_screen.dart; immediate reschedule on save",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "2.4",
+          "title": "Denied-permission banner (phase 0 state) + OS-settings deep link via new app_settings dependency",
+          "status": "done",
+          "notes": null
+        }
+      ],
+      "deviations": [
+        {
+          "date": "2026-07-19",
+          "kind": "scope-change",
+          "note": "Preferences are device-local (no sync outbox enqueue), same pattern as StatementImportPreferences \u2014 corrects the plan's 'flows through user_preferences sync' success criterion, which contradicted the cited template."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Denied-permission deep link via new app_settings dependency (AppSettingsType.notification): flutter_local_notifications is at ^21.0.0 (plan said v19) and exposes no OS-notification-settings API; no existing dependency covers it."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Route registration lives in lib/src/ui/router.dart (go_router), not main.dart as the plan's file table said; entry-point tile goes in lib/src/ui/screens/settings/settings_screen.dart (TBD resolved)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Tasks 2.1-2.2 implemented via Codex (codex:codex-rescue). Codex could not run flutter test (sandbox blocks Flutter SDK engine.stamp cache writes); orchestrator ran the notification suite inline: 15/15 pass."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Tasks 2.3-2.4 implemented via Codex (codex:codex-rescue). app_settings pinned to ^6.1.1 instead of ^8.0.0: 8.x is Swift-Package-Manager-only and the iOS project uses CocoaPods; 6.x exposes the same openAppSettings(type:) API and flutter pub get resolves cleanly. Orchestrator ran pub get/analyze/tests inline (Codex sandbox blocks them): analyzer clean, 15/15 notification tests pass."
+        }
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "date": "2026-07-19",
+      "note": "Phase 0: keep AndroidScheduleMode.inexactAllowWhileIdle (do not move to exact alarms). For 9:00 AM payment reminders the Doze batching window is acceptable, and it avoids the Android 14+ SCHEDULE_EXACT_ALARM Play-policy gate. Escalate to exactAllowWhileIdle only if on-device verification shows unacceptable delays. Also remove the unused SCHEDULE_EXACT_ALARM permission from AndroidManifest.xml.",
+      "adr_candidate": false
+    },
+    {
+      "date": "2026-07-19",
+      "note": "Phase 0: battery-optimization stance = document/deep-link only, no REQUEST_IGNORE_BATTERY_OPTIMIZATIONS blanket request (discouraged by Play policy). The OS battery-settings deep link is consumed by the phase 2 settings screen; phase 0 only documents the stance.",
+      "adr_candidate": false
+    },
+    {
+      "date": "2026-07-19",
+      "note": "Phase 1 copy scheme = specific + enumerated: single event titles name the event and its timing (\"en N dias\"/\"manana\"/\"hoy\"), body carries the amount for subscriptions/obligations; multiple events on one alert day -> counter title (\"Tienes N movimientos proximos\") + enumerated body. Credit-card events carry NO amount (the accounts projection selects only id/name/payment_due_day), so card copy names the card and due timing only.",
+      "adr_candidate": false
+    },
+    {
+      "date": "2026-07-19",
+      "note": "Phase 2: NotificationPreferences stored under user_preferences key 'notifications.settings' as one JSON object (per-type enabled flags, notifyHour/notifyMinute, per-type anticipationDays). Parsing tolerates unknown fields and falls back to defaults (all types on, 9:00, anticipation 3/1/0/0 for CREDIT_CARD/SUBSCRIPTION/OBLIGATION/STATEMENT_IMPORT) on any malformed value.",
+      "adr_candidate": false
+    }
+  ],
+  "references": [],
+  "preferences": {
+    "commit": true,
+    "next_phase_prompt": true,
+    "update_docs": false,
+    "auto_update_plan": true
+  }
+}

@@ -5,6 +5,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'package:pocket_pilot/src/core/notifications/notification_repository.dart';
 import 'package:pocket_pilot/src/core/notifications/in_app_notification.dart';
+import 'package:pocket_pilot/src/core/notifications/notification_preferences.dart';
 
 /// The OS notification permission state known by the scheduler.
 enum NotificationPermissionStatus { granted, denied, undetermined }
@@ -18,6 +19,7 @@ enum NotificationPermissionStatus { granted, denied, undetermined }
 /// YYYYMMDD.
 class NotificationSchedulerService {
   final NotificationRepository _repository;
+  final NotificationPreferencesStore _preferences;
   final FlutterLocalNotificationsPlugin _plugin;
   final void Function()? onNotificationTap;
 
@@ -26,9 +28,12 @@ class NotificationSchedulerService {
 
   NotificationSchedulerService({
     required NotificationRepository repository,
+    NotificationPreferencesStore? preferences,
     this.onNotificationTap,
     FlutterLocalNotificationsPlugin? plugin,
   }) : _repository = repository,
+       _preferences =
+           preferences ?? const DefaultNotificationPreferencesStore(),
        _plugin = plugin ?? FlutterLocalNotificationsPlugin();
 
   /// The most recently observed OS notification permission state.
@@ -141,16 +146,18 @@ class NotificationSchedulerService {
     final tomorrow = DateTime(now.year, now.month, now.day + 1);
 
     // 3. Fetch full projected events, then bucket them by their alert day.
+    final preferences = await _preferences.getPreferences();
     final events = await _repository.getUpcomingEvents(tomorrow, 63);
     final eventsByAlertDay = <DateTime, List<InAppNotification>>{};
     for (final event in events) {
-      final alertDay = _alertDayFor(event);
+      if (!preferences.isEnabled(event.type)) continue;
+      final alertDay = _alertDayFor(event, preferences);
       if (!alertDay.isBefore(tomorrow)) {
         eventsByAlertDay.putIfAbsent(alertDay, () => []).add(event);
       }
     }
 
-    // 4. Schedule one notification per alert day at 9:00 AM local time.
+    // 4. Schedule one notification per alert day at the configured local time.
     final alertDays = eventsByAlertDay.keys.toList()..sort();
     for (final day in alertDays) {
       final dayEvents = List<InAppNotification>.from(eventsByAlertDay[day]!)
@@ -168,7 +175,8 @@ class NotificationSchedulerService {
         day.year,
         day.month,
         day.day,
-        9, // 9:00 AM
+        preferences.notifyHour,
+        preferences.notifyMinute,
       );
 
       final androidDetails = AndroidNotificationDetails(
@@ -197,14 +205,11 @@ class NotificationSchedulerService {
     }
   }
 
-  DateTime _alertDayFor(InAppNotification event) {
-    final offset = switch (event.type) {
-      'CREDIT_CARD' => 3,
-      'SUBSCRIPTION' => 1,
-      'OBLIGATION' => 0,
-      'STATEMENT_IMPORT' => 0,
-      _ => 0,
-    };
+  DateTime _alertDayFor(
+    InAppNotification event,
+    NotificationPreferences preferences,
+  ) {
+    final offset = preferences.anticipationFor(event.type);
     final date = event.date.subtract(Duration(days: offset));
     return DateTime(date.year, date.month, date.day);
   }

@@ -7,6 +7,7 @@ import 'package:timezone/timezone.dart';
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/notifications/in_app_notification.dart';
 import 'package:pocket_pilot/src/core/notifications/notification_repository.dart';
+import 'package:pocket_pilot/src/core/notifications/notification_preferences.dart';
 import 'package:pocket_pilot/src/core/notifications/notification_scheduler_service.dart';
 import 'package:pocket_pilot/src/core/notifications/statement_import_preferences.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
@@ -63,6 +64,106 @@ void main() {
     expect(fakeAndroid.zonedScheduleCalls, greaterThan(0));
   });
 
+  test('excludes events for disabled notification types', () async {
+    final tomorrow = _tomorrow();
+    final fakeAndroid = _installAndroidPlugin();
+    addTearDown(_clearTestPlatform);
+    final service = NotificationSchedulerService(
+      repository: _FakeNotificationRepository(
+        events: [
+          _event(
+            'CREDIT_CARD',
+            'Tarjeta Azul',
+            tomorrow.add(const Duration(days: 3)),
+          ),
+          _event('OBLIGATION', 'Renta', tomorrow, amountCents: 120000),
+        ],
+      ),
+      preferences: _FakePreferences(
+        const NotificationPreferences(
+          enabledTypes: {
+            'CREDIT_CARD': false,
+            'SUBSCRIPTION': true,
+            'OBLIGATION': true,
+            'STATEMENT_IMPORT': true,
+          },
+        ),
+      ),
+      plugin: FlutterLocalNotificationsPlugin(),
+    );
+
+    await service.init();
+    await service.rescheduleAllNotifications();
+
+    expect(fakeAndroid.scheduledNotifications, hasLength(1));
+    expect(
+      fakeAndroid.scheduledNotifications.single.title,
+      'Pago de Renta hoy',
+    );
+  });
+
+  test('uses the configured notification time', () async {
+    final tomorrow = _tomorrow();
+    final fakeAndroid = _installAndroidPlugin();
+    addTearDown(_clearTestPlatform);
+    final service = NotificationSchedulerService(
+      repository: _FakeNotificationRepository(
+        events: [_event('OBLIGATION', 'Renta', tomorrow)],
+      ),
+      preferences: _FakePreferences(
+        const NotificationPreferences(notifyHour: 17, notifyMinute: 45),
+      ),
+      plugin: FlutterLocalNotificationsPlugin(),
+    );
+
+    await service.init();
+    await service.rescheduleAllNotifications();
+
+    final scheduledDate =
+        fakeAndroid.scheduledNotifications.single.scheduledDate;
+    expect(scheduledDate.hour, 17);
+    expect(scheduledDate.minute, 45);
+  });
+
+  test('uses configured anticipation when calculating the alert day', () async {
+    final tomorrow = _tomorrow();
+    final fakeAndroid = _installAndroidPlugin();
+    addTearDown(_clearTestPlatform);
+    final service = NotificationSchedulerService(
+      repository: _FakeNotificationRepository(
+        events: [
+          _event(
+            'CREDIT_CARD',
+            'Tarjeta Azul',
+            tomorrow.add(const Duration(days: 5)),
+          ),
+        ],
+      ),
+      preferences: _FakePreferences(
+        const NotificationPreferences(
+          anticipationDays: {
+            'CREDIT_CARD': 5,
+            'SUBSCRIPTION': 1,
+            'OBLIGATION': 0,
+            'STATEMENT_IMPORT': 0,
+          },
+        ),
+      ),
+      plugin: FlutterLocalNotificationsPlugin(),
+    );
+
+    await service.init();
+    await service.rescheduleAllNotifications();
+
+    final scheduledDate =
+        fakeAndroid.scheduledNotifications.single.scheduledDate;
+    expect(scheduledDate.day, tomorrow.day);
+    expect(
+      fakeAndroid.scheduledNotifications.single.title,
+      'Tarjeta Azul vence en 5 días',
+    );
+  });
+
   test(
     'names the card for a single credit-card event without an amount',
     () async {
@@ -94,6 +195,8 @@ void main() {
         fakeAndroid.scheduledNotifications.single.body,
         'Toca para revisar tu pago.',
       );
+      expect(fakeAndroid.scheduledNotifications.single.scheduledDate.hour, 9);
+      expect(fakeAndroid.scheduledNotifications.single.scheduledDate.minute, 0);
     },
   );
 
@@ -316,7 +419,6 @@ class _FakeAndroidNotificationsPlugin
     extends AndroidFlutterLocalNotificationsPlugin {
   _FakeAndroidNotificationsPlugin({
     this.requestPermissionResult = true,
-    this.notificationsEnabled = true,
   });
 
   bool requestedNotificationsPermission = false;
@@ -357,7 +459,9 @@ class _FakeAndroidNotificationsPlugin
     DateTimeComponents? matchDateTimeComponents,
   }) async {
     zonedScheduleCalls++;
-    scheduledNotifications.add(_ScheduledNotification(id, title, body));
+    scheduledNotifications.add(
+      _ScheduledNotification(id, title, body, scheduledDate),
+    );
   }
 }
 
@@ -365,19 +469,38 @@ class _ScheduledNotification {
   final int id;
   final String? title;
   final String? body;
+  final TZDateTime scheduledDate;
 
-  const _ScheduledNotification(this.id, this.title, this.body);
+  const _ScheduledNotification(
+    this.id,
+    this.title,
+    this.body,
+    this.scheduledDate,
+  );
 
   @override
   bool operator ==(Object other) {
     return other is _ScheduledNotification &&
         id == other.id &&
         title == other.title &&
-        body == other.body;
+        body == other.body &&
+        scheduledDate == other.scheduledDate;
   }
 
   @override
-  int get hashCode => Object.hash(id, title, body);
+  int get hashCode => Object.hash(id, title, body, scheduledDate);
+}
+
+class _FakePreferences implements NotificationPreferencesStore {
+  _FakePreferences(this.value);
+
+  final NotificationPreferences value;
+
+  @override
+  Future<NotificationPreferences> getPreferences() async => value;
+
+  @override
+  Future<void> savePreferences(NotificationPreferences preferences) async {}
 }
 
 class _FakeNotificationRepository extends NotificationRepository {

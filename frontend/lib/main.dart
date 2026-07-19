@@ -130,6 +130,7 @@ import 'package:pocket_pilot/src/core/grpc/grpc_client.dart';
 import 'package:pocket_pilot/src/core/notifications/notification_center_repository.dart';
 import 'package:pocket_pilot/src/core/notifications/notification_center_view_model.dart';
 import 'package:pocket_pilot/src/core/notifications/notification_local_store.dart';
+import 'package:pocket_pilot/src/core/notifications/notification_preferences.dart';
 import 'package:pocket_pilot/src/core/notifications/notification_repository.dart';
 import 'package:pocket_pilot/src/core/notifications/notification_scheduler_service.dart';
 import 'package:pocket_pilot/src/core/notifications/statement_import_preferences.dart';
@@ -447,6 +448,9 @@ Future<void> main() async {
   final statementImportPreferences = StatementImportPreferences(
     store: userPreferenceLocalStore,
   );
+  final notificationPreferences = NotificationPreferencesLocalStore(
+    store: userPreferenceLocalStore,
+  );
   final notificationRepo = NotificationRepository(
     db: dbHelper,
     statementImportPreferences: statementImportPreferences,
@@ -462,6 +466,7 @@ Future<void> main() async {
   final router = buildRouter(authProvider);
   final notificationScheduler = NotificationSchedulerService(
     repository: notificationRepo,
+    preferences: notificationPreferences,
     onNotificationTap: () => router.push('/notifications'),
   );
   await notificationScheduler.init();
@@ -570,6 +575,9 @@ Future<void> main() async {
         ),
         Provider<StatementImportPreferences>.value(
           value: statementImportPreferences,
+        ),
+        Provider<NotificationPreferencesStore>.value(
+          value: notificationPreferences,
         ),
         ChangeNotifierProvider<NotificationCenterViewModel>.value(
           value: notificationCenterVM,

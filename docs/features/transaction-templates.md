@@ -215,28 +215,37 @@ Key tests added/updated:
 
 UI files live in `features/transaction_templates/ui/`. `TransactionTemplateViewModel` is a
 `ChangeNotifier` (`templates`, `isLoading`, `isSyncing`, `errorMessage`), local-first with a 5s
-throttle before remote sync. `TransactionTemplateRouteScope` (`ChangeNotifierProvider`) wraps the
-list; `TransactionTemplateFormRouteScope` (`MultiProvider`) wraps the form and provides
+throttle before remote sync. The list UI is `TransactionTemplatesListBody`
+(`transaction_templates_list_body.dart`, renamed from `transaction_templates_list_tab.dart` in
+widget-unification phase 5) — an embeddable, Scaffold-less widget mounted as the "Plantillas" tab
+of `TransactionsScreen`, reading its `TransactionTemplateViewModel` from `TransactionsRouteScope`.
+`TransactionTemplateFormRouteScope` (`MultiProvider`) wraps the form and provides
 `AccountLocalStore`, `CategoryLocalStore`, `TagLocalStore`, `TagRepository`,
 `CurrencyPreferencesLocalStore`, `TransactionTemplateRepository`, `SyncService`.
 
-### Routes (outside `ShellRoute`)
+### Routes (nested under `/transactions`, outside `ShellRoute`)
 
 | Path | Scope | Screen |
 |------|-------|--------|
-| `/templates` | `TransactionTemplateRouteScope` | `TransactionTemplatesScreen` |
-| `/templates/new` | `TransactionTemplateFormRouteScope` | `TransactionTemplateFormScreen` |
-| `/templates/new/category` | `TransactionTemplateFormRouteScope` | `CategoryPickerScreen` |
-| `/templates/:id/edit` | `TransactionTemplateFormRouteScope` | `TransactionTemplateFormScreen` |
-| `/templates/:id/edit/category` | `TransactionTemplateFormRouteScope` | `CategoryPickerScreen` |
+| `/transactions/templates/new` | `TransactionTemplateFormRouteScope` | `TransactionTemplateFormScreen` |
+| `/transactions/templates/new/category` | `TransactionTemplateFormRouteScope` | `CategoryPickerScreen` |
+| `/transactions/templates/:templateId/edit` | `TransactionTemplateFormRouteScope` | `TransactionTemplateFormScreen` |
+| `/transactions/templates/:templateId/edit/category` | `TransactionTemplateFormRouteScope` | `CategoryPickerScreen` |
+
+There is no standalone list route: `/templates` was removed when navigation moved under
+`/transactions` (commit 42f51db), and the by-then-unreachable `TransactionTemplatesScreen` wrapper
+was deleted in widget-unification phase 5 along with the then-orphaned
+`TransactionTemplateRouteScope` (it only wrapped that screen; the tab's view model comes from
+`TransactionsRouteScope`).
 
 ### Entry points for template creation
 
 1. **AppBar of `TransactionFormScreen`** — `bookmark_add_outlined` → `_onSaveAsTemplate()` pushes
-   `/templates/new` with a prefill map `{type, accountId, categoryId, amountCents, currencyCode, description, tags}`.
+   `/transactions/templates/new` with a prefill map `{type, accountId, categoryId, amountCents, currencyCode, description, tags}`.
 2. **AppBar of `TransferFormScreen`** — same, prefill `{type:'transfer_out', accountId, toAccountId, …}`.
 3. **FAB menu on `TransactionsScreen`** — "Nueva plantilla".
-4. **Settings → Preferencias → Plantillas** — opens `/templates`.
+4. **"Plantillas" tab on `TransactionsScreen`** (`/transactions`) — mounts
+   `TransactionTemplatesListBody`; row tap opens `/transactions/templates/:templateId/edit`.
 
 ### Form field rules (mirror domain validation)
 

@@ -169,24 +169,31 @@ New backend tests:
 
 UI files live in `features/yield_configs/ui/`. `YieldConfigViewModel` is a `ChangeNotifier`
 (`configs`, `isLoading`, `isSyncing`, `errorMessage`), local-first with a 5s throttle before remote
-sync. `YieldConfigRouteScope` (`ChangeNotifierProvider`) wraps the list; `YieldConfigFormRouteScope`
-(`MultiProvider`) provides `AccountLocalStore`, `YieldConfigRepository`, `SyncService`.
-`YieldConfigsScreen` lists status badge (active/paused/completed) + APY + payout frequency;
+sync. The list UI is `YieldConfigsListBody` (`yield_configs_list_body.dart`, renamed from
+`yield_configs_list_tab.dart` in widget-unification phase 5) — an embeddable, Scaffold-less widget
+mounted as the "Rendimientos" tab of `TransactionsScreen`, reading its `YieldConfigViewModel` from
+`TransactionsRouteScope`. `YieldConfigFormRouteScope` (`MultiProvider`) provides
+`AccountLocalStore`, `YieldConfigRepository`, `SyncService` for the form.
+`YieldConfigsListBody` lists status badge (active/paused/completed) + APY + payout frequency;
 `YieldConfigFormScreen` is a scrollable form using `FormAppBarActions`.
 
-### Routes (outside `ShellRoute`)
+### Routes (nested under `/transactions`, outside `ShellRoute`)
 
 | Path | Scope | Screen |
 |------|-------|--------|
-| `/yields` | `YieldConfigRouteScope` | `YieldConfigsScreen` |
-| `/yields/new` | `YieldConfigFormRouteScope` | `YieldConfigFormScreen` |
-| `/yields/:yieldId/edit` | `YieldConfigFormRouteScope` | `YieldConfigFormScreen` |
+| `/transactions/yields/new` | `YieldConfigFormRouteScope` | `YieldConfigFormScreen` |
+| `/transactions/yields/:yieldId/edit` | `YieldConfigFormRouteScope` | `YieldConfigFormScreen` |
+
+There is no standalone list route: `/yields` was removed when navigation moved under
+`/transactions` (commit 42f51db), and the by-then-unreachable `YieldConfigsScreen` wrapper was
+deleted in widget-unification phase 5 along with the then-orphaned `YieldConfigRouteScope` (it
+only wrapped that screen; the tab's view model comes from `TransactionsRouteScope`).
 
 ### Entry points
 
-1. **Settings → Preferencias → Rendimientos** — opens `/yields`.
-2. **FAB menu on `TransactionsScreen`** — "Nuevo rendimiento".
-3. **FAB on `YieldConfigsScreen`** — `/yields/new`.
+1. **"Rendimientos" tab on `TransactionsScreen`** (`/transactions`) — mounts `YieldConfigsListBody`.
+2. **FAB menu on `TransactionsScreen`** — "Nuevo rendimiento" → `/transactions/yields/new`.
+3. **Row tap in the tab** — `/transactions/yields/:yieldId/edit`.
 
 ### Form validation rules
 

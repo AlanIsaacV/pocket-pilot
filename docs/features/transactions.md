@@ -13,7 +13,7 @@ list, which lives in the shell):
 
 | Route | Screen | Notes |
 | ----- | ------ | ----- |
-| `/transactions` | `TransactionsScreen` | list + persistent filter sheet + "Por confirmar" section |
+| `/transactions` | `TransactionsScreen` | 4-tab scaffold (Transacciones, Plantillas, Rendimientos, Deudas); tab 1 is the list + persistent filter sheet + "Por confirmar" section; the other tabs mount the feature-local `TransactionTemplatesListBody`, `YieldConfigsListBody`, `DebtsListTab` (view models provided by `TransactionsRouteScope`) |
 | `/transactions/new` (income/expense) | `TransactionFormScreen` | numpad in calculator mode |
 | transfer form | `TransferFormScreen` | DESDE/HACIA cards, FX rate |
 

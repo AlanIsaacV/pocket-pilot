@@ -18,7 +18,7 @@ import 'package:pocket_pilot/src/features/notification_capture/domain/pending_tr
 import 'package:pocket_pilot/src/features/notification_capture/ui/pending_review_sheet.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/pending_suggestions_view_model.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_view_model.dart';
-import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_templates_list_tab.dart';
+import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_templates_list_body.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/dismissible_background.dart';
@@ -27,7 +27,7 @@ import 'package:pocket_pilot/src/features/transactions/ui/transaction_filter_vie
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/widgets/filter_sheet.dart';
 import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_view_model.dart';
-import 'package:pocket_pilot/src/features/yield_configs/ui/yield_configs_list_tab.dart';
+import 'package:pocket_pilot/src/features/yield_configs/ui/yield_configs_list_body.dart';
 import 'package:pocket_pilot/src/features/debts/ui/debt_view_model.dart';
 import 'package:pocket_pilot/src/features/debts/ui/debts_list_tab.dart';
 import 'package:pocket_pilot/src/ui/widgets/notification_bell.dart';
@@ -87,8 +87,8 @@ class _TransactionsScreenState extends State<TransactionsScreen>
         controller: _tabController,
         children: const [
           _TransactionsListTab(),
-          TransactionTemplatesListTab(),
-          YieldConfigsListTab(),
+          TransactionTemplatesListBody(),
+          YieldConfigsListBody(),
           DebtsListTab(),
         ],
       ),

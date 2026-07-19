@@ -4,8 +4,8 @@
   "created_at": "2026-07-19",
   "updated_at": "2026-07-19",
   "owner": null,
-  "status": "in-progress",
-  "current_phase": 4,
+  "status": "completed",
+  "current_phase": 5,
   "phases": [
     {
       "id": 0,
@@ -367,11 +367,46 @@
       "name": "list-tab-screen-dedup",
       "file": "phase-5-list-tab-screen-dedup.md",
       "goal": "Each of `yield_configs` and `transaction_templates` maintains two near-identical files \u2014 a",
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "tasks": [],
-      "deviations": []
+      "status": "completed",
+      "started_at": "2026-07-19",
+      "completed_at": "2026-07-19",
+      "tasks": [
+        {
+          "id": "5.1",
+          "title": "yield_configs: git mv yield_configs_list_tab.dart -> yield_configs_list_body.dart (class YieldConfigsListBody), make yield_configs_screen.dart a thin Scaffold+AppBar+FAB wrapper around the body, update the caller in transactions_screen.dart",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "5.2",
+          "title": "transaction_templates: git mv transaction_templates_list_tab.dart -> transaction_templates_list_body.dart (class TransactionTemplatesListBody), make transaction_templates_screen.dart a thin wrapper, update the caller in transactions_screen.dart",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "5.3",
+          "title": "Verification pass: wrappers hold only scaffolding (diff-verified), both entry points work per feature, flutter analyze clean, flutter test green, net LOC <= -400",
+          "status": "done",
+          "notes": null
+        }
+      ],
+      "deviations": [
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Tasks 5.1-5.2 implemented via Codex (codex:codex-rescue): both list_tab files renamed to list_body (class *ListBody), both screens rewritten as thin Scaffold+AppBar+FAB wrappers (259->37 and 271->37 lines), transactions_screen caller updated. Codex used delete+create instead of git mv (rename detection at commit time will preserve history). Codex sandbox cannot run flutter; orchestrator ran analyze: clean (1 pre-existing info). Task 5.3's verification delegated to the verify sub-agent (phase 0-4 precedent)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "scope-change",
+          "note": "Post-verify user decision on the verify WARNING: both standalone screens (yield_configs_screen.dart, transaction_templates_screen.dart) DELETED instead of kept as thin wrappers - they were pre-existing dead code (routes moved under /transactions/ in 42f51db; zero call sites; FABs pushed unroutable /yields/new and /templates/new). Bodies remain the single implementation, mounted by transactions_screen tabs. Deleted inline by the orchestrator (trivial 2-file removal, phase-3 precedent); analyze clean (1 pre-existing info)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "scope-change",
+          "note": "Second post-verify cleanup (user-approved): the orphaned YieldConfigRouteScope and TransactionTemplateRouteScope files deleted too - they only wrapped the deleted standalone screens (zero references; the tabs' view models come from TransactionsRouteScope). Deleted inline by the orchestrator; analyze clean. Feature docs updated to record the deletion."
+        }
+      ]
     }
   ],
   "decisions": [
@@ -418,6 +453,11 @@
     {
       "date": "2026-07-19",
       "note": "Phase 4: dashboard_filter_sheet.dart and DashboardFilterViewModel move to lib/src/ui/ (consumed by statistics, cashflow and ui/screens/dashboard \u2014 11 files outside features/dashboard/ \u2014 violating the 'features/<f>/ui/ never imports another feature's ui/' rule). ~14 import sites update; mechanical churn accepted within this phase.",
+      "adr_candidate": false
+    },
+    {
+      "date": "2026-07-19",
+      "note": "Phase 5: each *_list_tab.dart is renamed (git mv) to *_list_body.dart with class *ListBody \u2014 the tab file already IS the embeddable body (diff shows the screen is identical plus Scaffold/AppBar/FAB). The screen becomes a thin Scaffold+AppBar+FAB wrapper around the body; the single tab caller (transactions_screen.dart) updates to the new class name. No new file is written from scratch and no embedded-flag widget is introduced.",
       "adr_candidate": false
     }
   ],

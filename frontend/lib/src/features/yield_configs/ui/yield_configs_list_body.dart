@@ -1,8 +1,8 @@
 // ============================================================
-// YieldConfigsListTab — Contenido de tab de rendimientos
+// YieldConfigsListBody — Contenido embebible de rendimientos
 // ============================================================
 //
-// Widget sin Scaffold para usar dentro de un TabBarView.
+// Widget sin Scaffold para usar dentro de un TabBarView o pantalla.
 // Muestra rendimientos con badge de estado, info de frecuencia y APY.
 
 import 'package:flutter/material.dart';
@@ -17,8 +17,8 @@ import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/dismissible_background.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
-class YieldConfigsListTab extends StatelessWidget {
-  const YieldConfigsListTab({super.key});
+class YieldConfigsListBody extends StatelessWidget {
+  const YieldConfigsListBody({super.key});
 
   @override
   Widget build(BuildContext context) {

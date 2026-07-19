@@ -1,9 +1,9 @@
 // ============================================================
-// TransactionTemplatesScreen — Lista de plantillas de transacción
+// TransactionTemplatesListBody — Contenido embebible de plantillas
 // ============================================================
 //
+// Widget sin Scaffold para usar dentro de un TabBarView o pantalla.
 // Muestra plantillas con badge de tipo, info de frecuencia y monto.
-// Tap abre edición; swipe end-to-start abre confirmación de borrado.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -17,66 +17,48 @@ import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/dismissible_background.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
-class TransactionTemplatesScreen extends StatelessWidget {
-  const TransactionTemplatesScreen({super.key});
+class TransactionTemplatesListBody extends StatelessWidget {
+  const TransactionTemplatesListBody({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Consumer<TransactionTemplateViewModel>(
       builder: (context, vm, _) {
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Plantillas'),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-              onPressed: () => Navigator.of(context).maybePop(),
-            ),
-          ),
-          body: Column(
-            children: [
-              if (vm.isSyncing && !vm.isLoading)
-                LinearProgressIndicator(
-                  color: Theme.of(context).colorScheme.primary,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHigh,
-                  minHeight: 2,
-                ),
-              Expanded(
-                child: PpScreenState(
-                  isLoading: vm.isLoading,
-                  errorMessage: vm.templates.isEmpty ? vm.errorMessage : null,
-                  isEmpty: vm.templates.isEmpty,
-                  emptyIcon: Icons.schedule_outlined,
-                  emptyLabel: 'No hay plantillas aún',
-                  emptySubLabel: 'Presiona + para crear una',
-                  onRefresh: vm.refresh,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: vm.templates.length,
-                    itemBuilder: (context, index) {
-                      final template = vm.templates[index];
-                      return _TemplateRow(
-                        template: template,
-                        onEdit: () => _openEdit(context, template, vm),
-                        onDelete: () => _confirmDelete(context, template, vm),
-                      );
-                    },
-                  ),
+        return Column(
+          children: [
+            if (vm.isSyncing && !vm.isLoading)
+              LinearProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHigh,
+                minHeight: 2,
+              ),
+            Expanded(
+              child: PpScreenState(
+                isLoading: vm.isLoading,
+                errorMessage: vm.templates.isEmpty ? vm.errorMessage : null,
+                isEmpty: vm.templates.isEmpty,
+                emptyIcon: Icons.schedule_outlined,
+                emptyLabel: 'No hay plantillas aún',
+                emptySubLabel: 'Presiona + para crear una',
+                onRefresh: vm.refresh,
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: vm.templates.length,
+                  itemBuilder: (context, index) {
+                    final template = vm.templates[index];
+                    return _TemplateRow(
+                      template: template,
+                      onEdit: () => _openEdit(context, template, vm),
+                      onDelete: () => _confirmDelete(context, template, vm),
+                    );
+                  },
                 ),
               ),
-            ],
-          ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () => context.push('/templates/new').then((result) {
-              if (result == true && context.mounted) {
-                context.read<TransactionTemplateViewModel>().loadOnAppear();
-              }
-            }),
-            tooltip: 'Nueva plantilla',
-            child: const Icon(Icons.add),
-          ),
+            ),
+          ],
         );
       },
     );
@@ -87,13 +69,13 @@ class TransactionTemplatesScreen extends StatelessWidget {
     TransactionTemplateModel template,
     TransactionTemplateViewModel vm,
   ) {
-    context.push('/templates/${template.id}/edit', extra: template).then((
-      result,
-    ) {
-      if (result == true && context.mounted) {
-        vm.loadOnAppear();
-      }
-    });
+    context
+        .push('/transactions/templates/${template.id}/edit', extra: template)
+        .then((result) {
+          if (result == true && context.mounted) {
+            vm.loadOnAppear();
+          }
+        });
   }
 
   Future<void> _confirmDelete(

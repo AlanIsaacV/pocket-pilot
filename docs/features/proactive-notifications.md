@@ -5,7 +5,7 @@
 Offline-first notification system that projects future financial events from local SQLite data. Two components:
 
 1. **Notification Center (In-App)** — Full-screen UI at `/notifications` showing persisted projected events with read/deleted state.
-2. **OS Local Notifications** — Idempotent scheduler using `flutter_local_notifications` for the next 64 days.
+2. **OS Local Notifications** — Idempotent scheduler using `flutter_local_notifications` for the next 64 days, gated on a real OS permission state and driven by user-configurable settings.
 
 No backend dependency. All data derived from the `accounts` and `transaction_templates` tables,
 plus the statement-import reminder preference in `user_preferences`.
@@ -83,6 +83,8 @@ NotificationBell (widget, in 3 AppBars) + NotificationsScreen
 | `core/notifications/notification_center_repository.dart` | Orchestrates projection → persistence → retrieval |
 | `core/notifications/notification_center_view_model.dart` | Global ChangeNotifier for UI state + badge count |
 | `core/notifications/notification_scheduler_service.dart` | OS notification scheduling via FlutterLocalNotificationsPlugin |
+| `core/notifications/notification_preferences.dart` | `NotificationPreferences` model + `NotificationPreferencesLocalStore` (device-local, key `notifications.settings`) |
+| `core/notifications/notification_settings_screen.dart` | Settings UI at `/settings/notifications` (per-type toggles, notify time, anticipation, OS deep link) |
 | `core/notifications/statement_import_preferences.dart` | Statement-import reminder preference (JSON map in `user_preferences`) |
 | `core/notifications/statement_import_reminder_settings_screen.dart` | Settings screen for statement-import reminders (`/settings/statement-import-reminders`) |
 | `core/notifications/in_app_notification.dart` | Domain model with `fromMap()`/`toMap()`/`copyWith()` |
@@ -92,23 +94,58 @@ NotificationBell (widget, in 3 AppBars) + NotificationsScreen
 ## OS Notification Scheduler
 
 **Algorithm (idempotent "clean slate"):**
-1. `cancelAll()` — remove all previously scheduled notifications
-2. Fetch projected dates for next 64 days (iOS limit) by type
-3. Apply anticipation offsets:
-   - Credit cards: **3 days before** due date
-   - Subscriptions: **1 day before** charge
-   - Obligations: **same day** as due
-   - Statement imports: **same day** as configured day-of-month
-4. Collect unique days → schedule **one generic notification per day** at 9:00 AM local time
-5. Notification ID = `YYYYMMDD` integer (deterministic, prevents duplicates)
+1. Bail out unless `permissionStatus == granted` (see [Permission state](#permission-state)).
+2. `cancelAll()` — remove all previously scheduled notifications.
+3. Load `NotificationPreferences` and fetch the full projected events for the
+   inclusive 64-day window via `NotificationRepository.getUpcomingEvents(tomorrow, 63)`.
+4. Drop events whose type is disabled in preferences (`isEnabled(type)`).
+5. Bucket each remaining event by its **alert day** = `event.date − anticipationDays[type]`
+   (skipping alert days before tomorrow). Anticipation is per-type and
+   user-configurable; defaults are Credit cards **3**, Subscriptions **1**,
+   Obligations **0**, Statement imports **0**.
+6. Schedule **one notification per alert day** at the user's configured
+   `notifyHour:notifyMinute` (default 09:00) local time. ID = `YYYYMMDD` integer
+   (deterministic, prevents duplicates).
+
+**Per-event content (phase 1):** instead of a single generic "Tienes movimientos
+próximos" body, each notification is composed from that day's actual events by
+`_composeContent()`:
+- One event → type-specific title/body — e.g. `"<card> vence mañana"`,
+  `"Cargo de <sub> hoy"` + amount, `"Importa el estado de cuenta de <account>"`.
+  Timing words come from `_timingFor()` (`hoy` / `mañana` / `en N días`).
+- Multiple events → title `"Tienes N movimientos próximos"` plus a bulleted list,
+  rendered on Android with `BigTextStyleInformation` so it expands.
+- The source display name rides along on `InAppNotification.sourceName`, a
+  transient field populated by the projection and **not persisted** (the stored
+  notification-center rows are unchanged).
 
 **Deep linking:** Tapping an OS notification navigates to `/notifications` via `onNotificationTap` callback passed to the scheduler.
+
+### Permission state
+
+`NotificationSchedulerService` tracks a real `NotificationPermissionStatus`
+(`granted` / `denied` / `undetermined`), exposed via `permissionStatus`.
+
+- `init()` requests the runtime permission and records the **actual** result on
+  both Android (`requestNotificationsPermission()`) and iOS. Previously the
+  Android result was discarded (`_permissionGranted` defaulted to `true`), so a
+  denied permission scheduled everything silently into the void — this was the
+  root cause of "reminders never reach the phone".
+- `refreshPermissionStatus()` re-reads the live OS state
+  (`areNotificationsEnabled()` / `checkPermissions()`) without prompting.
+- `rescheduleAllNotifications()` is a no-op unless the status is `granted`.
+- On app resume (`app.dart` → `didChangeAppLifecycleState`), the scheduler
+  refreshes the permission and, if now granted, reschedules — so enabling the
+  permission in OS settings takes effect without a cold restart. Rescheduling
+  otherwise remains startup + settings-change only (data edits do not reschedule).
 
 ## DI & Provider Setup
 
 Global singletons in `main.dart` MultiProvider:
 - `Provider<NotificationRepository>` — projection engine
 - `ChangeNotifierProvider<NotificationCenterViewModel>` — global for badge count across all tabs
+- `Provider<NotificationPreferencesStore>` — device-local notification settings, injected into
+  `NotificationSchedulerService` and read by `NotificationSettingsScreen`
 
 The `NotificationCenterViewModel` is loaded at startup (fire-and-forget) and provides `unreadCount` to `NotificationBell` widgets in dashboard, transactions, and accounts AppBars.
 
@@ -126,12 +163,32 @@ The `NotificationCenterViewModel` is loaded at startup (fire-and-forget) and pro
 - Tap marks as read
 - AppBar actions: mark-all-read, delete-all (with confirmation dialog)
 
+## Notification Settings
+
+Route `/settings/notifications` (`NotificationSettingsScreen`), reached from
+Settings → "Notificaciones". Lets the user control:
+- **Per-type enable/disable** — `CREDIT_CARD`, `SUBSCRIPTION`, `OBLIGATION`,
+  `STATEMENT_IMPORT`.
+- **Notify time** — hour/minute applied to every scheduled day (default 09:00).
+- **Anticipation days** — per type, how many days before the event to alert.
+- **OS deep link** — when the permission is `denied`, a button opens the system
+  notification settings via the `app_settings` package; the screen re-checks the
+  permission on resume.
+
+Settings are stored **device-local** (not synced) by
+`NotificationPreferencesLocalStore` under the `user_preferences` key
+`notifications.settings` as a JSON blob (`enabledTypes`, `notifyHour`,
+`notifyMinute`, `anticipationDays`), mirroring the `StatementImportPreferences`
+pattern but deliberately kept out of the sync outbox. Malformed/unknown values
+fall back to `NotificationPreferences.defaults`. Saving preferences immediately
+calls `rescheduleAllNotifications()` so changes take effect without a restart.
+
 ## Platform Configuration
 
 ### Android
 - `RECEIVE_BOOT_COMPLETED` is declared in AndroidManifest. `SCHEDULE_EXACT_ALARM` is deliberately
   not declared: reminders use `AndroidScheduleMode.inexactAllowWhileIdle`, where Doze batching is
-  acceptable for 9:00 AM reminders and avoids the Android 14+ exact-alarm Play-policy gate.
+  acceptable for once-a-day reminders and avoids the Android 14+ exact-alarm Play-policy gate.
 - `POST_NOTIFICATIONS` (Android 13+) declared in AndroidManifest and requested at app start in
   `NotificationSchedulerService.init()` via the plugin's `requestNotificationsPermission()` — no
   `permission_handler` dependency. Before frictionless-capture f6 session B this was missing, so
@@ -150,4 +207,5 @@ The `NotificationCenterViewModel` is loaded at startup (fire-and-forget) and pro
 - `flutter_local_notifications: ^19.0.0`
 - `timezone: ^0.10.0`
 - `flutter_timezone: ^4.0.0`
+- `app_settings: ^6.1.1` (deep link to OS notification settings when permission denied)
 - `uuid: ^4.5.1` (already in project)

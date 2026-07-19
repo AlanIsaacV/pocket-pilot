@@ -8,3 +8,4 @@ One decision per file. Dates are the file's first-commit date.
 | [0002](0002-sync-coalescing-and-user-preferences.md) | Sync coalescing and user-preferences flush timing | Accepted | 2026-03-27 |
 | [0003](0003-sync-preflight-cursors.md) | Sync preflight cursors | Accepted | 2026-04-16 |
 | [0004](0004-transaction-source-provenance.md) | Transaction provenance as synced `source` column | Accepted | 2026-07-18 |
+| [0005](0005-background-capture-workmanager-wal.md) | Background capture via workmanager + SQLite WAL/busy_timeout contract | Accepted | 2026-07-18 |

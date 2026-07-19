@@ -17,10 +17,13 @@
 // en su propio RouteScope bajo features/<feature>/ui/<feature>_route_scope.dart.
 
 import 'dart:async';
+import 'dart:developer' as developer;
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:workmanager/workmanager.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/sync/composite_scheduled_generator_runner.dart';
@@ -93,6 +96,7 @@ import 'package:pocket_pilot/src/features/notification_capture/data/pending_tran
 import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_remote_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_sync_handler.dart';
+import 'package:pocket_pilot/src/features/notification_capture/background/background_capture_runner.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/pending_suggestions_view_model.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_remote_service.dart';
@@ -131,8 +135,49 @@ import 'package:pocket_pilot/src/core/notifications/statement_import_preferences
 import 'package:pocket_pilot/src/ui/app.dart';
 import 'package:pocket_pilot/src/ui/router.dart';
 
+const _backgroundCapturePeriodicWorkName =
+    'app.pocketpilot.background_capture.periodic';
+const _backgroundCaptureTaskName = 'background_capture_periodic';
+
+/// Entry point invoked by Android WorkManager outside the UI isolate.
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((taskName, inputData) async {
+    try {
+      await runBackgroundCaptureInbox();
+      return true;
+    } catch (error, stackTrace) {
+      developer.log(
+        'Background capture task failed ($taskName).',
+        name: 'BackgroundCapture',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return false;
+    }
+  });
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (Platform.isAndroid) {
+    try {
+      await Workmanager().initialize(callbackDispatcher);
+      await Workmanager().registerPeriodicTask(
+        _backgroundCapturePeriodicWorkName,
+        _backgroundCaptureTaskName,
+        frequency: const Duration(hours: 6),
+        existingWorkPolicy: ExistingPeriodicWorkPolicy.update,
+      );
+    } catch (error, stackTrace) {
+      developer.log(
+        'Background capture scheduling unavailable; continuing foreground-only.',
+        name: 'BackgroundCapture',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
 
   // DatabaseHelper es un singleton interno; las instancias adicionales comparten la misma DB.
   final dbHelper = DatabaseHelper();

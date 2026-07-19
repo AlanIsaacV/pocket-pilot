@@ -5,7 +5,7 @@
   "updated_at": "2026-07-18",
   "owner": null,
   "status": "in-progress",
-  "current_phase": 5,
+  "current_phase": 6,
   "phases": [
     {
       "id": 1,
@@ -228,6 +228,11 @@
           "date": "2026-07-18",
           "kind": "note",
           "note": "Phase postponed before start: today's notification dump (325 items) contains NO real ATM-withdrawal notification (task 4.1 unmet \u2014 only a BBVA marketing message mentions 'retiros'). User chose to postpone the whole phase until a real withdrawal fixture is captured, and to proceed with phase 5 instead (independent). Pre-implementation exploration findings to reuse when this phase starts: transfers are created only by TransactionRepository.createTransfer (transaction_repository.dart:211-274, paired linked rows, caller supplies both UUIDs); parser seed-bump cursor caveat documented at docs/features/notification-capture.md:200-210; PendingTransaction already has transactionType but no destination-account column; auto-confirm gate hard-requires suggestedCategoryId!=null (notification_capture_repository.dart:649-674) so transfers need a separate eligibility branch; AdjustBalanceSheet is already 2 taps from accounts screen (account card -> 'Ajustar saldo'); proactive-notifications engine has hardcoded event types \u2014 monthly reminder means extending NotificationRepository's projection."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Re-checked 2026-07-18 evening: dump still has no real ATM-withdrawal notification and no adb device connected; phase 4 remains blocked on the fixture. Starting phase 6 instead per user's standing instruction."
         }
       ]
     },
@@ -299,11 +304,58 @@
       "name": "background-capture",
       "file": "phase-6-background-capture.md",
       "goal": "Remove the last dependency on opening the app: run the capture pipeline (parse \u2192 resolve \u2192",
-      "status": "pending",
-      "started_at": null,
+      "status": "in-progress",
+      "started_at": "2026-07-18",
       "completed_at": null,
-      "tasks": [],
-      "deviations": []
+      "tasks": [
+        {
+          "id": "6.1",
+          "title": "Add workmanager dependency (fluttercommunity v0.9.x) + headless callbackDispatcher entrypoint with @pragma('vm:entry-point') + Workmanager().initialize registration in main.dart",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "6.2",
+          "title": "SQLite concurrency hardening: PRAGMA journal_mode=WAL + busy_timeout on Dart DatabaseHelper open; busy_timeout on Kotlin NotificationDb.kt connections",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "6.3",
+          "title": "Headless pipeline runner: minimal composition root (DB + capture stores + TransactionRepository + SyncOutbox + ParserEngine + NotificationCapturePreferences, NO ParserRemoteService) invoking processInbox + auto-confirm gate",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "6.4",
+          "title": "Register periodic background task (~6h, WorkManager defaults, Doze-friendly) that runs the headless runner",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "6.5",
+          "title": "Tests: runner decision logic (auto-confirm vs stays-pending), pragmas applied on open, existing flutter test suite stays green",
+          "status": "done",
+          "notes": null
+        }
+      ],
+      "deviations": [
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Tasks 6.1-6.2 implemented via Codex (codex:codex-rescue). Codex sandbox could not resolve deps/run flutter test; orchestrator ran pub get + tests inline. One device-only bug caught in review: pragmas issued via db.execute() would throw on real Android (execSQL rejects row-returning statements) \u2014 fixed via Codex resume to db.rawQuery(). Pragma test + notification_capture suite (14/14) green; analyzer at 1-issue pre-existing baseline."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Tasks 6.3-6.5 implemented via Codex (resumed session). The Codex job hung after making its edits (43min in 'starting' with all edits written 2min in; job cancelled) so no COMPLETED_TASKS tail was returned \u2014 orchestrator classified the run Complete by reconciling the diff (runner + Android-guarded periodic registration + tests) and running verification inline: flutter analyze at 1-issue pre-existing baseline; flutter test 277/278 with only the documented pre-existing statistics failure."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Post-verify fixes via Codex: Workmanager initialize/registerPeriodicTask wrapped in try/catch (degrades to foreground-only capture instead of crashing cold start) and busy_timeout pragma moved before journal_mode=WAL. Verify session-A verdict: ready-to-close, 0 CRITICAL. Session A (tasks 6.1-6.5, mechanism + headless runner) complete; phase stays in-progress \u2014 session B scope remains: summary/actionable notifications, NLS one-shot enqueue decision, POST_NOTIFICATIONS permission, real-device validation (WAL journal-mode check, Doze, concurrency soak). Note for session B: parser asset seeding lives only in main(), safe for periodic tasks (main ran at least once) but must be revisited if NLS-triggered enqueue is added; BackgroundCaptureRunner duplicates main()'s wiring (drift risk)."
+        }
+      ]
     }
   ],
   "decisions": [
@@ -330,6 +382,16 @@
     {
       "date": "2026-07-18",
       "note": "Phase 5: monthly statement-import reminder implemented as a new STATEMENT_IMPORT event type in NotificationRepository's projection, driven by a device-local preference (marked account(s) + day of month) \u2014 integrates with the notification center, badge and the existing clean-slate OS scheduler. Chosen over a standalone one-off local notification (outside the idempotent scheduler pattern, invisible in the center) and over skipping the reminder.",
+      "adr_candidate": false
+    },
+    {
+      "date": "2026-07-18",
+      "note": "Phase 6: background mechanism is the workmanager plugin (fluttercommunity, v0.9.x federated) \u2014 it already implements the native WorkManager + headless FlutterEngine pattern; rolling our own buys nothing for a periodic DB batch job. SQLite concurrency hardening is mandatory regardless of mechanism: PRAGMA journal_mode=WAL (persists in the DB file, benefits the Kotlin NLS handle too) + per-connection busy_timeout on BOTH the Dart (DatabaseHelper) and Kotlin (NotificationDb.kt) sides, with short transactions in the background pipeline.",
+      "adr_candidate": true
+    },
+    {
+      "date": "2026-07-18",
+      "note": "Phase 6: the background runner skips the LLM parser fallback (no ParserRemoteService in the headless composition root) \u2014 unmatched notifications stay pending and retry on next foreground processInbox. Avoids network + LLM quota burn in background, and sidesteps workmanager's Android 15 background-networking issue (#649).",
       "adr_candidate": false
     }
   ],

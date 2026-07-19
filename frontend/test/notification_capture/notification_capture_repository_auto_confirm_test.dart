@@ -15,6 +15,7 @@ import 'package:pocket_pilot/src/features/notification_capture/data/parser_local
 import 'package:pocket_pilot/src/features/notification_capture/data/parser_remote_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/pending_transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_local_store.dart';
+import 'package:pocket_pilot/src/features/notification_capture/background/background_capture_runner.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/account_card_mapping.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/captured_notification.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/notification_parser.dart';
@@ -135,7 +136,7 @@ void main() {
       autoConfirmEnabled: true,
     );
 
-    expect(await repository.processInbox(), 1);
+    expect(await BackgroundCaptureRunner.withRepository(repository).run(), 1);
 
     expect(transactions.created, hasLength(1));
     expect(transactions.created.single['source'], 'auto_notification');
@@ -188,7 +189,7 @@ void main() {
       autoConfirmEnabled: true,
     );
 
-    expect(await repository.processInbox(), 1);
+    expect(await BackgroundCaptureRunner.withRepository(repository).run(), 1);
 
     expect(transactions.created, isEmpty);
     expect(pending.byId.values.single.status, 'pending');
@@ -299,6 +300,37 @@ void main() {
     expect(pending.byId.values.single.status, 'pending');
     expect(captured.byId['captured-local']!.status, 'matched_local');
     expect(feedback.models, isEmpty);
+  });
+
+  test('background runner never uses the LLM fallback', () async {
+    final now = DateTime.utc(2026, 7, 18);
+    final captured = _FakeCapturedStore()
+      ..seed(
+        CapturedNotificationModel(
+          id: 'captured-unmatched',
+          packageName: 'unknown.bank',
+          title: 'Movimiento',
+          text: 'texto que no coincide con el parser local',
+          postedAt: now,
+          status: 'received',
+          createdAt: now,
+        ),
+      );
+    final pending = _FakePendingStore();
+    final repository = buildRepository(
+      captured: captured,
+      pending: pending,
+      mappings: _FakeCardMappingStore(),
+      rules: _FakeRuleStore(),
+      transactions: _FakeTransactionStore(),
+      feedback: _FakeFeedbackStore(),
+      autoConfirmEnabled: true,
+      shareWithLlm: true,
+    );
+
+    expect(await BackgroundCaptureRunner.withRepository(repository).run(), 0);
+    expect(captured.byId['captured-unmatched']!.status, 'unparseable');
+    expect(pending.byId, isEmpty);
   });
 }
 

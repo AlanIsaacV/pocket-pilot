@@ -72,6 +72,15 @@
   table instead — CREATE the new table → `INSERT … SELECT` → DROP old → RENAME → recreate
   indexes/triggers. First use: `frontend/assets/migrations/017.sql` (the PostgreSQL side is a plain
   `ALTER COLUMN … DROP NOT NULL`).
+- **SQLite PRAGMAs on Android**: issue pragmas that return a row (`journal_mode`, `busy_timeout`)
+  via `rawQuery`, **never** `execute`/`execSQL` — Android's `execSQL` rejects row-returning
+  statements at runtime (device-only failure; `sqflite_common_ffi` unit tests accept `execute`
+  and won't catch it). Set `busy_timeout` **before** `journal_mode=WAL` so the one-time WAL
+  conversion already has the busy wait. `journal_mode=WAL` persists in the DB file;
+  `busy_timeout` is per-connection — every new connection (Dart or Kotlin) must set its own.
+  Canonical implementation: `configureDatabaseForConcurrentAccess` in
+  `frontend/lib/src/core/db/database_helper.dart` (Dart) and `NotificationDb.openDatabase`
+  (Kotlin).
 - **Unpublished-migration exception**: a migration created in the current, not-yet-shipped session
   may be edited in place instead of adding a repair migration — "never modify a published .sql"
   applies from the moment it ships to a device.

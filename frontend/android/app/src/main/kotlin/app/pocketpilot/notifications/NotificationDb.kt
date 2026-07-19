@@ -42,16 +42,7 @@ class NotificationDb(private val context: Context) {
             return
         }
 
-        val db = try {
-            SQLiteDatabase.openDatabase(
-                dbPath,
-                null,
-                SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.NO_LOCALIZED_COLLATORS,
-            )
-        } catch (t: Throwable) {
-            Log.w(TAG, "Could not open DB at $dbPath", t)
-            return
-        }
+        val db = openDatabase(SQLiteDatabase.OPEN_READWRITE) ?: return
 
         try {
             val postedIso = isoUtc(postedAtMillis)
@@ -111,16 +102,7 @@ class NotificationDb(private val context: Context) {
             return
         }
 
-        val db = try {
-            SQLiteDatabase.openDatabase(
-                dbPath,
-                null,
-                SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.NO_LOCALIZED_COLLATORS,
-            )
-        } catch (t: Throwable) {
-            Log.w(TAG, "Could not open DB at $dbPath for observation", t)
-            return
-        }
+        val db = openDatabase(SQLiteDatabase.OPEN_READWRITE) ?: return
 
         try {
             val iso = isoUtc(postedAtMillis)
@@ -157,16 +139,7 @@ class NotificationDb(private val context: Context) {
             return emptySet()
         }
 
-        val db = try {
-            SQLiteDatabase.openDatabase(
-                dbPath,
-                null,
-                SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS,
-            )
-        } catch (t: Throwable) {
-            Log.w(TAG, "Could not open DB at $dbPath for watched read", t)
-            return emptySet()
-        }
+        val db = openDatabase(SQLiteDatabase.OPEN_READONLY) ?: return emptySet()
 
         return try {
             val out = mutableSetOf<String>()
@@ -221,8 +194,25 @@ class NotificationDb(private val context: Context) {
         return fmt.format(Date(millis))
     }
 
+    /** Opens a short-lived NLS connection with its per-connection busy wait. */
+    private fun openDatabase(openMode: Int): SQLiteDatabase? = try {
+        SQLiteDatabase.openDatabase(
+            dbPath,
+            null,
+            openMode or SQLiteDatabase.NO_LOCALIZED_COLLATORS,
+        ).also { db ->
+            // WAL is set by sqflite and persisted in the DB file. busy_timeout
+            // must be applied to every Kotlin connection independently.
+            db.execSQL("PRAGMA busy_timeout=$SQLITE_BUSY_TIMEOUT_MILLIS")
+        }
+    } catch (t: Throwable) {
+        Log.w(TAG, "Could not open DB at $dbPath", t)
+        null
+    }
+
     companion object {
         private const val TAG = "NotificationDb"
+        private const val SQLITE_BUSY_TIMEOUT_MILLIS = 5000
 
         // sqflite usa este nombre por defecto en `getDatabasesPath() / dbName`.
         // Debe coincidir con `DatabaseHelper._init` en `database_helper.dart`.

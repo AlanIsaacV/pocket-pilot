@@ -119,7 +119,9 @@ flowchart LR
   `google/uuid`, `golang-jwt/jwt/v5` (HS256 access tokens + validation).
 - **Frontend** — `grpc` (Dart), `sqflite` (local DB), `provider` (state), `connectivity_plus`
   (sync triggers), `fixnum` (int64 from gRPC), `google_sign_in` / `sign_in_with_apple` (social
-  login), `flutter_secure_storage` (tokens), `fl_chart` (stats/cashflow), `csv` (import).
+  login), `flutter_secure_storage` (tokens), `fl_chart` (stats/cashflow), `csv` (import),
+  `workmanager` (Android background capture runs), `flutter_local_notifications` + `timezone`
+  (OS-scheduled reminders).
 - **Scripts** — `pdfplumber` (PDF extraction), `uv` (Python project mgmt).
 
 ## Critical notes for collaborators
@@ -131,8 +133,12 @@ flowchart LR
 - **Deterministic generators** — scheduled transactions, interest and investment transactions use
   fixed **UUIDv5 namespaces** (`core/ids/`) so re-runs are idempotent. Don't change a namespace.
 - **Notification capture gotchas** — the Android NLS survives `am force-stop` and keeps a SQLite
-  file handle (pushing a modified DB to the device fails); `showModalBottomSheet` does **not**
-  inherit providers, so re-provide via `MultiProvider(.value)`. See
+  file handle (pushing a modified DB to the device fails); since frictionless-capture f6 the DB
+  has **three** concurrent accessors (NLS Kotlin, background Dart isolate, foreground app),
+  governed by WAL + per-connection `busy_timeout` + short transactions — every new connection
+  (Dart or Kotlin) must set its own `busy_timeout`; background capture never calls the LLM.
+  `showModalBottomSheet` does **not** inherit providers, so re-provide via
+  `MultiProvider(.value)`. See
   [features/notification-capture.md](features/notification-capture.md).
 - **Category icons/colors** are stored as codepoint-hex / hex-without-`#` and must be rendered via
   the helpers, never as raw `Text`. See [conventions.md](conventions.md).

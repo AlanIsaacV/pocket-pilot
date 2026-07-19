@@ -14,7 +14,8 @@ Auto-suggestion of transactions from Android bank push notifications. iOS not su
 
 ```
 [Android NLS]                                                      [Flutter isolate]
-  StatusBarNotification (BBVA pkg)                                   on app open / refresh
+  StatusBarNotification (BBVA pkg)                                   on app open / refresh /
+                                                                     periodic bg run (f6, ~6h)
        │                                                                   │
        ▼                                                                   ▼
   package allowlist filter ────► captured_notifications ─────► ParserEngine.tryMatch
@@ -137,7 +138,9 @@ Tests live in `test/notification_parser_engine_test.dart`. The positive cases co
 
 ### Repository (`NotificationCaptureRepository`)
 
-`processInbox()` — drains `received` notifications:
+`processInbox()` — drains `received` notifications (the LLM fallback after a local miss runs only
+when a `ParserRemoteService` is wired in — i.e. foreground; the background runner omits it, so
+unmatched notifications retry on the next foreground run):
 1. Tries each active parser in order until one matches.
 2. On match: looks up `account_card_mappings` (latest active by `updated_at` for `bank_id` + `last_digits`) → `suggested_account_id`. When the notification carries no card digits (BBVA `purchase_tdc` is the only such pattern today), falls back to the `(bank_id, pattern_id)` mapping via `findByBankAndPattern` (same latest-active semantics). See `_resolveAccount` in `notification_capture_repository.dart`.
 3. On match: looks up `transaction_rules` (substring of merchant description in `match_text`, ordered by `LENGTH(match_text)` DESC, `priority` DESC, `updated_at` DESC — longest prefix wins) → `suggested_category_id`.
@@ -263,6 +266,38 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 | 10 (frictionless-capture f1) | done (2026-07-18) | Smart resolution: `pattern_id` on `account_card_mappings` (proto field 8, BE mig 019 / FE mig 017 `_version=17`; `last_digits` nullable + CHECK at-least-one via SQLite table rebuild), (`bank_id`, `pattern_id`) account fallback for digit-less notifications + approval-time pattern learning, longest-prefix rule learning/matching (`LENGTH(match_text)` DESC). No uniqueness guard: insert-new-row + latest-active LWW, same as digits mappings. Also fixed latent bug: `account_card_mapping_remote_service.upsertMapping` never forwarded `pattern_id` outbound. |
 | 11 (frictionless-capture f2) | done (2026-07-18) | Fast review: "Aprobar N resueltas" header action (`approveAllResolved()`, continue-on-error, confirm dialog + result snackbar) + quick-pick `ChoiceChip` category row on `_SuggestionTile` for category-only gaps (`candidateCategoriesFor()`: longest-prefix rules then account most-used, cap 3). `parser_feedback` rows still written on batch approvals (`was_helpful` null — quality signal feeds f3's confidence gate). |
 | 12 (frictionless-capture f3) | done (2026-07-18) | Auto-confirm: synced `transactions.source` provenance column (proto field 21, BE mig 020 / FE mig 018 `_version=18`; values `manual`/`auto_notification`, future `import_csv` — see ADR 0004), conservative gate in `processInbox()` (local-regex only, account + rule category resolved, merchant not ambiguous = ≥2 distinct historical categories per rule prefix), auto-approve path (feedback row `was_helpful` null, **no** mapping/rule learning), device-local `auto_confirm_enabled` toggle (default OFF), "Auto" badge on transaction tiles. Verify caught + fixed: `upsertTransaction` initially dropped `source` from the outbound proto (same bug class as f1's `pattern_id`); `updateTransaction` now preserves `source`. 4 gate tests. |
+| 13 (frictionless-capture f6, session A) | in progress (2026-07-18) | Background capture mechanism: workmanager periodic task (~6h) + headless `BackgroundCaptureRunner` (no LLM) + SQLite WAL/busy_timeout concurrency contract (Dart + Kotlin sides). Session B pending: actionable notifications + device validation. |
+
+## Background capture (frictionless-capture f6 — in progress, session A shipped)
+
+Since frictionless-capture f6 (session A) the pipeline also runs with the app closed, on Android:
+
+- **Mechanism**: `workmanager` plugin (fluttercommunity, v0.9.x federated — native WorkManager +
+  headless FlutterEngine already wired; see ADR 0005). `main.dart` registers a periodic task
+  (~6h, `ExistingPeriodicWorkPolicy.update`, Android-only, WorkManager defaults — Doze-friendly,
+  no extra constraints). Registration is wrapped in try/catch: on failure the app degrades to
+  foreground-only capture, never crashes cold start.
+- **Headless entrypoint**: `callbackDispatcher` (`@pragma('vm:entry-point')`) in `main.dart`
+  runs `BackgroundCaptureRunner`
+  (`lib/src/features/notification_capture/background/background_capture_runner.dart`) — a
+  minimal, UI-free composition root (DB + capture stores + `TransactionRepository` +
+  `SyncOutbox` + `ParserEngine` + `NotificationCapturePreferences`). It deliberately has **no
+  `ParserRemoteService`**, so the LLM fallback never runs in background (quota, network — see
+  ADR 0005); the auto-confirm gate (f3) applies unchanged.
+- **SQLite concurrency contract**: the background isolate is a *third* concurrent accessor of
+  `pocket_pilot.db` (alongside the Kotlin NLS and the foreground app). `DatabaseHelper`'s
+  `onConfigure` sets `PRAGMA busy_timeout=5000` **then** `PRAGMA journal_mode=WAL` (both via
+  `rawQuery` — see conventions.md); WAL persists in the DB file so the Kotlin handle benefits
+  too; `NotificationDb.kt` sets its own per-connection `busy_timeout`. Keep background
+  transactions short.
+- **Sync caveat**: transactions auto-confirmed in background sync on the next app open
+  (`SyncService` is foreground-only). Accepted for v1.
+- **Cold-isolate caveat**: parser asset seeding (`seedFromAssetIfMissing`) runs only in
+  `main()`. Safe for the periodic task (it can only exist after `main()` ran once), but must be
+  revisited if session B adds NLS-triggered one-shot enqueue.
+- **Session B (pending)**: summary + actionable notifications, `POST_NOTIFICATIONS` runtime
+  permission, NLS one-shot enqueue decision, real-device validation (journal mode, Doze,
+  concurrency soak).
 
 ## Operational tooling
 
@@ -332,6 +367,8 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 - `assets/migrations/016.sql` — Fase 8: 4 tablas nuevas (`package_observations`, `watched_packages`, `bank_aliases`, `bank_packages`) + seed BBVA en watched/bank_packages + backfill de package_observations desde captured_notifications. `database_helper.dart::_version = 16`.
 - `assets/migrations/017.sql` — frictionless-capture f1: table rebuild de `account_card_mappings` (`pattern_id`, `last_digits` nullable + CHECK, índices/trigger recreados — SQLite no puede dropear NOT NULL con ALTER). `database_helper.dart::_version = 17`.
 - `assets/migrations/018.sql` — frictionless-capture f3: `transactions.source TEXT NOT NULL DEFAULT 'manual'`. `database_helper.dart::_version = 18`.
+- `lib/src/features/notification_capture/background/background_capture_runner.dart` — frictionless-capture f6: headless composition root (no `ParserRemoteService`).
+- `lib/src/core/db/database_helper.dart` — frictionless-capture f6: `onConfigure` aplica `busy_timeout` + `journal_mode=WAL` vía `rawQuery` (`configureDatabaseForConcurrentAccess`).
 - `lib/src/features/notification_capture/domain/{package_observation,watched_package,bank_alias,bank_package}.dart` — Fase 8: 4 modelos de dominio.
 - `lib/src/features/notification_capture/data/{package_observation,watched_package,bank_alias,bank_package}_local_store.dart` — Fase 8: 4 DAOs.
 - `lib/src/features/notification_capture/data/bank_package_sync_handler.dart` — Fase 8: pull-only `syncOrder=4`, mismo orden que parser.
@@ -362,7 +399,8 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 - `backend/internal/cardmapping/cardmapping_test.go` — frictionless-capture f1: pattern-only permitido, ambos-ausentes rechazado, round-trip proto de `pattern_id`
 - `frontend/test/account_card_mapping_model_test.dart` — frictionless-capture f1: round-trip del modelo incl. mapping pattern-only (sin dígitos)
 - `frontend/test/notification_capture/notification_capture_repository_learn_test.dart` — frictionless-capture f1+f2: end-to-end con fixtures BBVA reales — TDC sin dígitos resuelve tras una aprobación; DIDI/DIDI FOOD coexisten por longest-prefix; f2 adds batch-approval filtering (resolved-only, continue-on-error), candidate-category ranking (prefix rules then account usage, no duplicates), and quick-pick approval (uses suggested account + tapped category, learns the rule)
-- `frontend/test/notification_capture/notification_capture_repository_auto_confirm_test.dart` — frictionless-capture f3: 4 gate scenarios (happy path auto-confirms with `source='auto_notification'` and no learning; ambiguous merchant stays pending; LLM extraction never auto-confirms; toggle OFF reproduces prior behavior)
+- `frontend/test/notification_capture/notification_capture_repository_auto_confirm_test.dart` — frictionless-capture f3: 4 gate scenarios (happy path auto-confirms with `source='auto_notification'` and no learning; ambiguous merchant stays pending; LLM extraction never auto-confirms; toggle OFF reproduces prior behavior); f6 adds runner decision tests via `BackgroundCaptureRunner.withRepository` incl. the never-LLM path
+- `frontend/test/database_helper_test.dart` — frictionless-capture f6: pragma test (WAL + busy_timeout applied on open)
 - `frontend/test/transaction_remote_service_test.dart` — frictionless-capture f3: regression — outbound proto built by `transactionFromPayload` carries `source` ('manual' fallback for old queued payloads)
 
 **Scripts:**

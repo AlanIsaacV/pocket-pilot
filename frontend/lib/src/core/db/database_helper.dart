@@ -20,6 +20,15 @@ import 'dart:developer' as developer;
 
 import 'package:pocket_pilot/src/core/db/migrations_runner.dart';
 
+const int _sqliteBusyTimeoutMillis = 5000;
+
+/// Configura cada conexión SQLite para convivir con el NLS Android y futuros
+/// isolates de fondo. WAL persiste en el archivo; busy_timeout es por conexión.
+Future<void> configureDatabaseForConcurrentAccess(DatabaseExecutor db) async {
+  await db.rawQuery('PRAGMA busy_timeout=$_sqliteBusyTimeoutMillis');
+  await db.rawQuery('PRAGMA journal_mode=WAL');
+}
+
 class DatabaseHelper {
   // Incrementa este número cada vez que agregues un nuevo archivo .sql.
   static const int _version = 18;
@@ -43,6 +52,7 @@ class DatabaseHelper {
     return openDatabase(
       dbPath,
       version: _version,
+      onConfigure: configureDatabaseForConcurrentAccess,
       onCreate: (db, version) => MigrationsRunner.run(db, from: 0, to: version),
       onUpgrade: (db, oldVersion, newVersion) =>
           MigrationsRunner.run(db, from: oldVersion, to: newVersion),

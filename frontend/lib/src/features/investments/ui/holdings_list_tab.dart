@@ -13,6 +13,8 @@ import 'package:pocket_pilot/src/features/investments/ui/holding_detail_screen.d
     show PriceSourceBadge, formatMoney, formatQty;
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
 import 'package:pocket_pilot/src/features/investments/ui/widgets/portfolio_pie_chart.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/dismissible_background.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 enum _HoldingsView { list, distribution }
@@ -40,10 +42,7 @@ class _HoldingStats {
   });
 }
 
-_HoldingStats _buildStats(
-  InvestmentHoldingModel h,
-  InvestmentViewModel vm,
-) {
+_HoldingStats _buildStats(InvestmentHoldingModel h, InvestmentViewModel vm) {
   final lots = vm.lotsFor(h.id);
   final splits = vm.splitsFor(h.id);
   try {
@@ -127,16 +126,18 @@ class _HoldingsListTabState extends State<HoldingsListTab> {
             if (vm.isSyncing && !vm.isLoadingAll)
               LinearProgressIndicator(
                 color: Theme.of(context).colorScheme.primary,
-                backgroundColor:
-                    Theme.of(context).colorScheme.surfaceContainerHigh,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHigh,
                 minHeight: 2,
               ),
             if (_shouldShowStaleBanner(vm.maxFetchedAt))
               _StalePricesBanner(maxFetchedAt: vm.maxFetchedAt!),
-            if (showSwitcher) _ViewSwitcher(
-              value: _view,
-              onChanged: (v) => setState(() => _view = v),
-            ),
+            if (showSwitcher)
+              _ViewSwitcher(
+                value: _view,
+                onChanged: (v) => setState(() => _view = v),
+              ),
             Expanded(
               child: PpScreenState(
                 isLoading: vm.isLoadingAll && holdings.isEmpty,
@@ -168,16 +169,18 @@ class _HoldingsListTabState extends State<HoldingsListTab> {
         return Dismissible(
           key: ValueKey(s.holding.id),
           direction: DismissDirection.endToStart,
-          background: _ArchiveBackground(),
+          background: const DismissibleBackground(
+            label: 'Archivar',
+            icon: Icons.archive_outlined,
+            colorScheme: DismissibleBackgroundColorScheme.archive,
+          ),
           confirmDismiss: (_) => _confirmArchive(ctx, s.holding.symbol),
           onDismissed: (_) async {
             await vm.archiveHolding(s.holding);
             if (!ctx.mounted) return;
             ScaffoldMessenger.of(ctx).showSnackBar(
               SnackBar(
-                content: Text(
-                  'Holding "${s.holding.symbol}" archivado',
-                ),
+                content: Text('Holding "${s.holding.symbol}" archivado'),
               ),
             );
           },
@@ -201,33 +204,18 @@ class _HoldingsListTabState extends State<HoldingsListTab> {
   }
 
   void _openHolding(BuildContext context, InvestmentHoldingModel holding) {
-    context
-        .push('/accounts/holdings/${holding.id}', extra: holding)
-        .then((_) {
+    context.push('/accounts/holdings/${holding.id}', extra: holding).then((_) {
       if (!context.mounted) return;
       context.read<InvestmentViewModel>().loadPortfolio();
     });
   }
 
   Future<bool?> _confirmArchive(BuildContext context, String symbol) {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Archivar holding'),
-        content: Text(
-          'Se archivará el holding "$symbol" y todas sus operaciones.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Archivar'),
-          ),
-        ],
-      ),
+    return showConfirmDialog(
+      context,
+      title: 'Archivar holding',
+      message: 'Se archivará el holding "$symbol" y todas sus operaciones.',
+      confirmLabel: 'Archivar',
     );
   }
 }
@@ -295,8 +283,7 @@ class _HoldingPnLCard extends StatelessWidget {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary
-                          .withValues(alpha: 0.12),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
                       borderRadius: AppTheme.radiusFull,
                     ),
                     child: Icon(
@@ -369,15 +356,19 @@ class _HoldingPnLCard extends StatelessWidget {
                   if (narrow) {
                     return Column(
                       children: [
-                        Row(children: [
-                          Expanded(child: tiles[0]),
-                          Expanded(child: tiles[1]),
-                        ]),
+                        Row(
+                          children: [
+                            Expanded(child: tiles[0]),
+                            Expanded(child: tiles[1]),
+                          ],
+                        ),
                         const SizedBox(height: 6),
-                        Row(children: [
-                          Expanded(child: tiles[2]),
-                          Expanded(child: tiles[3]),
-                        ]),
+                        Row(
+                          children: [
+                            Expanded(child: tiles[2]),
+                            Expanded(child: tiles[3]),
+                          ],
+                        ),
                       ],
                     );
                   }
@@ -472,11 +463,7 @@ class _PnLChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (amount == null) {
-      return _chipText(
-        context,
-        '$label —',
-        theme.colorScheme.onSurfaceVariant,
-      );
+      return _chipText(context, '$label —', theme.colorScheme.onSurfaceVariant);
     }
     final v = amount!;
     final color = v > 0
@@ -562,8 +549,7 @@ class _TotalsFooter extends StatelessWidget {
       ...unrealByCcy.keys,
       ...realByCcy.keys,
       ...divByCcy.keys,
-    }.toList()
-      ..sort();
+    }.toList()..sort();
 
     if (currencies.isEmpty) return const SizedBox.shrink();
 
@@ -629,8 +615,7 @@ class _TotalsRow extends StatelessWidget {
         ),
         if (value != null)
           _TotalsItem(label: 'Valor', amount: value!, neutral: true),
-        if (unreal != null)
-          _TotalsItem(label: 'Unreal', amount: unreal!),
+        if (unreal != null) _TotalsItem(label: 'Unreal', amount: unreal!),
         if (real != null) _TotalsItem(label: 'Real', amount: real!),
         if (div != null) _TotalsItem(label: 'Div', amount: div!, neutral: true),
       ],
@@ -655,10 +640,10 @@ class _TotalsItem extends StatelessWidget {
     final color = neutral
         ? theme.colorScheme.onSurface
         : (amount > 0
-            ? Colors.green.shade600
-            : (amount < 0
-                ? theme.colorScheme.error
-                : theme.colorScheme.onSurface));
+              ? Colors.green.shade600
+              : (amount < 0
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.onSurface));
     final sign = (!neutral && amount > 0) ? '+' : '';
     return Text(
       '$label $sign${formatMoney(amount)}',
@@ -706,42 +691,6 @@ class _StalePricesBanner extends StatelessWidget {
                 color: theme.colorScheme.tertiary,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ArchiveBackground extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.18),
-        borderRadius: AppTheme.radiusMedium,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.5),
-        ),
-      ),
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Archivar',
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.tertiary,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Icon(
-            Icons.archive_outlined,
-            color: Theme.of(context).colorScheme.tertiary,
           ),
         ],
       ),

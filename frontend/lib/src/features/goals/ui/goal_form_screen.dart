@@ -13,7 +13,9 @@ import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/goals/domain/goal.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_section_label.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
@@ -199,9 +201,9 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
       context.pop(true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo guardar la meta: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('No se pudo guardar la meta: $e')));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -210,25 +212,12 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
   Future<void> _onDelete() async {
     if (!_isEditMode || _isSaving) return;
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar meta'),
-        content: Text('Se eliminara la meta "${widget.goal!.name}".'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'Eliminar meta',
+      message: 'Se eliminara la meta "${widget.goal!.name}".',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
     if (confirm != true || !mounted) return;
 
@@ -280,7 +269,7 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _SectionLabel('Nombre de la meta'),
+              const FormSectionLabel('Nombre de la meta'),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _nameController,
@@ -292,7 +281,7 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
                     _requiredText(value, fieldName: 'El nombre'),
               ),
               const SizedBox(height: 24),
-              _SectionLabel('Monto objetivo'),
+              const FormSectionLabel('Monto objetivo'),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _targetAmountController,
@@ -300,9 +289,7 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
                   decimal: true,
                 ),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                    RegExp(r'^\d*\.?\d{0,2}'),
-                  ),
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                 ],
                 decoration: InputDecoration(
                   hintText: '0.00',
@@ -311,7 +298,7 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
                 validator: _validateTargetAmount,
               ),
               const SizedBox(height: 24),
-              _SectionLabel('Moneda'),
+              const FormSectionLabel('Moneda'),
               const SizedBox(height: 8),
               InkWell(
                 onTap: _showCurrencySheet,
@@ -340,7 +327,7 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              _SectionLabel('Fecha objetivo'),
+              const FormSectionLabel('Fecha objetivo'),
               const SizedBox(height: 8),
               InkWell(
                 onTap: _pickTargetDate,
@@ -359,9 +346,9 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
                             fontWeight: FontWeight.w500,
                             color: _targetDate != null
                                 ? Theme.of(context).colorScheme.onSurface
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -378,25 +365,6 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: GoogleFonts.ibmPlexSans(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-        letterSpacing: 0.3,
       ),
     );
   }

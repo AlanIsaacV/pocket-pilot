@@ -12,3 +12,4 @@ One decision per file. Dates are the file's first-commit date.
 | [0006](0006-no-nls-oneshot-enqueue.md) | No NLS-triggered one-shot background enqueue in v1 (periodic task only) | Accepted | 2026-07-18 |
 | [0007](0007-local-scheduled-notifications-over-fcm.md) | Local scheduled notifications over FCM push | Accepted | 2026-07-19 |
 | [0008](0008-canonical-widget-library-location.md) | Single canonical shared-widget library in `frontend/lib/src/ui/` | Accepted | 2026-07-19 |
+| [0009](0009-intentional-behavior-convergence.md) | Widget unification intentionally converges divergent UI behavior | Accepted | 2026-07-19 |

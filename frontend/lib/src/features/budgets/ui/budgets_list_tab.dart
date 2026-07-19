@@ -15,6 +15,8 @@ import 'package:pocket_pilot/src/features/budgets/ui/budget_view_model.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/ui/widgets/category_icon_data.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/dismissible_background.dart';
 import 'package:pocket_pilot/src/ui/widgets/transaction_form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
@@ -71,15 +73,17 @@ class _BudgetsListTabState extends State<BudgetsListTab> {
             if (vm.isSyncing && !vm.isLoading)
               LinearProgressIndicator(
                 color: Theme.of(context).colorScheme.primary,
-                backgroundColor:
-                    Theme.of(context).colorScheme.surfaceContainerHigh,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHigh,
                 minHeight: 2,
               ),
             Expanded(
               child: PpScreenState(
                 isLoading: vm.isLoading,
-                errorMessage:
-                    vm.budgetStatuses.isEmpty ? vm.errorMessage : null,
+                errorMessage: vm.budgetStatuses.isEmpty
+                    ? vm.errorMessage
+                    : null,
                 isEmpty: vm.budgetStatuses.isEmpty,
                 emptyIcon: Icons.pie_chart_outline_rounded,
                 emptyLabel: 'No tienes presupuestos aun',
@@ -91,12 +95,14 @@ class _BudgetsListTabState extends State<BudgetsListTab> {
                   itemCount: vm.budgetStatuses.length,
                   itemBuilder: (context, index) {
                     final status = vm.budgetStatuses[index];
-                    final category =
-                        _categoryCache[status.budget.categoryId];
+                    final category = _categoryCache[status.budget.categoryId];
                     return Dismissible(
                       key: ValueKey(status.budget.id),
                       direction: DismissDirection.endToStart,
-                      background: _DeleteBackground(),
+                      background: const DismissibleBackground(
+                        label: 'Eliminar',
+                        icon: Icons.delete_outline_rounded,
+                      ),
                       confirmDismiss: (_) => _confirmDelete(
                         context,
                         category?.name ?? 'Presupuesto',
@@ -115,11 +121,7 @@ class _BudgetsListTabState extends State<BudgetsListTab> {
                         } catch (e) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'No se pudo eliminar: $e',
-                              ),
-                            ),
+                            SnackBar(content: Text('No se pudo eliminar: $e')),
                           );
                         }
                       },
@@ -140,9 +142,9 @@ class _BudgetsListTabState extends State<BudgetsListTab> {
   }
 
   void _onBudgetTap(BuildContext context, BudgetModel budget) {
-    context
-        .push('/accounts/budgets/${budget.id}/edit', extra: budget)
-        .then((result) {
+    context.push('/accounts/budgets/${budget.id}/edit', extra: budget).then((
+      result,
+    ) {
       if (result == true && context.mounted) {
         context.read<BudgetViewModel>().loadOnAppear();
       }
@@ -150,25 +152,12 @@ class _BudgetsListTabState extends State<BudgetsListTab> {
   }
 
   Future<bool?> _confirmDelete(BuildContext context, String name) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Eliminar presupuesto'),
-        content: Text('Se eliminara el presupuesto de "$name".'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+    return showConfirmDialog(
+      context,
+      title: 'Eliminar presupuesto',
+      message: 'Se eliminara el presupuesto de "$name".',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
   }
 }
@@ -204,11 +193,11 @@ class _BudgetCard extends StatelessWidget {
     final categoryIcon = category != null
         ? CategoryIconData.iconFromHex(category!.icon)
         : Icons.category_outlined;
-    final categoryColor =
-        category != null ? hexToColor(category!.color) : statusColor;
+    final categoryColor = category != null
+        ? hexToColor(category!.color)
+        : statusColor;
     final categoryName = category?.name ?? 'Sin categoria';
-    final periodLabel =
-        status.budget.period == 'MONTHLY' ? 'MENSUAL' : 'ANUAL';
+    final periodLabel = status.budget.period == 'MONTHLY' ? 'MENSUAL' : 'ANUAL';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -237,11 +226,7 @@ class _BudgetCard extends StatelessWidget {
                       color: categoryColor.withValues(alpha: 0.12),
                       borderRadius: AppTheme.radiusFull,
                     ),
-                    child: Icon(
-                      categoryIcon,
-                      color: categoryColor,
-                      size: 20,
-                    ),
+                    child: Icon(categoryIcon, color: categoryColor, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -263,8 +248,9 @@ class _BudgetCard extends StatelessWidget {
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
                             letterSpacing: 0.5,
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -321,8 +307,9 @@ class _BudgetCard extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: progressFraction,
                   minHeight: 6,
-                  backgroundColor:
-                      Theme.of(context).colorScheme.surfaceContainerHigh,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHigh,
                   color: isExceeded
                       ? Theme.of(context).colorScheme.error
                       : statusColor,
@@ -369,45 +356,5 @@ class _BudgetCard extends StatelessWidget {
       return amount.toInt().toString();
     }
     return amount.toStringAsFixed(2);
-  }
-}
-
-// ============================================================
-// Background de swipe "Eliminar"
-// ============================================================
-
-class _DeleteBackground extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.18),
-        borderRadius: AppTheme.radiusMedium,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
-        ),
-      ),
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Eliminar',
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.error,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Icon(
-            Icons.delete_outline_rounded,
-            color: Theme.of(context).colorScheme.error,
-          ),
-        ],
-      ),
-    );
   }
 }

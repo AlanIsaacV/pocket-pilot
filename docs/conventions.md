@@ -100,6 +100,13 @@
   `NoteField`, `DetailRow`, `ScrollableBottomSheet`) and `ui/widgets/form_app_bar_actions.dart`
   across forms; the shared AppBar action renders Save last, secondary (Eliminar/Ocultar) first in
   edit mode. See [features/transaction-forms.md](features/transaction-forms.md).
+- **Shared interaction primitives (grep-enforced invariants)**: confirmations go through
+  `showConfirmDialog()` (`ui/widgets/confirm_dialog.dart`) — no inline `showDialog<bool>` +
+  `AlertDialog`; swipe backgrounds through `DismissibleBackground`
+  (`ui/widgets/dismissible_background.dart`, variants `delete`/`archive`/`edit`); form section
+  labels through `FormSectionLabel` (`ui/widgets/form_section_label.dart`); all date picking
+  through `pickDate()` — no raw `showDatePicker` outside `ui/widgets/form_date_utils.dart`.
+  See [decisions/0009](decisions/0009-intentional-behavior-convergence.md).
 - **Widget library layering**: a widget used by 2+ features lives in `lib/src/ui/` (`widgets/` or
   `screens/`); a feature's `ui/` never imports another feature's `ui/`. See
   [decisions/0008](decisions/0008-canonical-widget-library-location.md).

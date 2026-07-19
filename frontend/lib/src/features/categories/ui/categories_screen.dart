@@ -15,6 +15,7 @@ import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_view_model.dart';
 import 'package:pocket_pilot/src/ui/widgets/category_icon_data.dart';
+import 'package:pocket_pilot/src/ui/widgets/dismissible_background.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 class CategoriesScreen extends StatelessWidget {
@@ -435,7 +436,12 @@ class _CategoryRow extends StatelessWidget {
         _openEdit(context);
         return false;
       },
-      background: _EditBackground(),
+      background: const DismissibleBackground(
+        label: 'Editar',
+        icon: Icons.edit_outlined,
+        colorScheme: DismissibleBackgroundColorScheme.edit,
+        margin: EdgeInsets.only(bottom: 6),
+      ),
       child: row,
     );
   }
@@ -529,47 +535,6 @@ class _HiddenCategoryRow extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// Background de swipe "Editar"
-// ============================================================
-
-class _EditBackground extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
-        borderRadius: AppTheme.radiusMedium,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
-        ),
-      ),
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Editar',
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Icon(
-            Icons.edit_outlined,
-            color: Theme.of(context).colorScheme.primary,
-            size: 18,
-          ),
-        ],
       ),
     );
   }

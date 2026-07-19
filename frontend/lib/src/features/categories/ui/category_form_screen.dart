@@ -15,7 +15,10 @@ import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/categories/ui/categories_view_model.dart';
 import 'package:pocket_pilot/src/ui/widgets/category_icon_data.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_section_label.dart';
+import 'package:pocket_pilot/src/ui/widgets/transaction_form_widgets.dart';
 
 class CategoryFormScreen extends StatefulWidget {
   /// Categoría a editar. null = modo creación.
@@ -141,25 +144,12 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
 
   Future<void> _onHide() async {
     if (!_isEditMode) return;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Ocultar categoría'),
-        content: Text('Se ocultará la categoría "${widget.category!.name}".'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Ocultar'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'Ocultar categoría',
+      message: 'Se ocultará la categoría "${widget.category!.name}".',
+      confirmLabel: 'Ocultar',
+      destructive: true,
     );
     if (confirm != true || !mounted) return;
 
@@ -210,7 +200,7 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
               ],
 
               // --- Nombre ---
-              _SectionLabel('Nombre'),
+              const FormSectionLabel('Nombre'),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _nameController,
@@ -229,21 +219,27 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
               const SizedBox(height: 24),
 
               // --- Tipo ---
-              _SectionLabel('Tipo'),
+              const FormSectionLabel('Tipo'),
               const SizedBox(height: 12),
-              _TypeToggle(
+              TransactionTypeToggle(
                 value: _type,
                 onChanged: (t) {
                   setState(() {
                     _type = t;
                     // Reset nature when switching type if incompatible
                     if (t == 'expense' &&
-                        const {'active', 'passive', 'windfall'}
-                            .contains(_defaultNature)) {
+                        const {
+                          'active',
+                          'passive',
+                          'windfall',
+                        }.contains(_defaultNature)) {
                       _defaultNature = '';
                     } else if (t == 'income' &&
-                        const {'required', 'obligation', 'lifestyle'}
-                            .contains(_defaultNature)) {
+                        const {
+                          'required',
+                          'obligation',
+                          'lifestyle',
+                        }.contains(_defaultNature)) {
                       _defaultNature = '';
                     }
                   });
@@ -253,7 +249,7 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
               const SizedBox(height: 24),
 
               // --- Naturaleza por defecto ---
-              _SectionLabel('Naturaleza por defecto'),
+              const FormSectionLabel('Naturaleza por defecto'),
               const SizedBox(height: 12),
               _NaturePicker(
                 value: _defaultNature,
@@ -264,7 +260,7 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
               const SizedBox(height: 24),
 
               // --- Color ---
-              _SectionLabel('Color'),
+              const FormSectionLabel('Color'),
               const SizedBox(height: 12),
               _ColorPicker(
                 selected: _selectedColor,
@@ -274,7 +270,7 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
               const SizedBox(height: 24),
 
               // --- Icono ---
-              _SectionLabel('Icono'),
+              const FormSectionLabel('Icono'),
               const SizedBox(height: 12),
               _IconPicker(
                 selected: _selectedIcon,
@@ -361,129 +357,6 @@ class _ParentBadge extends StatelessWidget {
   }
 }
 
-// ============================================================
-// Label de sección
-// ============================================================
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: GoogleFonts.ibmPlexSans(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-        letterSpacing: 0.3,
-      ),
-    );
-  }
-}
-
-// ============================================================
-// Toggle Gasto / Ingreso
-// ============================================================
-
-class _TypeToggle extends StatelessWidget {
-  final String value;
-  final ValueChanged<String> onChanged;
-
-  const _TypeToggle({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-        borderRadius: AppTheme.radiusFull,
-      ),
-      child: Row(
-        children: [
-          _ToggleOption(
-            label: 'Gasto',
-            icon: Icons.arrow_upward_rounded,
-            isSelected: value == 'expense',
-            activeColor: Theme.of(context).colorScheme.error,
-            onTap: () => onChanged('expense'),
-          ),
-          _ToggleOption(
-            label: 'Ingreso',
-            icon: Icons.arrow_downward_rounded,
-            isSelected: value == 'income',
-            activeColor: Theme.of(context).colorScheme.onTertiary,
-            onTap: () => onChanged('income'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ToggleOption extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final Color activeColor;
-  final VoidCallback onTap;
-
-  const _ToggleOption({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.activeColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? activeColor.withValues(alpha: 0.15)
-                : Colors.transparent,
-            borderRadius: AppTheme.radiusFull,
-            border: Border.all(
-              color: isSelected ? activeColor : Colors.transparent,
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: isSelected
-                    ? activeColor
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: GoogleFonts.ibmPlexSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected
-                      ? activeColor
-                      : Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ============================================================
 // Nature picker — muestra opciones según el tipo de categoría

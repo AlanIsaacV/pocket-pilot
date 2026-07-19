@@ -13,6 +13,8 @@ import 'package:provider/provider.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/yield_configs/domain/yield_config.dart';
 import 'package:pocket_pilot/src/features/yield_configs/ui/yield_config_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/dismissible_background.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 class YieldConfigsScreen extends StatelessWidget {
@@ -35,15 +37,15 @@ class YieldConfigsScreen extends StatelessWidget {
               if (vm.isSyncing && !vm.isLoading)
                 LinearProgressIndicator(
                   color: Theme.of(context).colorScheme.primary,
-                  backgroundColor:
-                      Theme.of(context).colorScheme.surfaceContainerHigh,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHigh,
                   minHeight: 2,
                 ),
               Expanded(
                 child: PpScreenState(
                   isLoading: vm.isLoading,
-                  errorMessage:
-                      vm.configs.isEmpty ? vm.errorMessage : null,
+                  errorMessage: vm.configs.isEmpty ? vm.errorMessage : null,
                   isEmpty: vm.configs.isEmpty,
                   emptyIcon: Icons.trending_up_rounded,
                   emptyLabel: 'No hay rendimientos aún',
@@ -85,9 +87,7 @@ class YieldConfigsScreen extends StatelessWidget {
     YieldConfigModel config,
     YieldConfigViewModel vm,
   ) {
-    context
-        .push('/yields/${config.id}/edit', extra: config)
-        .then((result) {
+    context.push('/yields/${config.id}/edit', extra: config).then((result) {
       if (result == true && context.mounted) {
         vm.loadOnAppear();
       }
@@ -99,25 +99,12 @@ class YieldConfigsScreen extends StatelessWidget {
     YieldConfigModel config,
     YieldConfigViewModel vm,
   ) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar rendimiento'),
-        content: Text('Se eliminará "${config.name}".'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'Eliminar rendimiento',
+      message: 'Se eliminará "${config.name}".',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
     if (confirm == true && context.mounted) {
       await vm.deleteConfig(config.id);
@@ -205,7 +192,10 @@ class _YieldRow extends StatelessWidget {
         onDelete();
         return false;
       },
-      background: _DeleteBackground(),
+      background: const DismissibleBackground(
+        label: 'Eliminar',
+        icon: Icons.delete_outline_rounded,
+      ),
       child: row,
     );
   }
@@ -239,21 +229,21 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (icon, color) = switch (status) {
       'active' => (
-          Icons.trending_up_rounded,
-          Theme.of(context).colorScheme.tertiary,
-        ),
+        Icons.trending_up_rounded,
+        Theme.of(context).colorScheme.tertiary,
+      ),
       'paused' => (
-          Icons.pause_circle_outline_rounded,
-          Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
+        Icons.pause_circle_outline_rounded,
+        Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
       'completed' => (
-          Icons.check_circle_outline_rounded,
-          Theme.of(context).colorScheme.primary,
-        ),
+        Icons.check_circle_outline_rounded,
+        Theme.of(context).colorScheme.primary,
+      ),
       _ => (
-          Icons.help_outline_rounded,
-          Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
+        Icons.help_outline_rounded,
+        Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
     };
 
     return Container(
@@ -264,47 +254,6 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: AppTheme.radiusFull,
       ),
       child: Icon(icon, color: color, size: 18),
-    );
-  }
-}
-
-// ============================================================
-// Background de swipe "Eliminar"
-// ============================================================
-
-class _DeleteBackground extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.15),
-        borderRadius: AppTheme.radiusMedium,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.4),
-        ),
-      ),
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Eliminar',
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.error,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Icon(
-            Icons.delete_outline_rounded,
-            color: Theme.of(context).colorScheme.error,
-            size: 18,
-          ),
-        ],
-      ),
     );
   }
 }

@@ -13,6 +13,8 @@ import 'package:provider/provider.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/domain/transaction_template.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/dismissible_background.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 class TransactionTemplatesListTab extends StatelessWidget {
@@ -27,15 +29,15 @@ class TransactionTemplatesListTab extends StatelessWidget {
             if (vm.isSyncing && !vm.isLoading)
               LinearProgressIndicator(
                 color: Theme.of(context).colorScheme.primary,
-                backgroundColor:
-                    Theme.of(context).colorScheme.surfaceContainerHigh,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHigh,
                 minHeight: 2,
               ),
             Expanded(
               child: PpScreenState(
                 isLoading: vm.isLoading,
-                errorMessage:
-                    vm.templates.isEmpty ? vm.errorMessage : null,
+                errorMessage: vm.templates.isEmpty ? vm.errorMessage : null,
                 isEmpty: vm.templates.isEmpty,
                 emptyIcon: Icons.schedule_outlined,
                 emptyLabel: 'No hay plantillas aún',
@@ -70,10 +72,10 @@ class TransactionTemplatesListTab extends StatelessWidget {
     context
         .push('/transactions/templates/${template.id}/edit', extra: template)
         .then((result) {
-      if (result == true && context.mounted) {
-        vm.loadOnAppear();
-      }
-    });
+          if (result == true && context.mounted) {
+            vm.loadOnAppear();
+          }
+        });
   }
 
   Future<void> _confirmDelete(
@@ -81,25 +83,12 @@ class TransactionTemplatesListTab extends StatelessWidget {
     TransactionTemplateModel template,
     TransactionTemplateViewModel vm,
   ) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar plantilla'),
-        content: Text('Se eliminará "${template.name}".'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'Eliminar plantilla',
+      message: 'Se eliminará "${template.name}".',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
     if (confirm == true && context.mounted) {
       await vm.deleteTemplate(template.id);
@@ -188,7 +177,10 @@ class _TemplateRow extends StatelessWidget {
         onDelete();
         return false;
       },
-      background: _DeleteBackground(),
+      background: const DismissibleBackground(
+        label: 'Eliminar',
+        icon: Icons.delete_outline_rounded,
+      ),
       child: row,
     );
   }
@@ -238,17 +230,14 @@ class _TypeBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (icon, color) = switch (type) {
       'income' => (
-          Icons.arrow_downward_rounded,
-          Theme.of(context).colorScheme.tertiary,
-        ),
+        Icons.arrow_downward_rounded,
+        Theme.of(context).colorScheme.tertiary,
+      ),
       'expense' => (
-          Icons.arrow_upward_rounded,
-          Theme.of(context).colorScheme.error,
-        ),
-      _ => (
-          Icons.swap_horiz_rounded,
-          Theme.of(context).colorScheme.primary,
-        ),
+        Icons.arrow_upward_rounded,
+        Theme.of(context).colorScheme.error,
+      ),
+      _ => (Icons.swap_horiz_rounded, Theme.of(context).colorScheme.primary),
     };
 
     return Container(
@@ -259,47 +248,6 @@ class _TypeBadge extends StatelessWidget {
         borderRadius: AppTheme.radiusFull,
       ),
       child: Icon(icon, color: color, size: 18),
-    );
-  }
-}
-
-// ============================================================
-// Background de swipe "Eliminar"
-// ============================================================
-
-class _DeleteBackground extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.15),
-        borderRadius: AppTheme.radiusMedium,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.4),
-        ),
-      ),
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Eliminar',
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.error,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Icon(
-            Icons.delete_outline_rounded,
-            color: Theme.of(context).colorScheme.error,
-            size: 18,
-          ),
-        ],
-      ),
     );
   }
 }

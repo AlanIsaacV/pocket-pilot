@@ -8,6 +8,7 @@ import 'package:pocket_pilot/src/features/debts/data/debt_repository.dart';
 import 'package:pocket_pilot/src/features/debts/domain/contact_balance.dart';
 import 'package:pocket_pilot/src/features/debts/ui/debt_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 
 class DebtDetailScreen extends StatefulWidget {
   final String accountId;
@@ -177,27 +178,13 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
     final contact = _contact;
     if (contact == null) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Perdonar deuda'),
-        content: Text(
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Perdonar deuda',
+      message:
           'Se eliminará la cuenta de "${contact.contactName}" y la deuda se considerará perdonada.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Perdonar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Perdonar',
+      destructive: true,
     );
 
     if (confirmed != true || !mounted) return;

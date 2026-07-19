@@ -28,6 +28,7 @@ import 'package:pocket_pilot/src/features/tags/data/tag_repository.dart';
 import 'package:pocket_pilot/src/features/tags/domain/tag.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/data/transaction_template_repository.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/domain/transaction_template.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
@@ -431,25 +432,12 @@ class _TransactionTemplateFormScreenState
   Future<void> _onDelete() async {
     if (!_isEditMode || _isSaving) return;
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar plantilla'),
-        content: Text('Se eliminará "${widget.template!.name}".'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'Eliminar plantilla',
+      message: 'Se eliminará "${widget.template!.name}".',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
     if (confirm != true || !mounted) return;
 
@@ -1011,10 +999,7 @@ class _TransactionTemplateFormScreenState
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    secondary: const Icon(
-                      Icons.autorenew_rounded,
-                      size: 20,
-                    ),
+                    secondary: const Icon(Icons.autorenew_rounded, size: 20),
                     value: _isAutoCharge,
                     onChanged: (v) => setState(() => _isAutoCharge = v),
                   ),

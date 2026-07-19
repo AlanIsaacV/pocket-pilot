@@ -19,6 +19,7 @@ import 'package:pocket_pilot/src/features/tags/data/tag_repository.dart';
 import 'package:pocket_pilot/src/features/tags/domain/tag.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/transfer_form_widgets.dart';
@@ -741,41 +742,29 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
     }
     final parsedAmount = double.tryParse(_amountOutInput) ?? 0;
     final amountCents = parsedAmount > 0 ? (parsedAmount * 100).round() : null;
-    await context.push<bool>('/transactions/templates/new', extra: {
-      'type': 'transfer_out',
-      'accountId': _fromAccount!.id,
-      'toAccountId': _toAccount?.id,
-      'amountCents': amountCents,
-      'currencyCode': _currencyOut,
-      'description': _noteController.text,
-      'tags': _selectedTags.map((t) => t.name).toList(),
-    });
+    await context.push<bool>(
+      '/transactions/templates/new',
+      extra: {
+        'type': 'transfer_out',
+        'accountId': _fromAccount!.id,
+        'toAccountId': _toAccount?.id,
+        'amountCents': amountCents,
+        'currencyCode': _currencyOut,
+        'description': _noteController.text,
+        'tags': _selectedTags.map((t) => t.name).toList(),
+      },
+    );
   }
 
   Future<void> _onDelete() async {
     if (!_isEditMode || _isSaving) return;
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar transferencia'),
-        content: const Text(
-          'Se eliminará esta transferencia completa (ambos movimientos).',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'Eliminar transferencia',
+      message: 'Se eliminará esta transferencia completa (ambos movimientos).',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
     if (confirm != true || !mounted) return;
 

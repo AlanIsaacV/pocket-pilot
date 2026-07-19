@@ -63,7 +63,8 @@ pocket-pilot/
   `*_route_scope.dart` (`ChangeNotifierProvider` for list/detail, `*_form_route_scope.dart` with
   `Provider.value` for cross-feature form data). App-wide controllers (e.g. theme) live at `main.dart`.
 - **Shared widget library** — `lib/src/ui/` is the single home for cross-feature UI:
-  `ui/widgets/` (form widgets, account/category icon helpers, date utils) and `ui/screens/`
+  `ui/widgets/` (form widgets, interaction primitives — confirm dialog, swipe background, section
+  label —, account/category icon helpers, date utils) and `ui/screens/`
   (shared screens, e.g. the category pickers). Rule: a widget used by 2+ features lives here;
   a feature's `ui/` never imports another feature's `ui/` (ADR 0008).
 

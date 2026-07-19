@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/dashboard/ui/dashboard_filter_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 
 class TemporalPageView extends StatefulWidget {
   const TemporalPageView({super.key});
@@ -226,9 +227,9 @@ class _CustomPage extends StatelessWidget {
 
   Future<void> _pickDate(BuildContext context, {required bool isFrom}) async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: isFrom ? vm.customFrom : vm.customTo,
+    final picked = await pickDate(
+      context,
+      isFrom ? vm.customFrom : vm.customTo,
       firstDate: DateTime(2020),
       lastDate: DateTime(now.year + 5, now.month, now.day),
     );

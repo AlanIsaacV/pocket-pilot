@@ -18,6 +18,7 @@ import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/ui/widgets/account_icon.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/features/yield_configs/data/yield_config_repository.dart';
@@ -132,8 +133,9 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
         _selectedAccount = selectedAccount;
         _payoutFrequency = c.payoutFrequency;
         _nextDate = DateTime.tryParse(c.nextDate);
-        _maturityDate =
-            c.maturityDate != null ? DateTime.tryParse(c.maturityDate!) : null;
+        _maturityDate = c.maturityDate != null
+            ? DateTime.tryParse(c.maturityDate!)
+            : null;
         _autoRenew = c.autoRenew;
         _status = c.status;
         _dataLoaded = true;
@@ -229,8 +231,9 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
         apyRate: apyRate,
         payoutFrequency: _payoutFrequency,
         nextDate: formatDateISO(_nextDate!),
-        maturityDate:
-            _maturityDate != null ? formatDateISO(_maturityDate!) : null,
+        maturityDate: _maturityDate != null
+            ? formatDateISO(_maturityDate!)
+            : null,
         termDays: termDays,
         autoRenew: _autoRenew,
         status: _status,
@@ -256,25 +259,12 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
   Future<void> _onDelete() async {
     if (!_isEditMode || _isSaving) return;
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar rendimiento'),
-        content: Text('Se eliminará "${widget.config!.name}".'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'Eliminar rendimiento',
+      message: 'Se eliminará "${widget.config!.name}".',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
     if (confirm != true || !mounted) return;
 
@@ -507,10 +497,7 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
                       ],
                       decoration: const InputDecoration(
                         labelText: 'Monto (capital)',
-                        prefixIcon: Icon(
-                          Icons.attach_money_rounded,
-                          size: 20,
-                        ),
+                        prefixIcon: Icon(Icons.attach_money_rounded, size: 20),
                       ),
                     ),
                   ),
@@ -530,15 +517,11 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
                       ],
                       decoration: InputDecoration(
                         labelText: 'Tasa APY (%)',
-                        prefixIcon: const Icon(
-                          Icons.percent_rounded,
-                          size: 20,
-                        ),
+                        prefixIcon: const Icon(Icons.percent_rounded, size: 20),
                         suffixText: '%',
                         suffixStyle: GoogleFonts.ibmPlexSans(
                           fontSize: 13,
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -569,8 +552,7 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
                     label: 'Fecha de vencimiento',
                     date: _maturityDate,
                     onTap: _pickMaturityDate,
-                    onClear:
-                        _maturityDate != null ? _clearMaturityDate : null,
+                    onClear: _maturityDate != null ? _clearMaturityDate : null,
                   ),
 
                   // ── 8. Plazo en días (opcional / requerido at_maturity)
@@ -585,10 +567,7 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
                         ],
                         decoration: const InputDecoration(
                           labelText: 'Plazo en días',
-                          prefixIcon: Icon(
-                            Icons.timelapse_rounded,
-                            size: 20,
-                          ),
+                          prefixIcon: Icon(Icons.timelapse_rounded, size: 20),
                         ),
                       ),
                     ),
@@ -602,8 +581,7 @@ class _YieldConfigFormScreenState extends State<YieldConfigFormScreen> {
                       'Auto-renovar',
                       style: GoogleFonts.ibmPlexSans(
                         fontSize: 14,
-                        color:
-                            Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                     value: _autoRenew,
@@ -665,9 +643,7 @@ class _OptionalDateRow extends StatelessWidget {
             ),
             const Spacer(),
             Text(
-              date != null
-                  ? formatDateDisplay(date!)
-                  : 'Sin fecha (opcional)',
+              date != null ? formatDateDisplay(date!) : 'Sin fecha (opcional)',
               style: GoogleFonts.ibmPlexSans(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,

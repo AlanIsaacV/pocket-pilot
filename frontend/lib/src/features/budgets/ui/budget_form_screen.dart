@@ -16,6 +16,8 @@ import 'package:pocket_pilot/src/features/budgets/ui/budget_view_model.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/ui/widgets/category_icon_data.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_section_label.dart';
 import 'package:pocket_pilot/src/ui/widgets/transaction_form_widgets.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
@@ -52,7 +54,9 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
   String? _selectedCategoryId;
   CategoryModel? _selectedCategory;
   String _selectedCurrencyCode = kInitialDefaultCurrency;
-  List<String> _allowedCurrencies = List<String>.from(kInitialAllowedCurrencies);
+  List<String> _allowedCurrencies = List<String>.from(
+    kInitialAllowedCurrencies,
+  );
   String _selectedPeriod = 'MONTHLY';
   bool _isSaving = false;
 
@@ -70,8 +74,7 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
     } else {
       // New-budget pre-fill via route params (e.g. from Statistics).
       if (widget.initialLimitCents != null && widget.initialLimitCents! > 0) {
-        _limitController.text =
-            _formatInitial(widget.initialLimitCents! / 100);
+        _limitController.text = _formatInitial(widget.initialLimitCents! / 100);
       }
       if (widget.initialCategoryId != null) {
         _selectedCategoryId = widget.initialCategoryId;
@@ -206,9 +209,9 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
     if (form == null || !form.validate()) return;
 
     if (_selectedCategoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecciona una categoria')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Selecciona una categoria')));
       return;
     }
 
@@ -220,9 +223,7 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
       final model = BudgetModel(
         id: _isEditMode ? widget.budget!.id : _uuid.v4(),
         categoryId: _selectedCategoryId!,
-        limitAmountCents: _parseMoneyToCents(
-          _limitController.text.trim(),
-        ),
+        limitAmountCents: _parseMoneyToCents(_limitController.text.trim()),
         currencyCode: _selectedCurrencyCode,
         period: _selectedPeriod,
         createdAt: _isEditMode ? widget.budget!.createdAt : now,
@@ -234,9 +235,9 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
       context.pop(true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo guardar: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('No se pudo guardar: $e')));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -245,27 +246,13 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
   Future<void> _onDelete() async {
     if (!_isEditMode || _isSaving) return;
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar presupuesto'),
-        content: Text(
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'Eliminar presupuesto',
+      message:
           'Se eliminara el presupuesto de "${_selectedCategory?.name ?? ''}".',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
     if (confirm != true || !mounted) return;
 
@@ -276,9 +263,9 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
       context.pop(true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo eliminar: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('No se pudo eliminar: $e')));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -305,8 +292,9 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
             canSave: !_isSaving,
             isSaving: _isSaving,
             onSave: _onSave,
-            saveTooltip:
-                _isEditMode ? 'Guardar cambios' : 'Guardar presupuesto',
+            saveTooltip: _isEditMode
+                ? 'Guardar cambios'
+                : 'Guardar presupuesto',
             secondaryAction: _isEditMode
                 ? FormAppBarSecondaryAction(
                     icon: Icons.delete_outline_rounded,
@@ -326,7 +314,7 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Category selector
-              _SectionLabel('Categoria'),
+              const FormSectionLabel('Categoria'),
               const SizedBox(height: 8),
               InkWell(
                 onTap: _openCategoryPicker,
@@ -353,9 +341,9 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
                             fontWeight: FontWeight.w500,
                             color: _selectedCategory != null
                                 ? Theme.of(context).colorScheme.onSurface
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -371,7 +359,7 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
               const SizedBox(height: 24),
 
               // Limit amount
-              _SectionLabel('Monto limite'),
+              const FormSectionLabel('Monto limite'),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _limitController,
@@ -379,9 +367,7 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
                   decimal: true,
                 ),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                    RegExp(r'^\d*\.?\d{0,2}'),
-                  ),
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                 ],
                 decoration: InputDecoration(
                   hintText: '0.00',
@@ -392,7 +378,7 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
               const SizedBox(height: 24),
 
               // Currency selector
-              _SectionLabel('Moneda'),
+              const FormSectionLabel('Moneda'),
               const SizedBox(height: 8),
               InkWell(
                 onTap: _showCurrencySheet,
@@ -423,7 +409,7 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
               const SizedBox(height: 24),
 
               // Period selector
-              _SectionLabel('Periodo'),
+              const FormSectionLabel('Periodo'),
               const SizedBox(height: 8),
               SegmentedButton<String>(
                 segments: const [
@@ -460,25 +446,6 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  final String text;
-
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: GoogleFonts.ibmPlexSans(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-        letterSpacing: 0.3,
-      ),
-    );
-  }
-}
-
 class _ScrollableBottomSheet extends StatelessWidget {
   final String title;
   final List<Widget> children;
@@ -504,7 +471,9 @@ class _ScrollableBottomSheet extends StatelessWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: AppTheme.radiusFull,
                   ),
                 ),

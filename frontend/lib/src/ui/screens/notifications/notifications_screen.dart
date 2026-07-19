@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/notifications/in_app_notification.dart';
 import 'package:pocket_pilot/src/core/notifications/notification_center_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/dismissible_background.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -127,29 +129,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return 'Anteriores';
   }
 
-  void _confirmDeleteAll(BuildContext context, NotificationCenterViewModel vm) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar todas'),
-        content: const Text(
+  Future<void> _confirmDeleteAll(
+    BuildContext context,
+    NotificationCenterViewModel vm,
+  ) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Eliminar todas',
+      message:
           'Se eliminaran todas las notificaciones. Esta accion no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              vm.deleteAll();
-            },
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
+    if (confirmed) vm.deleteAll();
   }
 }
 
@@ -197,11 +189,9 @@ class _NotificationTile extends StatelessWidget {
       key: ValueKey(notification.id),
       direction: DismissDirection.endToStart,
       onDismissed: (_) => onDismissed(),
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        color: theme.colorScheme.error,
-        child: Icon(Icons.delete, color: theme.colorScheme.onError),
+      background: const DismissibleBackground(
+        label: 'Eliminar',
+        icon: Icons.delete,
       ),
       child: ListTile(
         leading: CircleAvatar(

@@ -14,6 +14,7 @@ import 'package:pocket_pilot/src/features/investments/domain/pnl_math.dart';
 import 'package:pocket_pilot/src/features/investments/domain/position_math.dart';
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
@@ -98,34 +99,19 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
     final holding = _holding;
     if (holding == null) return;
     context
-        .push(
-          '/accounts/holdings/${widget.holdingId}/edit',
-          extra: holding,
-        )
+        .push('/accounts/holdings/${widget.holdingId}/edit', extra: holding)
         .then((_) => _load());
   }
 
   Future<void> _onArchiveHolding() async {
     final holding = _holding;
     if (holding == null) return;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Archivar holding'),
-        content: Text(
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'Archivar holding',
+      message:
           'Se archivará el holding "${holding.symbol}" y todas sus operaciones.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Archivar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Archivar',
     );
     if (confirm != true || !mounted) return;
 
@@ -140,14 +126,15 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
     final holding = _holding;
     final lots = vm.lotsFor(widget.holdingId);
     final splits = vm.splitsFor(widget.holdingId);
-    final events = <_HoldingEvent>[
-      ...lots.map(_LotEvent.new),
-      ...splits.map(_SplitEvent.new),
-    ]..sort((a, b) {
-        final byDate = b.occurredAt.compareTo(a.occurredAt);
-        if (byDate != 0) return byDate;
-        return b.createdAt.compareTo(a.createdAt);
-      });
+    final events =
+        <_HoldingEvent>[
+          ...lots.map(_LotEvent.new),
+          ...splits.map(_SplitEvent.new),
+        ]..sort((a, b) {
+          final byDate = b.occurredAt.compareTo(a.occurredAt);
+          if (byDate != 0) return byDate;
+          return b.createdAt.compareTo(a.createdAt);
+        });
     final isLoading = vm.isLoadingHolding(widget.holdingId);
 
     final position = computePosition(lots, splits: splits);
@@ -434,9 +421,7 @@ class _HoldingSummaryCard extends StatelessWidget {
               Expanded(
                 child: _StatTile(
                   label: 'Precio actual',
-                  value: price == null
-                      ? '—'
-                      : '${formatMoney(price)} $ccy',
+                  value: price == null ? '—' : '${formatMoney(price)} $ccy',
                 ),
               ),
               Expanded(
@@ -482,8 +467,7 @@ class _HoldingSummaryCard extends StatelessWidget {
                   child: _StatTile(
                     label: 'Dividendos',
                     value: dividendsByCurrency.entries
-                        .map((e) =>
-                            '${formatMoney(e.value)} ${e.key}')
+                        .map((e) => '${formatMoney(e.value)} ${e.key}')
                         .join(' · '),
                   ),
                 ),
@@ -657,10 +641,12 @@ class _LotCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isBuy = lot.isBuy;
-    final color =
-        isBuy ? Theme.of(context).colorScheme.error : Colors.green.shade600;
-    final icon =
-        isBuy ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded;
+    final color = isBuy
+        ? Theme.of(context).colorScheme.error
+        : Colors.green.shade600;
+    final icon = isBuy
+        ? Icons.arrow_downward_rounded
+        : Icons.arrow_upward_rounded;
     final dateLabel = _safeDate(lot.occurredAt);
     final qty = _formatQty(lot.quantity);
     final price = lot.price.toStringAsFixed(2);
@@ -689,10 +675,7 @@ class _LotCard extends StatelessWidget {
             ),
           ),
           subtitle: Text(
-            [
-              dateLabel,
-              ?accountName,
-            ].join(' · '),
+            [dateLabel, ?accountName].join(' · '),
             style: GoogleFonts.ibmPlexSans(
               fontSize: 12,
               color: Theme.of(context).colorScheme.onSurfaceVariant,

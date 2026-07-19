@@ -26,6 +26,7 @@ import 'package:pocket_pilot/src/features/user_preferences/data/currency_prefere
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/transaction_form_widgets.dart';
@@ -642,25 +643,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         ? 'la transacción "${transaction.description}"'
         : 'esta transacción';
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar transacción'),
-        content: Text('Se eliminará $label.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'Eliminar transacción',
+      message: 'Se eliminará $label.',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
     if (confirm != true || !mounted) return;
 
@@ -717,7 +705,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       !_isSaving;
 
   bool _isDigit(int codeUnit) => codeUnit >= 48 && codeUnit <= 57;
-
 
   void _showNatureSheet() {
     _commitPendingAmountIfAny();
@@ -948,20 +935,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                     onTap: () async {
                       _commitPendingAmountIfAny();
 
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _date,
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                        builder: (context, child) => Theme(
-                          data: Theme.of(context).copyWith(
-                            colorScheme: Theme.of(context).colorScheme.copyWith(
-                              primary: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          child: child!,
-                        ),
-                      );
+                      final picked = await pickDate(context, _date);
                       if (picked != null) setState(() => _date = picked);
                     },
                   ),

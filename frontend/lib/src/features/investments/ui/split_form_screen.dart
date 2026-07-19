@@ -9,6 +9,7 @@ import 'package:pocket_pilot/src/features/investments/data/investment_holding_re
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_split.dart';
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
@@ -154,27 +155,13 @@ class _SplitFormScreenState extends State<SplitFormScreen> {
 
   Future<void> _onDelete() async {
     if (!_isEditMode || _isSaving) return;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar split'),
-        content: const Text(
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'Eliminar split',
+      message:
           'Se eliminará este split. Las cantidades y precios volverán a su valor pre-split.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
     if (confirm != true || !mounted) return;
     setState(() => _isSaving = true);
@@ -264,8 +251,9 @@ class _SplitFormScreenState extends State<SplitFormScreen> {
                       Expanded(
                         child: TextField(
                           controller: _ratioNumController,
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           inputFormatters: [
                             FilteringTextInputFormatter.allow(
                               RegExp(r'^\d*\.?\d*'),
@@ -273,7 +261,10 @@ class _SplitFormScreenState extends State<SplitFormScreen> {
                           ],
                           decoration: const InputDecoration(
                             labelText: 'Numerador',
-                            prefixIcon: Icon(Icons.call_split_rounded, size: 20),
+                            prefixIcon: Icon(
+                              Icons.call_split_rounded,
+                              size: 20,
+                            ),
                           ),
                         ),
                       ),
@@ -284,8 +275,9 @@ class _SplitFormScreenState extends State<SplitFormScreen> {
                           'a',
                           style: GoogleFonts.ibmPlexSans(
                             fontSize: 14,
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -293,8 +285,9 @@ class _SplitFormScreenState extends State<SplitFormScreen> {
                       Expanded(
                         child: TextField(
                           controller: _ratioDenController,
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           inputFormatters: [
                             FilteringTextInputFormatter.allow(
                               RegExp(r'^\d*\.?\d*'),

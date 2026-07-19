@@ -18,7 +18,10 @@ lib/src/ui/widgets/               # shared widget library (used by 10+ features)
 ├── form_widgets.dart             # Shared form widgets (Tags, Details, NumPad, etc.)
 ├── form_date_utils.dart          # Date formatting and picking utilities
 ├── transfer_form_widgets.dart    # Transfer-specific widgets (also used by debts)
-├── transaction_form_widgets.dart # Transaction-specific widgets (also used by budgets)
+├── transaction_form_widgets.dart # Transaction-specific widgets (also used by budgets, categories)
+├── confirm_dialog.dart           # showConfirmDialog() — canonical confirmation dialog
+├── dismissible_background.dart   # DismissibleBackground — canonical swipe background
+├── form_section_label.dart       # FormSectionLabel — 13px form section label
 └── account_icon.dart             # accountIconForType() (used by 5 features)
 ```
 
@@ -43,15 +46,32 @@ lib/src/ui/widgets/               # shared widget library (used by 10+ features)
 
 ---
 
-#### `ui/widgets/form_date_utils.dart` (~25 lines)
+#### `ui/widgets/form_date_utils.dart` (~30 lines)
 **Purpose:** Date formatting and picking utilities shared by both form screens.
 
 **Exports:**
 - `formatDateDisplay(DateTime d)` → `DD/MM/YYYY` string (display)
 - `formatDateISO(DateTime d)` → `YYYY-MM-DD` string (storage)
-- `pickDate(BuildContext context, DateTime initial)` → `Future<DateTime?>` (themed date picker)
+- `pickDate(BuildContext context, DateTime initial, {DateTime? firstDate, DateTime? lastDate})` →
+  `Future<DateTime?>` (themed date picker — the only `showDatePicker` call site in the app)
 
 **Why Separate:** Both `TransactionFormScreen` and `TransferFormScreen` use identical date logic; extracting eliminates duplication.
+
+---
+
+#### `ui/widgets/confirm_dialog.dart` / `dismissible_background.dart` / `form_section_label.dart`
+**Purpose:** Shared interaction primitives (widget-unification phase 1, 2026-07-19 — see ADR 0009).
+
+**Exports:**
+- `showConfirmDialog(context, {title, message, confirmLabel = 'Confirmar', destructive})` →
+  `Future<bool>` — canonical confirm dialog (Spanish `Cancelar` cancel + `FilledButton` confirm,
+  error-colored when `destructive: true`; dismiss returns `false`). Replaced all 23 former inline
+  `showDialog<bool>` confirms.
+- `DismissibleBackground` — canonical swipe background;
+  `DismissibleBackgroundColorScheme { delete, archive, edit }` maps to error / tertiary / primary.
+  Replaced all 11 former inline swipe backgrounds.
+- `FormSectionLabel` — 13px semibold muted section label; `fontSize` param (12px dense variant
+  used by the notification-capture pending-review sheet).
 
 ---
 

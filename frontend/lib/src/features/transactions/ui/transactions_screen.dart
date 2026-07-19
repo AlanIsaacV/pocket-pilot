@@ -20,6 +20,8 @@ import 'package:pocket_pilot/src/features/notification_capture/ui/pending_sugges
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_view_model.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_templates_list_tab.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/dismissible_background.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_view_model.dart';
@@ -396,7 +398,10 @@ class _TransactionList extends StatelessWidget {
     return Dismissible(
       key: ValueKey('tx-${t.id}'),
       direction: DismissDirection.endToStart,
-      background: _DeleteBackground(),
+      background: const DismissibleBackground(
+        label: 'Eliminar',
+        icon: Icons.delete_outline_rounded,
+      ),
       confirmDismiss: (_) => _confirmDelete(context, t),
       onDismissed: (_) async {
         try {
@@ -442,7 +447,10 @@ class _TransactionList extends StatelessWidget {
     return Dismissible(
       key: ValueKey('sg-${suggestion.id}'),
       direction: DismissDirection.endToStart,
-      background: _DeleteBackground(),
+      background: const DismissibleBackground(
+        label: 'Eliminar',
+        icon: Icons.delete_outline_rounded,
+      ),
       confirmDismiss: (_) => _confirmDismissSuggestion(context, suggestion),
       onDismissed: (_) async {
         try {
@@ -1034,49 +1042,23 @@ Future<bool?> _confirmDismissSuggestion(
   final label = suggestion.merchantDescription?.trim().isNotEmpty == true
       ? '"${suggestion.merchantDescription}"'
       : 'esta sugerencia';
-  return showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Descartar sugerencia'),
-      content: Text(
+  return showConfirmDialog(
+    context,
+    title: 'Descartar sugerencia',
+    message:
         'Se descartará $label. La notificación original seguirá guardada localmente sin generar transacción.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(false),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(ctx).pop(true),
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(ctx).colorScheme.error,
-          ),
-          child: const Text('Descartar'),
-        ),
-      ],
-    ),
+    confirmLabel: 'Descartar',
+    destructive: true,
   );
 }
 
 Future<bool?> _confirmApproveAllResolved(BuildContext context, int count) {
-  return showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Aprobar sugerencias resueltas'),
-      content: Text(
+  return showConfirmDialog(
+    context,
+    title: 'Aprobar sugerencias resueltas',
+    message:
         'Se aprobarán $count sugerencias con cuenta y categoría asignadas.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(false),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(ctx).pop(true),
-          child: const Text('Aprobar'),
-        ),
-      ],
-    ),
+    confirmLabel: 'Aprobar',
   );
 }
 
@@ -1085,68 +1067,15 @@ Future<bool?> _confirmDelete(BuildContext context, TransactionModel t) {
   final label = t.description.isNotEmpty
       ? '"${t.description}"'
       : 'esta transacción';
-  return showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(
-        isTransfer ? 'Eliminar transferencia' : 'Eliminar transacción',
-      ),
-      content: Text(
-        isTransfer
-            ? 'Se eliminará esta transferencia completa (ambos movimientos).'
-            : 'Se eliminará $label.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(false),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(ctx).pop(true),
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(ctx).colorScheme.error,
-          ),
-          child: const Text('Eliminar'),
-        ),
-      ],
-    ),
+  return showConfirmDialog(
+    context,
+    title: isTransfer ? 'Eliminar transferencia' : 'Eliminar transacción',
+    message: isTransfer
+        ? 'Se eliminará esta transferencia completa (ambos movimientos).'
+        : 'Se eliminará $label.',
+    confirmLabel: 'Eliminar',
+    destructive: true,
   );
-}
-
-class _DeleteBackground extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.18),
-        borderRadius: AppTheme.radiusMedium,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
-        ),
-      ),
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Eliminar',
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.error,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Icon(
-            Icons.delete_outline_rounded,
-            color: Theme.of(context).colorScheme.error,
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ============================================================

@@ -21,6 +21,8 @@ import 'package:pocket_pilot/src/ui/widgets/category_icon_data.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/pending_transaction.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/pending_suggestions_view_model.dart';
 import 'package:pocket_pilot/src/ui/screens/category_picker/category_picker_screen.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_section_label.dart';
 
 class PendingReviewSheet extends StatefulWidget {
   final PendingTransactionModel pending;
@@ -302,7 +304,7 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              _SectionLabel('Monto'),
+              const FormSectionLabel('Monto', fontSize: 12),
               const SizedBox(height: 6),
               TextFormField(
                 controller: _amountController,
@@ -322,7 +324,7 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
                 },
               ),
               const SizedBox(height: 16),
-              _SectionLabel('Moneda'),
+              const FormSectionLabel('Moneda', fontSize: 12),
               const SizedBox(height: 6),
               TextFormField(
                 controller: _currencyController,
@@ -334,7 +336,7 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 16),
-              _SectionLabel('Descripción'),
+              const FormSectionLabel('Descripción', fontSize: 12),
               const SizedBox(height: 6),
               TextFormField(
                 controller: _descriptionController,
@@ -343,7 +345,7 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              _SectionLabel('Cuenta'),
+              const FormSectionLabel('Cuenta', fontSize: 12),
               const SizedBox(height: 6),
               if (_isLoadingAccounts)
                 const Padding(
@@ -365,7 +367,7 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
                       v == null ? 'Selecciona una cuenta' : null,
                 ),
               const SizedBox(height: 16),
-              _SectionLabel('Categoría (opcional)'),
+              const FormSectionLabel('Categoría (opcional)', fontSize: 12),
               const SizedBox(height: 6),
               if (_isLoadingCategory)
                 const Padding(
@@ -410,13 +412,13 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
                 ),
               ],
               const SizedBox(height: 16),
-              _SectionLabel('Fecha'),
+              const FormSectionLabel('Fecha', fontSize: 12),
               const SizedBox(height: 6),
               InkWell(
                 onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _occurredAt,
+                  final picked = await pickDate(
+                    context,
+                    _occurredAt,
                     firstDate: DateTime.now().subtract(const Duration(days: 365)),
                     lastDate: DateTime.now().add(const Duration(days: 1)),
                   );
@@ -473,24 +475,6 @@ class _PendingReviewSheetState extends State<PendingReviewSheet> {
       default:
         return source;
     }
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: GoogleFonts.ibmPlexSans(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-        letterSpacing: 0.3,
-      ),
-    );
   }
 }
 

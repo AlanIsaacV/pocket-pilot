@@ -10,6 +10,8 @@ import 'package:provider/provider.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/goals/domain/goal.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/dismissible_background.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 class GoalsListTab extends StatelessWidget {
@@ -24,8 +26,9 @@ class GoalsListTab extends StatelessWidget {
             if (vm.isSyncing && !vm.isLoading)
               LinearProgressIndicator(
                 color: Theme.of(context).colorScheme.primary,
-                backgroundColor:
-                    Theme.of(context).colorScheme.surfaceContainerHigh,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHigh,
                 minHeight: 2,
               ),
             Expanded(
@@ -46,27 +49,25 @@ class GoalsListTab extends StatelessWidget {
                     return Dismissible(
                       key: ValueKey(goal.id),
                       direction: DismissDirection.endToStart,
-                      background: _DeleteBackground(),
-                      confirmDismiss: (_) =>
-                          _confirmDelete(context, goal.name),
+                      background: const DismissibleBackground(
+                        label: 'Eliminar',
+                        icon: Icons.delete_outline_rounded,
+                      ),
+                      confirmDismiss: (_) => _confirmDelete(context, goal.name),
                       onDismissed: (_) async {
                         try {
                           await vm.deleteGoal(goal.id);
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(
-                                'Meta "${goal.name}" eliminada',
-                              ),
+                              content: Text('Meta "${goal.name}" eliminada'),
                             ),
                           );
                         } catch (e) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(
-                                'No se pudo eliminar la meta: $e',
-                              ),
+                              content: Text('No se pudo eliminar la meta: $e'),
                             ),
                           );
                         }
@@ -88,9 +89,7 @@ class GoalsListTab extends StatelessWidget {
   }
 
   void _onGoalTap(BuildContext context, GoalModel goal) {
-    context
-        .push('/accounts/goals/${goal.id}/edit', extra: goal)
-        .then((result) {
+    context.push('/accounts/goals/${goal.id}/edit', extra: goal).then((result) {
       if (result == true && context.mounted) {
         context.read<GoalViewModel>().loadOnAppear();
       }
@@ -98,25 +97,12 @@ class GoalsListTab extends StatelessWidget {
   }
 
   Future<bool?> _confirmDelete(BuildContext context, String goalName) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Eliminar meta'),
-        content: Text('Se eliminara la meta "$goalName".'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+    return showConfirmDialog(
+      context,
+      title: 'Eliminar meta',
+      message: 'Se eliminara la meta "$goalName".',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
   }
 }
@@ -140,19 +126,23 @@ class _GoalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final progress = goal
-        .progressPercentageAt(now, liquidityAssignedCents: liquidityAssignedCents)
+        .progressPercentageAt(
+          now,
+          liquidityAssignedCents: liquidityAssignedCents,
+        )
         .clamp(0, 100)
         .toDouble();
     final progressFraction = progress / 100;
     final target = goal.targetAmountCents / 100;
     final monthly =
         goal.monthlyRequiredCentsAt(
-              now,
-              liquidityAssignedCents: liquidityAssignedCents,
-            ) /
-            100;
+          now,
+          liquidityAssignedCents: liquidityAssignedCents,
+        ) /
+        100;
     final months = goal.monthsRemainingAt(now);
-    final isCompleted = goal.targetAmountCents > 0 &&
+    final isCompleted =
+        goal.targetAmountCents > 0 &&
         liquidityAssignedCents >= goal.targetAmountCents;
     final isOverdue = goal.isOverdueAt(
       now,
@@ -162,8 +152,8 @@ class _GoalCard extends StatelessWidget {
     final (statusLabel, statusColor) = isCompleted
         ? ('Completada', Theme.of(context).colorScheme.primary)
         : isOverdue
-            ? ('Atrasada', Theme.of(context).colorScheme.error)
-            : ('En curso', Theme.of(context).colorScheme.tertiary);
+        ? ('Atrasada', Theme.of(context).colorScheme.error)
+        : ('En curso', Theme.of(context).colorScheme.tertiary);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -215,8 +205,9 @@ class _GoalCard extends StatelessWidget {
                           'Meta: ${goal.targetDate}',
                           style: GoogleFonts.ibmPlexSans(
                             fontSize: 12,
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -269,8 +260,9 @@ class _GoalCard extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: progressFraction,
                   minHeight: 6,
-                  backgroundColor:
-                      Theme.of(context).colorScheme.surfaceContainerHigh,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHigh,
                   color: statusColor,
                 ),
               ),
@@ -356,46 +348,6 @@ class _InfoChip extends StatelessWidget {
               fontWeight: FontWeight.w600,
               color: Theme.of(innerContext).colorScheme.onSurface,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================
-// Background de swipe "Eliminar"
-// ============================================================
-
-class _DeleteBackground extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.18),
-        borderRadius: AppTheme.radiusMedium,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
-        ),
-      ),
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Eliminar',
-            style: GoogleFonts.ibmPlexSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.error,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Icon(
-            Icons.delete_outline_rounded,
-            color: Theme.of(context).colorScheme.error,
           ),
         ],
       ),

@@ -406,9 +406,9 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
                             label: 'Fecha',
                             value: formatDateDisplay(_date),
                             onTap: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: _date,
+                              final picked = await pickDate(
+                                context,
+                                _date,
                                 firstDate: DateTime(2020),
                                 lastDate: DateTime.now().add(
                                   const Duration(days: 365),

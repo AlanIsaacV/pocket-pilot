@@ -20,6 +20,8 @@ import 'package:pocket_pilot/src/features/user_preferences/domain/currency_prefe
 import 'package:pocket_pilot/src/features/accounts/data/account_adjustment_service.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/adjust_balance_sheet.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_section_label.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart'
     show showFormBottomSheet;
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
@@ -354,22 +356,11 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     if (!_isEditMode || _isSaving || _isLoadingInitialBalance) return;
 
     final account = _effectiveAccount!;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Archivar cuenta'),
-        content: Text('Se archivará la cuenta "${account.name}".'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Archivar'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'Archivar cuenta',
+      message: 'Se archivará la cuenta "${account.name}".',
+      confirmLabel: 'Archivar',
     );
     if (confirm != true || !mounted) return;
 
@@ -455,7 +446,6 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
     return null;
   }
 
-
   @override
   Widget build(BuildContext context) {
     if (_isLoadingAccount) {
@@ -501,7 +491,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _SectionLabel('Nombre de la cuenta'),
+              const FormSectionLabel('Nombre de la cuenta'),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _nameController,
@@ -513,7 +503,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
                     _requiredText(value, fieldName: 'El nombre'),
               ),
               const SizedBox(height: 24),
-              _SectionLabel('Tipo de cuenta'),
+              const FormSectionLabel('Tipo de cuenta'),
               const SizedBox(height: 12),
               _AccountTypeSelector(
                 selected: _selectedType,
@@ -524,7 +514,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
                 types: _accountTypes,
               ),
               const SizedBox(height: 24),
-              _SectionLabel('Moneda de la cuenta'),
+              const FormSectionLabel('Moneda de la cuenta'),
               const SizedBox(height: 8),
               InkWell(
                 onTap: _showCurrencySheet,
@@ -553,7 +543,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              _SectionLabel('Monto inicial (opcional)'),
+              const FormSectionLabel('Monto inicial (opcional)'),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _initialAmountController,
@@ -578,7 +568,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
               ),
               if (_requiresSpecialFields) ...[
                 const SizedBox(height: 24),
-                _SectionLabel(
+                FormSectionLabel(
                   _isCreditCard
                       ? 'Límite de crédito'
                       : 'Monto original del préstamo',
@@ -608,7 +598,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
               ],
               if (_isCreditCard) ...[
                 const SizedBox(height: 24),
-                _SectionLabel('Día de corte'),
+                const FormSectionLabel('Día de corte'),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _statementDayController,
@@ -621,7 +611,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
               ],
               if (_requiresSpecialFields) ...[
                 const SizedBox(height: 24),
-                _SectionLabel('Fecha límite de pago'),
+                const FormSectionLabel('Fecha límite de pago'),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _paymentDueDayController,
@@ -634,7 +624,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                _SectionLabel('Interés APR (%) — opcional'),
+                const FormSectionLabel('Interés APR (%) — opcional'),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _interestRateController,
@@ -645,7 +635,7 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
               ],
               if (_isLoan) ...[
                 const SizedBox(height: 24),
-                _SectionLabel('Plazo (meses)'),
+                const FormSectionLabel('Plazo (meses)'),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _termMonthsController,
@@ -678,25 +668,6 @@ class _AccountFormScreenState extends State<AccountFormScreen> {
 // ============================================================
 // Label de sección
 // ============================================================
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: GoogleFonts.ibmPlexSans(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-        letterSpacing: 0.3,
-      ),
-    );
-  }
-}
 
 // ============================================================
 // Selector de tipo de cuenta (chips)
@@ -770,7 +741,6 @@ class _AccountTypeSelector extends StatelessWidget {
     );
   }
 }
-
 
 class _ScrollableBottomSheet extends StatelessWidget {
   final String title;

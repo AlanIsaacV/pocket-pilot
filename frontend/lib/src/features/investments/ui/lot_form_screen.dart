@@ -12,6 +12,7 @@ import 'package:pocket_pilot/src/features/investments/data/investment_lot_reposi
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_lot.dart';
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
+import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
@@ -102,8 +103,9 @@ class _LotFormScreenState extends State<LotFormScreen> {
 
     final holding = await holdingRepo.getById(widget.holdingId);
     final allAccounts = await accountStore.getAccounts();
-    final investments =
-        allAccounts.where((a) => a.type == 'investment').toList();
+    final investments = allAccounts
+        .where((a) => a.type == 'investment')
+        .toList();
     final siblings = await lotRepo.getByHolding(widget.holdingId);
 
     AccountModel? selected;
@@ -222,8 +224,9 @@ class _LotFormScreenState extends State<LotFormScreen> {
       final qty = double.parse(_quantityController.text.trim());
       final price = double.parse(_priceController.text.trim());
       final feeText = _feeController.text.trim();
-      final feeCents =
-          feeText.isEmpty ? 0 : (double.parse(feeText) * 100).round();
+      final feeCents = feeText.isEmpty
+          ? 0
+          : (double.parse(feeText) * 100).round();
       final fxText = _fxRateController.text.trim();
       final fxRate = fxText.isEmpty ? null : double.parse(fxText);
       final notesText = _notesController.text.trim();
@@ -260,25 +263,12 @@ class _LotFormScreenState extends State<LotFormScreen> {
 
   Future<void> _onDelete() async {
     if (!_isEditMode || _isSaving) return;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar operación'),
-        content: const Text('Se eliminará esta operación del holding.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'Eliminar operación',
+      message: 'Se eliminará esta operación del holding.',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
     if (confirm != true || !mounted) return;
 
@@ -421,8 +411,9 @@ class _LotFormScreenState extends State<LotFormScreen> {
                     value: account != null
                         ? '${account.name} · ${account.currencyCode}'
                         : 'Sin cuenta',
-                    onTap:
-                        _investmentAccounts.isEmpty ? () {} : _showAccountSheet,
+                    onTap: _investmentAccounts.isEmpty
+                        ? () {}
+                        : _showAccountSheet,
                   ),
                   const SizedBox(height: 8),
 
@@ -503,10 +494,11 @@ class _LotFormScreenState extends State<LotFormScreen> {
                       decoration: InputDecoration(
                         labelText:
                             'Tipo de cambio ${holding?.currencyCode} → ${account?.currencyCode}',
-                        helperText:
-                            'Obligatorio cuando las monedas difieren',
-                        prefixIcon:
-                            const Icon(Icons.swap_horiz_rounded, size: 20),
+                        helperText: 'Obligatorio cuando las monedas difieren',
+                        prefixIcon: const Icon(
+                          Icons.swap_horiz_rounded,
+                          size: 20,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),

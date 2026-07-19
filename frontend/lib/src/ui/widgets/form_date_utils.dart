@@ -11,12 +11,17 @@ String formatDateISO(DateTime d) =>
 /// Shows a date picker dialog themed with the current context's color scheme.
 ///
 /// Returns the selected date or null if the user cancels.
-Future<DateTime?> pickDate(BuildContext context, DateTime initial) =>
+Future<DateTime?> pickDate(
+  BuildContext context,
+  DateTime initial, {
+  DateTime? firstDate,
+  DateTime? lastDate,
+}) =>
     showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      firstDate: firstDate ?? DateTime(2000),
+      lastDate: lastDate ?? DateTime(2100),
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: Theme.of(context).colorScheme.copyWith(

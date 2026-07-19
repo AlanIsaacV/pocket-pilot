@@ -5,7 +5,7 @@
   "updated_at": "2026-07-19",
   "owner": null,
   "status": "in-progress",
-  "current_phase": 0,
+  "current_phase": 1,
   "phases": [
     {
       "id": 0,
@@ -70,11 +70,78 @@
       "name": "shared-primitives",
       "file": "phase-1-shared-primitives.md",
       "goal": "Ship the small, low-risk shared primitives and adopt them everywhere, killing ~30 scattered",
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "tasks": [],
-      "deviations": []
+      "status": "completed",
+      "started_at": "2026-07-19",
+      "completed_at": "2026-07-19",
+      "tasks": [
+        {
+          "id": "1.1",
+          "title": "Create confirm_dialog.dart, dismissible_background.dart, form_section_label.dart in lib/src/ui/widgets/ with at least one widget test each",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.2",
+          "title": "Adopt showConfirmDialog across all 22 files with showDialog<bool> confirms (verify notifications_screen:131 dialog shape); leave inline + document any dialog with extra content",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.3",
+          "title": "Adopt DismissibleBackground in the 11 Dismissible sites and FormSectionLabel in the 5 section-label sites",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.4",
+          "title": "Extend pickDate() with optional firstDate/lastDate and adopt it in the 5 raw showDatePicker sites; replace category_form's private _TypeToggle with shared TransactionTypeToggle",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "1.5",
+          "title": "Verification pass: flutter analyze, flutter test, greps proving no confirm/swipe/label/showDatePicker duplicate remains outside shared widgets",
+          "status": "done",
+          "notes": null
+        }
+      ],
+      "deviations": [
+        {
+          "date": "2026-07-19",
+          "kind": "scope-change",
+          "note": "Sweep widened beyond the planning survey: adopt showConfirmDialog in ALL current showDialog<bool> confirm sites (22 files; survey listed ~18 \u2014 extra discard-changes confirms in budget/goal/transaction/template/yield-config form screens) and DismissibleBackground in all 11 Dismissible sites (extra: categories_screen, notifications_screen which moved to lib/src/ui/screens/notifications/)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "scope-change",
+          "note": "pickDate() (extended with optional firstDate/lastDate) is also adopted in both temporal_page_view copies (phase-4 files) so the 'no raw showDatePicker outside form_date_utils' criterion holds fully in phase 1."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Task 1.1 implemented via Codex (codex:codex-rescue). Codex sandbox could not run flutter test; orchestrator ran the 3 new widget tests: all pass."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Task 1.2 implemented via Codex (codex:codex-rescue): 23 files (22 typed-confirm sites + notifications_screen's untyped confirm, migrated too). Codex sandbox could not run flutter analyze; orchestrator ran it: clean (1 pre-existing info) and grep shows zero showDialog<bool> outside confirm_dialog.dart."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Task 1.4 + most of 1.3 implemented via Codex (codex:codex-rescue): pickDate() extended and adopted in all 5 raw showDatePicker sites (grep clean), _TypeToggle replaced, FormSectionLabel adopted in 5 sites, DismissibleBackground in 10/11 sites. Remaining: categories_screen's EDIT swipe uses colorScheme.primary \u2014 shared enum only has delete/archive; paused for user decision. Orchestrator ran flutter analyze: clean (1 pre-existing info)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Task 1.3 completed via Codex follow-up: DismissibleBackgroundColorScheme gained 'edit' variant (primary color) and categories_screen's edit swipe migrated; 11/11 Dismissible sites now use the shared widget. Orchestrator ran analyze (clean, 1 pre-existing info) and the widget tests (pass)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Task 1.5's verification executed by the verify sub-agent (phase-0 precedent): all success criteria met; sole test failure is the documented pre-existing statistics_category_list_row_test (be4af04)."
+        }
+      ]
     },
     {
       "id": 2,
@@ -125,6 +192,11 @@
     {
       "date": "2026-07-19",
       "note": "Phase 0: category_icon_data.dart moves to ui/widgets/ as planned. Import-graph verified: only non-UI consumer is categories/data/category_seeder.dart (uses CategoryIconData.resolveIcon); it already imports from a ui/ path today, so the move does not worsen layering. core/ relocation rejected to keep the phase a pure relocation faithful to the plan.",
+      "adr_candidate": false
+    },
+    {
+      "date": "2026-07-19",
+      "note": "Phase 1: DismissibleBackgroundColorScheme gains an 'edit' variant (colorScheme.primary) so categories_screen's edit swipe adopts the shared DismissibleBackground; no inline exceptions remain.",
       "adr_candidate": false
     }
   ],

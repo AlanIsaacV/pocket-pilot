@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
-import 'package:pocket_pilot/src/features/categories/ui/category_icon_data.dart';
+import 'package:pocket_pilot/src/ui/widgets/category_icon_data.dart';
 
 // ============================================================
 // Color utility

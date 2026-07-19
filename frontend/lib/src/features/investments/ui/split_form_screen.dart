@@ -9,8 +9,8 @@ import 'package:pocket_pilot/src/features/investments/data/investment_holding_re
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_split.dart';
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/form_date_utils.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
 class SplitFormScreen extends StatefulWidget {

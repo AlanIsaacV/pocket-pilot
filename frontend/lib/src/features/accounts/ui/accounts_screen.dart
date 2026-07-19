@@ -16,7 +16,7 @@ import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goals_list_tab.dart';
 import 'package:pocket_pilot/src/features/investments/ui/holdings_list_tab.dart';
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/notification_bell.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 

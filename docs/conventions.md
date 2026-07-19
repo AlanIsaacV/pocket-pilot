@@ -96,10 +96,13 @@
   `Color(int.parse('FF$sanitized', radix: 16))` with a try/catch fallback.
 - **Custom numpad + system keyboard coexistence**: `resizeToAvoidBottomInset: false` +
   `MediaQuery.viewInsets.bottom > 0`; hide the numpad when the keyboard is up (Save stays in AppBar).
-- **Shared form widgets/actions**: reuse `form_widgets.dart` (`NumPad`, `TagsSection`, `NoteField`,
-  `DetailRow`, `ScrollableBottomSheet`) and `ui/widgets/form_app_bar_actions.dart` across forms; the
-  shared AppBar action renders Save last, secondary (Eliminar/Ocultar) first in edit mode. See
-  [features/transaction-forms.md](features/transaction-forms.md).
+- **Shared form widgets/actions**: reuse `ui/widgets/form_widgets.dart` (`NumPad`, `TagsSection`,
+  `NoteField`, `DetailRow`, `ScrollableBottomSheet`) and `ui/widgets/form_app_bar_actions.dart`
+  across forms; the shared AppBar action renders Save last, secondary (Eliminar/Ocultar) first in
+  edit mode. See [features/transaction-forms.md](features/transaction-forms.md).
+- **Widget library layering**: a widget used by 2+ features lives in `lib/src/ui/` (`widgets/` or
+  `screens/`); a feature's `ui/` never imports another feature's `ui/`. See
+  [decisions/0008](decisions/0008-canonical-widget-library-location.md).
 - **Providers & bottom sheets**: `showModalBottomSheet` does not inherit the widget-tree providers;
   re-provide dependencies via `MultiProvider` with `.value`.
 

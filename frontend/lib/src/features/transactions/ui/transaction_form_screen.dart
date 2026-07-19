@@ -15,7 +15,7 @@ import 'package:pocket_pilot/src/core/sync/sync_service.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
-import 'package:pocket_pilot/src/features/accounts/ui/account_icon.dart';
+import 'package:pocket_pilot/src/ui/widgets/account_icon.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/tags/data/tag_local_store.dart';
@@ -26,9 +26,9 @@ import 'package:pocket_pilot/src/features/user_preferences/data/currency_prefere
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/form_date_utils.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/widgets/transaction_form_widgets.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
+import 'package:pocket_pilot/src/ui/widgets/transaction_form_widgets.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_amount_calculator.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 

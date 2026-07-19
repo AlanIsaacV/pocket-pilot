@@ -54,7 +54,7 @@ import 'package:pocket_pilot/src/features/categories/ui/category_form_screen.dar
 import 'package:pocket_pilot/src/features/transaction_templates/domain/transaction_template.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_form_route_scope.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_form_screen.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/category_picker_screen.dart';
+import 'package:pocket_pilot/src/ui/screens/category_picker/category_picker_screen.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_form_route_scope.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_form_screen.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_route_scope.dart';

@@ -20,7 +20,7 @@ import 'package:pocket_pilot/src/features/user_preferences/domain/currency_prefe
 import 'package:pocket_pilot/src/features/accounts/data/account_adjustment_service.dart';
 import 'package:pocket_pilot/src/features/accounts/ui/adjust_balance_sheet.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart'
+import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart'
     show showFormBottomSheet;
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 

@@ -23,7 +23,8 @@ through the usual paths.
   transactions per mapped account to feed the matcher.
 - Depends on `AccountLocalStore`, `CategoryLocalStore`, `TagLocalStore`, `TagRepository`,
   `AccountRepository`, `CategoryRepository`, `SyncOutbox` (all injected via `CsvImportRouteScope`).
-- Shares `form_widgets.dart` with the transaction/transfer forms.
+- Uses the shared widget library (`lib/src/ui/widgets/form_widgets.dart`, also used by the
+  transaction/transfer forms).
 
 ## CSV format (11 columns, last 2 optional)
 

@@ -14,7 +14,7 @@ import 'package:pocket_pilot/src/features/investments/domain/pnl_math.dart';
 import 'package:pocket_pilot/src/features/investments/domain/position_math.dart';
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/form_date_utils.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 class HoldingDetailScreen extends StatefulWidget {

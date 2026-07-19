@@ -14,8 +14,8 @@ import 'package:pocket_pilot/src/features/budgets/domain/budget_status.dart';
 import 'package:pocket_pilot/src/features/budgets/ui/budget_view_model.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
-import 'package:pocket_pilot/src/features/categories/ui/category_icon_data.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/widgets/transaction_form_widgets.dart';
+import 'package:pocket_pilot/src/ui/widgets/category_icon_data.dart';
+import 'package:pocket_pilot/src/ui/widgets/transaction_form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/pp_screen_state.dart';
 
 class BudgetsListTab extends StatefulWidget {

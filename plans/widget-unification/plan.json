@@ -1,0 +1,138 @@
+{
+  "schema_version": "1",
+  "feature": "widget-unification",
+  "created_at": "2026-07-19",
+  "updated_at": "2026-07-19",
+  "owner": null,
+  "status": "in-progress",
+  "current_phase": 0,
+  "phases": [
+    {
+      "id": 0,
+      "name": "ui-library-home",
+      "file": "phase-0-ui-library-home.md",
+      "goal": "Make `frontend/lib/src/ui/` the single canonical home for cross-feature widgets by moving the",
+      "status": "completed",
+      "started_at": "2026-07-19",
+      "completed_at": "2026-07-19",
+      "tasks": [
+        {
+          "id": "0.1",
+          "title": "Move account_icon.dart + category_icon_data.dart to ui/widgets/ and update all import sites (incl. category_seeder)",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "0.2",
+          "title": "Move form_widgets.dart + form_date_utils.dart to ui/widgets/ and update all import sites",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "0.3",
+          "title": "Move transaction_form_widgets.dart + transfer_form_widgets.dart to ui/widgets/ and update import sites",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "0.4",
+          "title": "Move category_picker_screen.dart + category_multi_picker.dart to ui/screens/category_picker/ and update router.dart + import sites",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "0.5",
+          "title": "Verification pass: flutter analyze clean, flutter test green, success-criteria greps empty, git diff shows only moves + import lines",
+          "status": "done",
+          "notes": null
+        }
+      ],
+      "deviations": [
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Tasks 0.1-0.2 implemented via Codex (codex:codex-rescue) instead of the apply sub-agent. Codex sandbox could not run flutter analyze; orchestrator ran it: no errors (1 pre-existing info in untouched banks_picker_screen.dart)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Tasks 0.3-0.4 implemented via Codex (codex:codex-rescue). Codex sandbox could not run flutter analyze/test; orchestrator ran analyze (no errors) and success greps (clean). Task 0.5's flutter test delegated to the verify sub-agent."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Success criterion 'flutter test passes' met modulo one PRE-EXISTING failure: test/statistics_category_list_row_test.dart:35 expects a 'prom' label that category_list_row.dart never rendered (added broken in commit be4af04, untouched by this phase; 300/301 pass). Follow-up fix belongs outside this plan."
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "shared-primitives",
+      "file": "phase-1-shared-primitives.md",
+      "goal": "Ship the small, low-risk shared primitives and adopt them everywhere, killing ~30 scattered",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "tasks": [],
+      "deviations": []
+    },
+    {
+      "id": 2,
+      "name": "currency-picker",
+      "file": "phase-2-currency-picker.md",
+      "goal": "Replace the ~9 per-form `_showCurrencySheet()` implementations with a single shared",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "tasks": [],
+      "deviations": []
+    },
+    {
+      "id": 3,
+      "name": "account-picker",
+      "file": "phase-3-account-picker.md",
+      "goal": "Replace the ~8 per-form `_showAccountSheet()`/`_showAccountPicker()` implementations with a shared",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "tasks": [],
+      "deviations": []
+    },
+    {
+      "id": 4,
+      "name": "temporal-page-view",
+      "file": "phase-4-temporal-page-view.md",
+      "goal": "Collapse the two wholesale copies of `temporal_page_view.dart` (~340 LOC each, transactions vs",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "tasks": [],
+      "deviations": []
+    },
+    {
+      "id": 5,
+      "name": "list-tab-screen-dedup",
+      "file": "phase-5-list-tab-screen-dedup.md",
+      "goal": "Each of `yield_configs` and `transaction_templates` maintains two near-identical files \u2014 a",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "tasks": [],
+      "deviations": []
+    }
+  ],
+  "decisions": [
+    {
+      "date": "2026-07-19",
+      "note": "Phase 0: category_icon_data.dart moves to ui/widgets/ as planned. Import-graph verified: only non-UI consumer is categories/data/category_seeder.dart (uses CategoryIconData.resolveIcon); it already imports from a ui/ path today, so the move does not worsen layering. core/ relocation rejected to keep the phase a pure relocation faithful to the plan.",
+      "adr_candidate": false
+    }
+  ],
+  "references": [],
+  "preferences": {
+    "auto_update_plan": true,
+    "update_docs": true,
+    "commit": true,
+    "next_phase_prompt": true
+  }
+}

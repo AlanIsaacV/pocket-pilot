@@ -9,7 +9,7 @@ import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_filter_view_model.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/widgets/category_multi_picker.dart';
+import 'package:pocket_pilot/src/ui/screens/category_picker/category_multi_picker.dart';
 
 class AdvancedFilters extends StatelessWidget {
   final List<AccountModel> accounts;

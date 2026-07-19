@@ -6,7 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 

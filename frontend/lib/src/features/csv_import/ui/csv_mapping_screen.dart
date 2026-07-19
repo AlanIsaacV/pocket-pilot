@@ -8,11 +8,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
-import 'package:pocket_pilot/src/features/accounts/ui/account_icon.dart';
-import 'package:pocket_pilot/src/features/categories/ui/category_icon_data.dart';
+import 'package:pocket_pilot/src/ui/widgets/account_icon.dart';
+import 'package:pocket_pilot/src/ui/widgets/category_icon_data.dart';
 import 'package:pocket_pilot/src/features/csv_import/domain/csv_transaction_row.dart';
 import 'package:pocket_pilot/src/features/csv_import/ui/csv_import_view_model.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 
 class CsvMappingScreen extends StatefulWidget {
   const CsvMappingScreen({super.key});

@@ -32,7 +32,7 @@ pocket-pilot/
 │   │   ├── features/<feature>/{domain,data,ui}/   # see "Frontend feature structure"
 │   │   ├── core/{db,ids,sync,grpc,auth,notifications,theme,constants}/
 │   │   ├── generated/         # GENERATED Dart gRPC stubs — do not edit by hand
-│   │   └── ui/                # shared widgets/theme
+│   │   └── ui/                # canonical cross-feature widget library (widgets/, screens/, router)
 │   └── assets/migrations/     # numbered SQLite migrations (001..NNN; head == DatabaseHelper._version)
 ├── scripts/                   # Python bank-statement parsers (uv) + gen_proto.sh + adb dump helper
 ├── statements/                # sample bank statements (input for the parsers)
@@ -62,6 +62,10 @@ pocket-pilot/
 - **State & DI** — `Provider`/`ChangeNotifier`; each feature wires its graph in a
   `*_route_scope.dart` (`ChangeNotifierProvider` for list/detail, `*_form_route_scope.dart` with
   `Provider.value` for cross-feature form data). App-wide controllers (e.g. theme) live at `main.dart`.
+- **Shared widget library** — `lib/src/ui/` is the single home for cross-feature UI:
+  `ui/widgets/` (form widgets, account/category icon helpers, date utils) and `ui/screens/`
+  (shared screens, e.g. the category pickers). Rule: a widget used by 2+ features lives here;
+  a feature's `ui/` never imports another feature's `ui/` (ADR 0008).
 
 ## Sync (cross-cutting)
 

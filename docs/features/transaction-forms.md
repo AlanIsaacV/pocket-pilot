@@ -2,28 +2,31 @@
 
 ## Overview
 
-The `features/transactions/ui` directory contains forms for creating and editing transactions and transfers. This document maps the structure after refactoring (2026-03-29).
+Transaction and transfer forms live in `features/transactions/ui/`; the reusable form widgets they
+were built with now live in the shared widget library `lib/src/ui/widgets/` (relocated 2026-07-19,
+widget-unification phase 0 — see ADR 0008). This document maps both.
 
 ## Directory Layout
 
 ```
 features/transactions/ui/
-├── form_widgets.dart          # Shared form widgets (Tags, Details, NumPad, etc.)
-├── form_date_utils.dart       # Date formatting and picking utilities
-├── transfer_form_screen.dart   # Transfer form (edit two-legged transactions)
-├── transaction_form_screen.dart # Transaction form (income/expense)
-├── ...other screens and utilities...
-└── widgets/
-    ├── transfer_form_widgets.dart    # Transfer-specific widgets
-    ├── transaction_form_widgets.dart # Transaction-specific widgets
-    └── ...other custom widgets...
+├── transfer_form_screen.dart     # Transfer form (edit two-legged transactions)
+├── transaction_form_screen.dart  # Transaction form (income/expense)
+└── ...other screens, view models and widgets...
+
+lib/src/ui/widgets/               # shared widget library (used by 10+ features)
+├── form_widgets.dart             # Shared form widgets (Tags, Details, NumPad, etc.)
+├── form_date_utils.dart          # Date formatting and picking utilities
+├── transfer_form_widgets.dart    # Transfer-specific widgets (also used by debts)
+├── transaction_form_widgets.dart # Transaction-specific widgets (also used by budgets)
+└── account_icon.dart             # accountIconForType() (used by 5 features)
 ```
 
 ## File-by-File Reference
 
 ### Shared Components
 
-#### `form_widgets.dart` (~555 lines)
+#### `ui/widgets/form_widgets.dart` (~555 lines)
 **Purpose:** Reusable widgets used across multiple form screens.
 
 **Exports:**
@@ -40,7 +43,7 @@ features/transactions/ui/
 
 ---
 
-#### `form_date_utils.dart` (~25 lines)
+#### `ui/widgets/form_date_utils.dart` (~25 lines)
 **Purpose:** Date formatting and picking utilities shared by both form screens.
 
 **Exports:**
@@ -116,7 +119,7 @@ features/transactions/ui/
 
 ---
 
-#### `widgets/transfer_form_widgets.dart` (~315 lines)
+#### `ui/widgets/transfer_form_widgets.dart` (~315 lines)
 **Purpose:** Private widget classes extracted from `transfer_form_screen.dart` to reduce file size and improve readability.
 
 **Exports:**
@@ -136,7 +139,7 @@ features/transactions/ui/
 
 ---
 
-#### `widgets/transaction_form_widgets.dart` (~230 lines)
+#### `ui/widgets/transaction_form_widgets.dart` (~230 lines)
 **Purpose:** Private widget classes extracted from `transaction_form_screen.dart`.
 
 **Exports:**
@@ -158,7 +161,7 @@ features/transactions/ui/
 
 ### Account Icon Utilities
 
-#### `features/accounts/ui/account_icon.dart` (~20 lines)
+#### `ui/widgets/account_icon.dart` (~20 lines) — moved from `features/accounts/ui/` (2026-07-19)
 **Purpose:** Shared icon mapping for account types (used in both form screens).
 
 **Exports:**
@@ -224,6 +227,9 @@ transaction_form_widgets.dart
 ├── imports app_theme.dart, app_colors.dart
 └── no form-screen imports
 ```
+
+All shared files above (`form_widgets`, `form_date_utils`, `*_form_widgets`, `account_icon`) live
+in `lib/src/ui/widgets/` as of 2026-07-19; the graph's relationships are unchanged.
 
 ---
 

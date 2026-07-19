@@ -13,7 +13,7 @@ import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/goals/domain/goal.dart';
 import 'package:pocket_pilot/src/features/goals/ui/goal_view_model.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/form_date_utils.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';

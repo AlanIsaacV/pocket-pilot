@@ -18,7 +18,7 @@ import 'package:pocket_pilot/src/core/theme/app_colors.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
-import 'package:pocket_pilot/src/features/categories/ui/category_icon_data.dart';
+import 'package:pocket_pilot/src/ui/widgets/category_icon_data.dart';
 
 Color _hexToColor(String hex) {
   if (hex.isEmpty) return AppColors.primary;

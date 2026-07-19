@@ -17,10 +17,10 @@ import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
-import 'package:pocket_pilot/src/features/categories/ui/category_icon_data.dart';
+import 'package:pocket_pilot/src/ui/widgets/category_icon_data.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/pending_transaction.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/pending_suggestions_view_model.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/category_picker_screen.dart';
+import 'package:pocket_pilot/src/ui/screens/category_picker/category_picker_screen.dart';
 
 class PendingReviewSheet extends StatefulWidget {
   final PendingTransactionModel pending;

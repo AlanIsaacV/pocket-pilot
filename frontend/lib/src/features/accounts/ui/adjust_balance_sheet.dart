@@ -8,7 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/accounts/data/account_adjustment_service.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_local_store.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 
 class AdjustBalanceSheet extends StatefulWidget {
   final String accountId;

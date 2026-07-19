@@ -12,7 +12,7 @@ import 'package:pocket_pilot/src/features/accounts/data/account_local_store.dart
 import 'package:pocket_pilot/src/features/accounts/domain/account.dart';
 import 'package:pocket_pilot/src/features/categories/data/category_local_store.dart';
 import 'package:pocket_pilot/src/features/categories/domain/category.dart';
-import 'package:pocket_pilot/src/features/categories/ui/category_icon_data.dart';
+import 'package:pocket_pilot/src/ui/widgets/category_icon_data.dart';
 import 'package:pocket_pilot/src/core/theme/app_theme.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/pending_transaction.dart';
 import 'package:pocket_pilot/src/features/notification_capture/ui/pending_review_sheet.dart';
@@ -20,7 +20,7 @@ import 'package:pocket_pilot/src/features/notification_capture/ui/pending_sugges
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_template_view_model.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/ui/transaction_templates_list_tab.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
-import 'package:pocket_pilot/src/features/transactions/ui/form_widgets.dart';
+import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transaction_filter_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/transactions_view_model.dart';
 import 'package:pocket_pilot/src/features/transactions/ui/widgets/filter_sheet.dart';

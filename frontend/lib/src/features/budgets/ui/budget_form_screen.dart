@@ -21,9 +21,9 @@ import 'package:pocket_pilot/src/ui/widgets/form_section_label.dart';
 import 'package:pocket_pilot/src/ui/widgets/transaction_form_widgets.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
-import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
+import 'package:pocket_pilot/src/ui/widgets/currency_picker.dart';
 
 class BudgetFormScreen extends StatefulWidget {
   final BudgetModel? budget;
@@ -54,9 +54,6 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
   String? _selectedCategoryId;
   CategoryModel? _selectedCategory;
   String _selectedCurrencyCode = kInitialDefaultCurrency;
-  List<String> _allowedCurrencies = List<String>.from(
-    kInitialAllowedCurrencies,
-  );
   String _selectedPeriod = 'MONTHLY';
   bool _isSaving = false;
 
@@ -84,7 +81,7 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
       }
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadCurrencyOptions();
+      _loadDefaultCurrency();
       if (_selectedCategoryId != null) _loadSelectedCategory();
     });
   }
@@ -126,7 +123,7 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
     }
   }
 
-  Future<void> _loadCurrencyOptions() async {
+  Future<void> _loadDefaultCurrency() async {
     final db = context.read<DatabaseHelper>();
     final userPreferenceStore = UserPreferenceLocalStore(db: db);
     final currencyPreferenceStore = CurrencyPreferencesLocalStore(
@@ -135,59 +132,20 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
     final snapshot = await currencyPreferenceStore.getSnapshot();
     if (!mounted) return;
 
-    final allowed = List<String>.from(snapshot.allowedCodes);
-    if (!allowed.contains(_selectedCurrencyCode)) {
-      allowed.add(_selectedCurrencyCode);
-    }
-    allowed.sort(compareCurrencyCodes);
-
     setState(() {
-      _allowedCurrencies = allowed;
       if (!_isEditMode) {
         _selectedCurrencyCode = snapshot.defaultCode;
       }
     });
   }
 
-  void _showCurrencySheet() {
-    showModalBottomSheet<Object>(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => _ScrollableBottomSheet(
-        title: 'Seleccionar moneda',
-        children: [
-          _SheetItem(
-            label: 'Configurar monedas',
-            icon: Icons.tune_rounded,
-            onTap: () => Navigator.pop(ctx, '__preferences__'),
-          ),
-          ..._allowedCurrencies.map(
-            (code) => _SheetItem(
-              label: '$code - ${currencyNameForCode(code)}',
-              onTap: () => Navigator.pop(ctx, code),
-            ),
-          ),
-        ],
-      ),
-    ).then((selection) async {
-      if (selection == null) return;
-
-      if (selection is String && selection == '__preferences__') {
-        if (!mounted) return;
-        await context.push<bool>('/settings/currency');
-        if (!mounted) return;
-        await _loadCurrencyOptions();
-        return;
-      }
-
-      if (selection is String) {
-        setState(() => _selectedCurrencyCode = selection);
-      }
-    });
+  Future<void> _showCurrencyPicker(BuildContext pickerContext) async {
+    final selection = await showCurrencyPicker(
+      pickerContext,
+      selectedCode: _selectedCurrencyCode,
+    );
+    if (!mounted || selection == null) return;
+    setState(() => _selectedCurrencyCode = selection);
   }
 
   Future<void> _openCategoryPicker() async {
@@ -380,29 +338,40 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
               // Currency selector
               const FormSectionLabel('Moneda'),
               const SizedBox(height: 8),
-              InkWell(
-                onTap: _showCurrencySheet,
-                borderRadius: AppTheme.radiusSmall,
-                child: InputDecorator(
-                  decoration: const InputDecoration(),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '$_selectedCurrencyCode - ${currencyNameForCode(_selectedCurrencyCode)}',
-                          style: GoogleFonts.ibmPlexSans(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Theme.of(context).colorScheme.onSurface,
+              Provider<CurrencyPreferencesLocalStore>(
+                create: (context) => CurrencyPreferencesLocalStore(
+                  preferences: UserPreferenceLocalStore(
+                    db: context.read<DatabaseHelper>(),
+                  ),
+                ),
+                child: Builder(
+                  builder: (pickerContext) => InkWell(
+                    onTap: () => _showCurrencyPicker(pickerContext),
+                    borderRadius: AppTheme.radiusSmall,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '$_selectedCurrencyCode - ${currencyNameForCode(_selectedCurrencyCode)}',
+                              style: GoogleFonts.ibmPlexSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
                           ),
-                        ),
+                          Icon(
+                            Icons.unfold_more_rounded,
+                            size: 18,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ],
                       ),
-                      Icon(
-                        Icons.unfold_more_rounded,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -440,101 +409,6 @@ class _BudgetFormScreenState extends State<BudgetFormScreen> {
               const SizedBox(height: 24),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ScrollableBottomSheet extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
-
-  const _ScrollableBottomSheet({required this.title, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.5,
-      minChildSize: 0.3,
-      maxChildSize: 0.85,
-      expand: false,
-      builder: (context, scrollController) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                    borderRadius: AppTheme.radiusFull,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: GoogleFonts.ibmPlexSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  children: children,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _SheetItem extends StatelessWidget {
-  final String label;
-  final IconData? icon;
-  final VoidCallback onTap;
-
-  const _SheetItem({required this.label, this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppTheme.radiusMedium,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        child: Row(
-          children: [
-            if (icon != null) ...[
-              Icon(
-                icon,
-                size: 20,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 12),
-            ],
-            Text(
-              label,
-              style: GoogleFonts.ibmPlexSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-          ],
         ),
       ),
     );

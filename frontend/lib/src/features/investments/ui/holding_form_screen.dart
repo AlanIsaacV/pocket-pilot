@@ -4,10 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/features/investments/domain/investment_holding.dart';
 import 'package:pocket_pilot/src/features/investments/ui/investment_view_model.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
+import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
+import 'package:pocket_pilot/src/ui/widgets/currency_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
 const _kExchanges = <(String, String)>[
@@ -119,8 +123,9 @@ class _HoldingFormScreenState extends State<HoldingFormScreen> {
     try {
       final vm = context.read<InvestmentViewModel>();
       final manualPriceText = _manualPriceController.text.trim();
-      final manualPrice =
-          manualPriceText.isEmpty ? null : double.parse(manualPriceText);
+      final manualPrice = manualPriceText.isEmpty
+          ? null
+          : double.parse(manualPriceText);
       final notesText = _notesController.text.trim();
 
       final now = DateTime.now().toUtc();
@@ -191,24 +196,13 @@ class _HoldingFormScreenState extends State<HoldingFormScreen> {
     });
   }
 
-  void _showCurrencySheet() {
-    showFormBottomSheet<String>(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: 'Moneda del activo',
-        children: kSuggestedCurrencies
-            .map(
-              (c) => SheetItem(
-                icon: Icons.payments_outlined,
-                label: '${c.code} — ${c.name}',
-                onTap: () => Navigator.pop(ctx, c.code),
-              ),
-            )
-            .toList(),
-      ),
-    ).then((selection) {
-      if (selection != null) setState(() => _currencyCode = selection);
-    });
+  Future<void> _showCurrencyPicker(BuildContext pickerContext) async {
+    final selection = await showCurrencyPicker(
+      pickerContext,
+      selectedCode: _currencyCode,
+    );
+    if (!mounted || selection == null) return;
+    setState(() => _currencyCode = selection);
   }
 
   String _exchangeLabel() =>
@@ -281,11 +275,20 @@ class _HoldingFormScreenState extends State<HoldingFormScreen> {
               value: _assetTypeLabel(),
               onTap: _showAssetTypeSheet,
             ),
-            DetailRow(
-              icon: Icons.payments_outlined,
-              label: 'Moneda',
-              value: _currencyCode,
-              onTap: _showCurrencySheet,
+            Provider<CurrencyPreferencesLocalStore>(
+              create: (context) => CurrencyPreferencesLocalStore(
+                preferences: UserPreferenceLocalStore(
+                  db: context.read<DatabaseHelper>(),
+                ),
+              ),
+              child: Builder(
+                builder: (pickerContext) => DetailRow(
+                  icon: Icons.payments_outlined,
+                  label: 'Moneda',
+                  value: _currencyCode,
+                  onTap: () => _showCurrencyPicker(pickerContext),
+                ),
+              ),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -298,8 +301,7 @@ class _HoldingFormScreenState extends State<HoldingFormScreen> {
               ],
               decoration: const InputDecoration(
                 labelText: 'Precio manual (opcional)',
-                helperText:
-                    'Usado cuando no hay precio de mercado disponible',
+                helperText: 'Usado cuando no hay precio de mercado disponible',
                 prefixIcon: Icon(Icons.attach_money_rounded, size: 20),
               ),
             ),

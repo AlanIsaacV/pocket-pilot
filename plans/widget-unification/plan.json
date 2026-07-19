@@ -5,7 +5,7 @@
   "updated_at": "2026-07-19",
   "owner": null,
   "status": "in-progress",
-  "current_phase": 1,
+  "current_phase": 2,
   "phases": [
     {
       "id": 0,
@@ -148,11 +148,68 @@
       "name": "currency-picker",
       "file": "phase-2-currency-picker.md",
       "goal": "Replace the ~9 per-form `_showCurrencySheet()` implementations with a single shared",
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "tasks": [],
-      "deviations": []
+      "status": "completed",
+      "started_at": "2026-07-19",
+      "completed_at": "2026-07-19",
+      "tasks": [
+        {
+          "id": "2.1",
+          "title": "Create ui/widgets/currency_picker.dart: self-contained showCurrencyPicker (loads snapshot, CODE \u2014 Name labels, 'Configurar monedas' entry with internal round-trip + donor reconciliation) + widget tests",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "2.2",
+          "title": "Adopt picker in transaction_template_form_screen (donor), deleting its sheet + _openCurrencyPreferencesFlow",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "2.3",
+          "title": "Adopt picker in account/budget/goal form screens, deleting private _ScrollableBottomSheet/_SheetItem copies",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "2.4",
+          "title": "Adopt picker in transaction/transfer/debt/holding form screens (calculator-commit stays in caller; debt/transfer pass per-field selectedCode)",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "2.5",
+          "title": "Verification pass: success-criteria greps, flutter analyze, flutter test, negative net LOC",
+          "status": "done",
+          "notes": null
+        }
+      ],
+      "deviations": [
+        {
+          "date": "2026-07-19",
+          "kind": "scope-change",
+          "note": "Public API returns Future<String?> instead of the phase file's public sealed result (selected|openPreferences|dismissed); the typed selection state stays internal to currency_picker.dart. Chosen by the user for maximal call-site deletion."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Tasks 2.1-2.2 implemented via Codex (codex:codex-rescue) in two rounds: the initial run left a missing-import compile error in the donor, an unguarded context.push in the picker, and a dead-code reconciliation fallback (selectedCode was always added to the membership set); all three fixed in a Codex follow-up with a regression test for the fallback path. Codex sandbox cannot run flutter; orchestrator ran analyze (clean, 1 pre-existing info) and the 2 picker widget tests (pass)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Task 2.3 implemented via Codex (codex:codex-rescue): accounts/budgets/goals adopted showCurrencyPicker and their private _ScrollableBottomSheet/_SheetItem copies were deleted (-384 net LOC). None of the three passes mustIncludeCode (no account context in those forms; the picker preserves the selected code regardless). Orchestrator ran analyze (clean, 1 pre-existing info) and success greps (clean)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Task 2.4 implemented via Codex (codex:codex-rescue): transaction/transfer/debt/holding forms adopted showCurrencyPicker; calculator-expression commit kept at the transaction call site and transfer's same-currency amount sync preserved. Orchestrator ran analyze (clean, 1 pre-existing info) and all success greps (clean). Phase LOC balance so far: -659 net across the 8 forms. Task 2.5's flutter test delegated to the verify sub-agent (phase-0/1 precedent)."
+        },
+        {
+          "date": "2026-07-19",
+          "kind": "note",
+          "note": "Task 2.5 verification executed by the verify sub-agent: verdict ready-to-close, 0 CRITICAL. All success criteria met; net LOC -429 (forms -659, new picker+test +230). Sole test failure is the documented pre-existing statistics_category_list_row_test (be4af04). Out-of-scope working-tree change noted: user's own .gitignore edit (tooling housekeeping), left uncommitted by this phase."
+        }
+      ]
     },
     {
       "id": 3,
@@ -197,6 +254,11 @@
     {
       "date": "2026-07-19",
       "note": "Phase 1: DismissibleBackgroundColorScheme gains an 'edit' variant (colorScheme.primary) so categories_screen's edit swipe adopts the shared DismissibleBackground; no inline exceptions remain.",
+      "adr_candidate": false
+    },
+    {
+      "date": "2026-07-19",
+      "note": "Phase 2: showCurrencyPicker is fully self-contained \u2014 loads allowed codes from CurrencyPreferencesLocalStore itself (read before opening the sheet, since showModalBottomSheet doesn't inherit providers), handles the 'Configurar monedas' round-trip internally (push /settings/currency, reload snapshot, reconcile selection like the templates donor, no sheet re-open) and returns Future<String?>. Callers pass selectedCode + optional mustIncludeCode (account currency). Forms delete _allowedCurrencies state, _openCurrencyPreferencesFlow and their sheets.",
       "adr_candidate": false
     }
   ],

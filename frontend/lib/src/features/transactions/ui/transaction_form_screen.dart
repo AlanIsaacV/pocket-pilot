@@ -24,9 +24,9 @@ import 'package:pocket_pilot/src/features/tags/domain/tag.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
-import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
 import 'package:pocket_pilot/src/features/transactions/domain/transaction.dart';
 import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/currency_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/transaction_form_widgets.dart';
@@ -43,8 +43,6 @@ class TransactionFormScreen extends StatefulWidget {
 }
 
 enum _AccountSheetSelection { addNew }
-
-enum _CurrencySheetSelection { openPreferences }
 
 class _TransactionFormScreenState extends State<TransactionFormScreen> {
   static const _uuid = Uuid();
@@ -68,9 +66,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   List<AccountModel> _accounts = [];
   List<CategoryModel> _allCategories = [];
   List<TagModel> _allTags = [];
-  List<String> _allowedCurrencies = List<String>.from(
-    kInitialAllowedCurrencies,
-  );
 
   final _tagController = TextEditingController();
   final _noteController = TextEditingController();
@@ -136,7 +131,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       }
     }
 
-    var allowedCurrencies = List<String>.from(currencySnapshot.allowedCodes);
     var selectedCurrencyCode = currencySnapshot.defaultCode;
     AccountModel? selectedAccount;
     CategoryModel? selectedCategory;
@@ -203,18 +197,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       selectedCurrencyCode = selectedAccount.currencyCode;
     }
 
-    if (!allowedCurrencies.contains(selectedCurrencyCode)) {
-      allowedCurrencies.add(selectedCurrencyCode);
-      allowedCurrencies.sort(compareCurrencyCodes);
-    }
-
     _amountCalculator.reset(initialAmount);
 
     setState(() {
       _accounts = accounts;
       _allCategories = categories;
       _allTags = tags;
-      _allowedCurrencies = allowedCurrencies;
       _currencyCode = selectedCurrencyCode;
       _selectedAccount = selectedAccount;
       _selectedCategory = selectedCategory;
@@ -253,42 +241,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     }
 
     await _loadData();
-  }
-
-  Future<void> _openCurrencyPreferencesFlow() async {
-    await context.push<bool>('/settings/currency');
-    if (!mounted) return;
-
-    final snapshot = await context
-        .read<CurrencyPreferencesLocalStore>()
-        .getSnapshot();
-    if (!mounted) return;
-
-    final allowed = List<String>.from(snapshot.allowedCodes);
-    if (_selectedAccount != null &&
-        !allowed.contains(_selectedAccount!.currencyCode)) {
-      allowed.add(_selectedAccount!.currencyCode);
-    }
-
-    var nextCurrencyCode = _currencyCode;
-    if (!allowed.contains(nextCurrencyCode)) {
-      if (_selectedAccount != null &&
-          allowed.contains(_selectedAccount!.currencyCode)) {
-        nextCurrencyCode = _selectedAccount!.currencyCode;
-      } else {
-        nextCurrencyCode = snapshot.defaultCode;
-      }
-    }
-
-    if (!allowed.contains(nextCurrencyCode)) {
-      allowed.add(nextCurrencyCode);
-    }
-    allowed.sort(compareCurrencyCodes);
-
-    setState(() {
-      _allowedCurrencies = allowed;
-      _currencyCode = nextCurrencyCode;
-    });
   }
 
   // ----------------------------------------------------------
@@ -385,11 +337,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         setState(() {
           _selectedAccount = selection;
           _currencyCode = selection.currencyCode;
-          if (!_allowedCurrencies.contains(_currencyCode)) {
-            _allowedCurrencies = List<String>.from(_allowedCurrencies)
-              ..add(_currencyCode)
-              ..sort(compareCurrencyCodes);
-          }
           if (!_canUseInstallments) {
             _installmentsCount = 1;
           }
@@ -427,38 +374,15 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     });
   }
 
-  void _showCurrencySheet() {
+  Future<void> _showCurrencyPicker() async {
     _commitPendingAmountIfAny();
-
-    showFormBottomSheet<Object>(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: 'Seleccionar moneda',
-        children: [
-          SheetItem(
-            icon: Icons.tune_rounded,
-            label: 'Configurar monedas',
-            onTap: () =>
-                Navigator.pop(ctx, _CurrencySheetSelection.openPreferences),
-          ),
-          ..._allowedCurrencies.map(
-            (code) => SheetItem(
-              label: '$code — ${currencyNameForCode(code)}',
-              onTap: () => Navigator.pop(ctx, code),
-            ),
-          ),
-        ],
-      ),
-    ).then((selection) async {
-      if (selection is String) {
-        setState(() => _currencyCode = selection);
-        return;
-      }
-
-      if (selection == _CurrencySheetSelection.openPreferences) {
-        await _openCurrencyPreferencesFlow();
-      }
-    });
+    final selection = await showCurrencyPicker(
+      context,
+      selectedCode: _currencyCode,
+      mustIncludeCode: _selectedAccount?.currencyCode,
+    );
+    if (!mounted || selection == null) return;
+    setState(() => _currencyCode = selection);
   }
 
   Future<void> _openCategoryPicker() async {
@@ -827,7 +751,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                           children: [
                             // Currency pill pinned left
                             GestureDetector(
-                              onTap: _showCurrencySheet,
+                              onTap: _showCurrencyPicker,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,

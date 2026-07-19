@@ -25,7 +25,7 @@ import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/ui/widgets/transfer_form_widgets.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
-import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
+import 'package:pocket_pilot/src/ui/widgets/currency_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
 // ----------------------------------------------------------
@@ -72,9 +72,6 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
   // ----------------------------------------------------------
   String _currencyOut = '';
   String _currencyIn = '';
-  List<String> _allowedCurrencies = List<String>.from(
-    kInitialAllowedCurrencies,
-  );
 
   // ----------------------------------------------------------
   // Campo activo del numpad
@@ -176,7 +173,6 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
       if (!mounted) return;
     }
 
-    var allowedCurrencies = List<String>.from(currencySnapshot.allowedCodes);
     AccountModel? fromAccount;
     AccountModel? toAccount;
     var amountOutInput = '0';
@@ -275,14 +271,6 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
       currencyIn = toAccount.currencyCode;
     }
 
-    // Asegurar que las monedas usadas estén en la lista permitida
-    for (final code in [currencyOut, currencyIn]) {
-      if (!allowedCurrencies.contains(code)) {
-        allowedCurrencies.add(code);
-      }
-    }
-    allowedCurrencies.sort(compareCurrencyCodes);
-
     // Recalcular tasa si aplica en edición
     if (_isEditMode && currencyOut != currencyIn) {
       final outVal = double.tryParse(amountOutInput) ?? 0;
@@ -295,7 +283,6 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
     setState(() {
       _accounts = accounts;
       _allTags = tags;
-      _allowedCurrencies = allowedCurrencies;
       _fromAccount = fromAccount;
       _toAccount = toAccount;
       _amountOutInput = amountOutInput;
@@ -460,19 +447,9 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
           if (isSource) {
             _fromAccount = selection;
             _currencyOut = selection.currencyCode;
-            if (!_allowedCurrencies.contains(_currencyOut)) {
-              _allowedCurrencies = List<String>.from(_allowedCurrencies)
-                ..add(_currencyOut)
-                ..sort(compareCurrencyCodes);
-            }
           } else {
             _toAccount = selection;
             _currencyIn = selection.currencyCode;
-            if (!_allowedCurrencies.contains(_currencyIn)) {
-              _allowedCurrencies = List<String>.from(_allowedCurrencies)
-                ..add(_currencyIn)
-                ..sort(compareCurrencyCodes);
-            }
           }
           _syncAmountsIfSameCurrency();
         });
@@ -522,77 +499,22 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
   // Selector de moneda (origen o destino)
   // ----------------------------------------------------------
 
-  void _showCurrencySheet({required bool isSource}) {
-    showFormBottomSheet<Object>(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: isSource ? 'Moneda origen' : 'Moneda destino',
-        children: [
-          SheetItem(
-            icon: Icons.tune_rounded,
-            label: 'Configurar monedas',
-            onTap: () => Navigator.of(ctx).pop('__preferences__'),
-          ),
-          for (final code in _allowedCurrencies)
-            SheetItem(
-              label: '$code — ${currencyNameForCode(code)}',
-              onTap: () => Navigator.of(ctx).pop(code),
-            ),
-        ],
-      ),
-    ).then((selection) async {
-      if (selection == null || !mounted) return;
-
-      if (selection is String && selection == '__preferences__') {
-        await _openCurrencyPreferencesFlow();
-        return;
-      }
-
-      if (selection is String) {
-        setState(() {
-          if (isSource) {
-            _currencyOut = selection;
-          } else {
-            _currencyIn = selection;
-          }
-          _syncAmountsIfSameCurrency();
-        });
-      }
-    });
-  }
-
-  Future<void> _openCurrencyPreferencesFlow() async {
-    await context.push<bool>('/settings/currency');
-    if (!mounted) return;
-
-    final snapshot = await context
-        .read<CurrencyPreferencesLocalStore>()
-        .getSnapshot();
-    if (!mounted) return;
-
-    final allowed = List<String>.from(snapshot.allowedCodes);
-    // Mantener las monedas de las cuentas seleccionadas
-    for (final code in [_currencyOut, _currencyIn]) {
-      if (!allowed.contains(code)) {
-        allowed.add(code);
-      }
-    }
-    allowed.sort(compareCurrencyCodes);
-
-    // Si alguna moneda activa fue removida, volver a la de la cuenta
-    var nextOut = _currencyOut;
-    var nextIn = _currencyIn;
-    if (!allowed.contains(nextOut) && _fromAccount != null) {
-      nextOut = _fromAccount!.currencyCode;
-    }
-    if (!allowed.contains(nextIn) && _toAccount != null) {
-      nextIn = _toAccount!.currencyCode;
-    }
+  Future<void> _showCurrencyPicker({required bool isSource}) async {
+    final selection = await showCurrencyPicker(
+      context,
+      selectedCode: isSource ? _currencyOut : _currencyIn,
+      mustIncludeCode: isSource
+          ? _fromAccount?.currencyCode
+          : _toAccount?.currencyCode,
+    );
+    if (!mounted || selection == null) return;
 
     setState(() {
-      _allowedCurrencies = allowed;
-      _currencyOut = nextOut;
-      _currencyIn = nextIn;
+      if (isSource) {
+        _currencyOut = selection;
+      } else {
+        _currencyIn = selection;
+      }
       _syncAmountsIfSameCurrency();
     });
   }
@@ -862,7 +784,7 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
                           trailing: null,
                           onAccountTap: () => _showAccountSheet(isSource: true),
                           onCurrencyTap: () =>
-                              _showCurrencySheet(isSource: true),
+                              _showCurrencyPicker(isSource: true),
                           onAmountTap: () => setState(
                             () => _activeField = _ActiveField.source,
                           ),
@@ -917,7 +839,7 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
                           onAccountTap: () =>
                               _showAccountSheet(isSource: false),
                           onCurrencyTap: () =>
-                              _showCurrencySheet(isSource: false),
+                              _showCurrencyPicker(isSource: false),
                           onAmountTap: () => setState(
                             () => _activeField = _ActiveField.destination,
                           ),

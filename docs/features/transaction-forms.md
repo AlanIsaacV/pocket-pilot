@@ -22,6 +22,7 @@ lib/src/ui/widgets/               # shared widget library (used by 10+ features)
 ├── confirm_dialog.dart           # showConfirmDialog() — canonical confirmation dialog
 ├── dismissible_background.dart   # DismissibleBackground — canonical swipe background
 ├── form_section_label.dart       # FormSectionLabel — 13px form section label
+├── currency_picker.dart          # showCurrencyPicker() — canonical currency selection flow
 └── account_icon.dart             # accountIconForType() (used by 5 features)
 ```
 
@@ -75,15 +76,37 @@ lib/src/ui/widgets/               # shared widget library (used by 10+ features)
 
 ---
 
+#### `ui/widgets/currency_picker.dart` (~80 lines)
+**Purpose:** Canonical currency selection flow (widget-unification phase 2, 2026-07-19 — see ADR
+0009). Replaced the ~9 per-form `_showCurrencySheet()` implementations across all 8
+currency-selecting forms and deleted the private `_ScrollableBottomSheet`/`_SheetItem` copies in
+accounts/budgets/goals.
+
+**Exports:**
+- `showCurrencyPicker(context, {required selectedCode, mustIncludeCode})` → `Future<String?>` —
+  opens the shared bottom sheet with `CODE — Name` labels plus a "Configurar monedas" entry.
+  Fully self-contained: reads `CurrencyPreferencesLocalStore` from the caller's context *before*
+  opening the sheet (bottom-sheet routes don't inherit providers) and handles the preferences
+  round-trip internally — pushes `/settings/currency`, reloads the snapshot, and reconciles the
+  selection (falls back to `mustIncludeCode ?? defaultCode` when the selected code is no longer
+  allowed; no sheet re-open). Returns the selected/reconciled code, or `null` when dismissed.
+
+**Call-site contract:** callers only apply a non-null result; `mustIncludeCode` keeps a related
+currency (e.g. the selected account's) available even when not in the allowed list. Divergent side
+effects stay at the call site: the transaction form commits a pending calculator expression before
+opening; the transfer form re-syncs amounts when both currencies match.
+
+---
+
 ### Screen-Specific Components
 
-#### `transfer_form_screen.dart` (~953 lines)
+#### `transfer_form_screen.dart` (~939 lines)
 **Purpose:** Form for creating/editing transfers between two accounts with exchange rates.
 
 **State Variables (core domains):**
 - **Accounts:** `_fromAccount`, `_toAccount`, `_accounts` list
 - **Amounts:** `_amountOutInput`, `_amountInInput` (string inputs, convert to cents on save)
-- **Currencies:** `_currencyOut`, `_currencyIn`, `_allowedCurrencies` list
+- **Currencies:** `_currencyOut`, `_currencyIn`
 - **Exchange Rate:** `_activeField` (enum: source/destination), `_isRateMode`, `_rateInput`
 - **Dates:** `_date`, `_dateIn` (optional, for split dates), `_splitDates` toggle
 - **Tags:** `_selectedTags`, `_allTags`, `_tagController`
@@ -94,7 +117,8 @@ lib/src/ui/widgets/               # shared widget library (used by 10+ features)
 - `_loadData()` — Fetch accounts, tags, currency prefs; pre-fill for edit mode
 - `_onNumKey(String key)` — Handle numpad: routes to amount or rate based on `_activeField`
 - `_swapAccounts()` — Swap source/destination (including amounts and currencies)
-- `_showAccountSheet()`, `_showCurrencySheet()` — Bottom sheet pickers
+- `_showAccountSheet()` — Bottom sheet picker; currency selection goes through the shared
+  `showCurrencyPicker()` (per leg, with the leg's account currency as `mustIncludeCode`)
 - `_recalcDestFromRate()`, `_syncAmountsIfSameCurrency()` — Amount sync logic
 - `_onSave()`, `_onDelete()` — Persist or delete via `TransactionRepository`
 
@@ -108,13 +132,13 @@ lib/src/ui/widgets/               # shared widget library (used by 10+ features)
 
 ---
 
-#### `transaction_form_screen.dart` (~820 lines)
+#### `transaction_form_screen.dart` (~917 lines)
 **Purpose:** Form for creating/editing single transactions (income or expense).
 
 **State Variables (core domains):**
 - **Type:** `_type` ('expense' or 'income')
 - **Amount:** `_amountCalculator` (state machine; supports +/-/×/÷ operators)
-- **Currency:** `_currencyCode`, `_allowedCurrencies` list
+- **Currency:** `_currencyCode`
 - **Date:** `_date`
 - **Linked Entities:** `_selectedAccount`, `_selectedCategory`, `_selectedTags`
 - **Loaded Data:** `_accounts`, `_allCategories`, `_allTags`
@@ -124,7 +148,8 @@ lib/src/ui/widgets/               # shared widget library (used by 10+ features)
 **Key Methods:**
 - `_loadData()` — Fetch accounts, categories, tags, currency prefs
 - `_onNumpad(String digit)`, `_onNumpadOperation(CalcOperator)` — Delegate to calculator
-- `_showAccountSheet()`, `_showCurrencySheet()` — Bottom sheet pickers
+- `_showAccountSheet()` — Bottom sheet picker; currency selection goes through the shared
+  `showCurrencyPicker()` (commits any pending calculator expression before opening)
 - `_openCategoryPicker()` — Navigate to category picker screen
 - `_onSave()`, `_onDelete()` — Persist or delete via `TransactionRepository`
 
@@ -257,7 +282,9 @@ in `lib/src/ui/widgets/` as of 2026-07-19; the graph's relationships are unchang
 
 When testing these forms, ensure:
 1. **Numpad behavior** — digits, decimal, backspace all work correctly
-2. **Account/Currency selection** — bottom sheet pickers display and update state
+2. **Account/Currency selection** — account bottom sheets display and update state; currency
+   selection goes through the shared `showCurrencyPicker()` (covered by
+   `test/currency_picker_test.dart`, incl. the preferences-reconciliation fallback)
 3. **Date picking** — both single and split dates work
 4. **Tag adding** — recent tags appear and new tags can be created
 5. **Save/Delete** — correctly invoke repository and trigger sync
@@ -269,5 +296,5 @@ When testing these forms, ensure:
 
 1. **Form State Abstraction** — Both screens manage similar state; consider a mixin or ChangeNotifier
 2. **Amount Input Unification** — TransactionFormScreen uses a calculator; TransferFormScreen uses manual entry. Could unify with a mode switch
-3. **Bottom Sheet Consolidation** — Other screens (settings, accounts) also use `showModalBottomSheet`; could globally adopt `showFormBottomSheet()`
+3. **Bottom Sheet Consolidation** — Currency selection is done (`showCurrencyPicker`, widget-unification phase 2); account selection is next (phase 3). Other screens (settings) still use raw `showModalBottomSheet`
 4. **Widget Key Parameters** — All extracted widgets should add named `key` parameter to satisfy linter

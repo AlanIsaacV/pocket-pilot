@@ -243,5 +243,7 @@ list; `TransactionTemplateFormRouteScope` (`MultiProvider`) wraps the form and p
 `name` required; `type` income/expense/transfer_out; `account` required; `toAccount` required only
 for `transfer_out` (excludes from-account); `category` optional for income/expense, hidden for
 transfer_out (opens `CategoryPickerScreen`); `amount` optional for manual, required when
-`frequency != null`; `currency` via bottom sheet; `frequency` none/DAILY/WEEKLY/MONTHLY/YEARLY
+`frequency != null`; `currency` via the shared `showCurrencyPicker()`
+(`ui/widgets/currency_picker.dart` — this form's flow was the canonical donor);
+`frequency` none/DAILY/WEEKLY/MONTHLY/YEARLY
 (sets `nextDate` required); `nextDate`/`endDate` date pickers (`endDate` optional, clearable).

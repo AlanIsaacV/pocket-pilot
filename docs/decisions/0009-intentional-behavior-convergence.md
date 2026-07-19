@@ -30,6 +30,11 @@ converged; an `edit` variant was added for categories' edit swipe), `FormSection
 labels, `pickDate()` (extended with optional `firstDate`/`lastDate`) replaced all raw
 `showDatePicker` calls, and `category_form_screen`'s private toggle copy was deleted.
 
+Phase 2 (2026-07-19): `showCurrencyPicker` (`ui/widgets/currency_picker.dart`) replaced the ~9
+per-form `_showCurrencySheet()` implementations across all 8 currency-selecting forms — the
+templates form's flow was the canonical donor — and the private
+`_ScrollableBottomSheet`/`_SheetItem` copies in accounts/budgets/goals were deleted (net −429 LOC).
+
 ## Alternatives considered
 
 - **Behavior-preserving refactor** (parameterize every existing divergence) — rejected: the

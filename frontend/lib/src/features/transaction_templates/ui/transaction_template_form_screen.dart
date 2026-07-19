@@ -29,6 +29,7 @@ import 'package:pocket_pilot/src/features/tags/domain/tag.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/data/transaction_template_repository.dart';
 import 'package:pocket_pilot/src/features/transaction_templates/domain/transaction_template.dart';
 import 'package:pocket_pilot/src/ui/widgets/confirm_dialog.dart';
+import 'package:pocket_pilot/src/ui/widgets/currency_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_date_utils.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_widgets.dart';
 import 'package:pocket_pilot/src/features/user_preferences/data/currency_preferences_local_store.dart';
@@ -37,8 +38,6 @@ import 'package:pocket_pilot/src/features/user_preferences/domain/currency_prefe
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
 enum _AccountSheetSelection { addNew }
-
-enum _CurrencySheetSelection { openPreferences }
 
 class TransactionTemplateFormScreen extends StatefulWidget {
   final TransactionTemplateModel? template;
@@ -78,9 +77,6 @@ class _TransactionTemplateFormScreenState
   List<TagModel> _allTags = [];
   List<AccountModel> _accounts = [];
   String _currencyCode = kInitialDefaultCurrency;
-  List<String> _allowedCurrencies = List<String>.from(
-    kInitialAllowedCurrencies,
-  );
 
   String? _frequency;
   DateTime? _nextDate;
@@ -142,7 +138,6 @@ class _TransactionTemplateFormScreenState
     final tags = results[2] as List<TagModel>;
     final currencySnapshot = results[3] as CurrencyPreferencesSnapshot;
 
-    var allowedCurrencies = List<String>.from(currencySnapshot.allowedCodes);
     var selectedCurrencyCode = currencySnapshot.defaultCode;
     AccountModel? selectedAccount;
     AccountModel? selectedToAccount;
@@ -301,15 +296,9 @@ class _TransactionTemplateFormScreenState
       }
     }
 
-    if (!allowedCurrencies.contains(selectedCurrencyCode)) {
-      allowedCurrencies.add(selectedCurrencyCode);
-      allowedCurrencies.sort(compareCurrencyCodes);
-    }
-
     setState(() {
       _accounts = accounts;
       _allTags = tags;
-      _allowedCurrencies = allowedCurrencies;
       _currencyCode = selectedCurrencyCode;
       _selectedAccount = selectedAccount;
       _selectedToAccount = selectedToAccount;
@@ -526,40 +515,6 @@ class _TransactionTemplateFormScreenState
   }
 
   // ----------------------------------------------------------
-  // Flujo configuración de monedas
-  // ----------------------------------------------------------
-
-  Future<void> _openCurrencyPreferencesFlow() async {
-    await context.push<bool>('/settings/currency');
-    if (!mounted) return;
-
-    final snapshot = await context
-        .read<CurrencyPreferencesLocalStore>()
-        .getSnapshot();
-    if (!mounted) return;
-
-    final allowed = List<String>.from(snapshot.allowedCodes);
-    if (_selectedAccount != null &&
-        !allowed.contains(_selectedAccount!.currencyCode)) {
-      allowed.add(_selectedAccount!.currencyCode);
-    }
-
-    var nextCurrencyCode = _currencyCode;
-    if (!allowed.contains(nextCurrencyCode)) {
-      nextCurrencyCode = _selectedAccount?.currencyCode ?? snapshot.defaultCode;
-    }
-    if (!allowed.contains(nextCurrencyCode)) {
-      allowed.add(nextCurrencyCode);
-    }
-    allowed.sort(compareCurrencyCodes);
-
-    setState(() {
-      _allowedCurrencies = allowed;
-      _currencyCode = nextCurrencyCode;
-    });
-  }
-
-  // ----------------------------------------------------------
   // Bottom sheets: cuentas
   // ----------------------------------------------------------
 
@@ -589,11 +544,6 @@ class _TransactionTemplateFormScreenState
           _selectedAccount = selection;
           if (_type != 'transfer_out') {
             _currencyCode = selection.currencyCode;
-            if (!_allowedCurrencies.contains(_currencyCode)) {
-              _allowedCurrencies = List<String>.from(_allowedCurrencies)
-                ..add(_currencyCode)
-                ..sort(compareCurrencyCodes);
-            }
           }
         });
         return;
@@ -706,35 +656,14 @@ class _TransactionTemplateFormScreenState
   // Bottom sheet: moneda
   // ----------------------------------------------------------
 
-  void _showCurrencySheet() {
-    showFormBottomSheet<Object>(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: 'Moneda',
-        children: [
-          SheetItem(
-            icon: Icons.tune_rounded,
-            label: 'Configurar monedas',
-            onTap: () =>
-                Navigator.pop(ctx, _CurrencySheetSelection.openPreferences),
-          ),
-          ..._allowedCurrencies.map(
-            (code) => SheetItem(
-              label: '$code — ${currencyNameForCode(code)}',
-              onTap: () => Navigator.pop(ctx, code),
-            ),
-          ),
-        ],
-      ),
-    ).then((selection) async {
-      if (selection is String) {
-        setState(() => _currencyCode = selection);
-        return;
-      }
-      if (selection == _CurrencySheetSelection.openPreferences) {
-        await _openCurrencyPreferencesFlow();
-      }
-    });
+  Future<void> _showCurrencyPicker() async {
+    final selection = await showCurrencyPicker(
+      context,
+      selectedCode: _currencyCode,
+      mustIncludeCode: _selectedAccount?.currencyCode,
+    );
+    if (!mounted || selection == null) return;
+    setState(() => _currencyCode = selection);
   }
 
   void _showFrequencySheet() {
@@ -912,7 +841,7 @@ class _TransactionTemplateFormScreenState
                     icon: Icons.currency_exchange_rounded,
                     label: 'Moneda',
                     value: _currencyCode,
-                    onTap: _showCurrencySheet,
+                    onTap: _showCurrencyPicker,
                   ),
 
                   // ── 7. Monto ──────────────────────────────────────────

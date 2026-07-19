@@ -20,6 +20,7 @@ import 'package:pocket_pilot/src/features/user_preferences/data/currency_prefere
 import 'package:pocket_pilot/src/features/user_preferences/data/user_preference_local_store.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences.dart';
 import 'package:pocket_pilot/src/features/user_preferences/domain/currency_preferences_constants.dart';
+import 'package:pocket_pilot/src/ui/widgets/currency_picker.dart';
 import 'package:pocket_pilot/src/ui/widgets/form_app_bar_actions.dart';
 
 enum _ActiveField { source, destination }
@@ -59,9 +60,6 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
 
   String _sourceCurrency = kInitialDefaultCurrency;
   String _destinationCurrency = kInitialDefaultCurrency;
-  List<String> _allowedCurrencies = List<String>.from(
-    kInitialAllowedCurrencies,
-  );
 
   bool _isContactSource = false;
   _ActiveField _activeField = _ActiveField.source;
@@ -102,8 +100,6 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
     final currencySnapshot = results[1] as CurrencyPreferencesSnapshot;
 
     final myAccounts = allAccounts.where((a) => a.type != 'contact').toList();
-    var allowedCurrencies = List<String>.from(currencySnapshot.allowedCodes);
-
     String sourceCurrency = currencySnapshot.defaultCode;
     String destinationCurrency = currencySnapshot.defaultCode;
     String amountSource = '0';
@@ -178,16 +174,8 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
       isContactSource = false;
     }
 
-    for (final code in [sourceCurrency, destinationCurrency]) {
-      if (!allowedCurrencies.contains(code)) {
-        allowedCurrencies.add(code);
-      }
-    }
-    allowedCurrencies.sort(compareCurrencyCodes);
-
     setState(() {
       _myAccounts = myAccounts;
-      _allowedCurrencies = allowedCurrencies;
       _sourceCurrency = sourceCurrency;
       _destinationCurrency = destinationCurrency;
       _amountSourceInput = amountSource;
@@ -344,7 +332,7 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
                                   }
                                 : () => _showAccountSheet(isSource: true),
                             onCurrencyTap: () =>
-                                _showCurrencySheet(isSource: true),
+                                _showCurrencyPicker(isSource: true),
                             onAmountTap: () => setState(
                               () => _activeField = _ActiveField.source,
                             ),
@@ -395,7 +383,7 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
                                     );
                                   },
                             onCurrencyTap: () =>
-                                _showCurrencySheet(isSource: false),
+                                _showCurrencyPicker(isSource: false),
                             onAmountTap: () => setState(
                               () => _activeField = _ActiveField.destination,
                             ),
@@ -494,11 +482,6 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
         } else {
           _destinationCurrency = currency;
         }
-        if (!_allowedCurrencies.contains(currency)) {
-          _allowedCurrencies = List<String>.from(_allowedCurrencies)
-            ..add(currency)
-            ..sort(compareCurrencyCodes);
-        }
       }
 
       if (!_isContactAsSource && _myAccount != null) {
@@ -570,55 +553,20 @@ class _DebtFormScreenState extends State<DebtFormScreen> {
     });
   }
 
-  void _showCurrencySheet({required bool isSource}) {
-    showFormBottomSheet<Object>(
-      context: context,
-      builder: (ctx) => ScrollableBottomSheet(
-        title: isSource ? 'Moneda origen' : 'Moneda destino',
-        children: [
-          SheetItem(
-            icon: Icons.tune_rounded,
-            label: 'Configurar monedas',
-            onTap: () => Navigator.of(ctx).pop('__preferences__'),
-          ),
-          for (final code in _allowedCurrencies)
-            SheetItem(
-              label: '$code — ${currencyNameForCode(code)}',
-              onTap: () => Navigator.of(ctx).pop(code),
-            ),
-        ],
-      ),
-    ).then((selection) async {
-      if (selection == null || !mounted) return;
+  Future<void> _showCurrencyPicker({required bool isSource}) async {
+    final isMyAccountField = isSource != _isContactAsSource;
+    final selection = await showCurrencyPicker(
+      context,
+      selectedCode: isSource ? _sourceCurrency : _destinationCurrency,
+      mustIncludeCode: isMyAccountField ? _myAccount?.currencyCode : null,
+    );
+    if (!mounted || selection == null) return;
 
-      if (selection is String && selection == '__preferences__') {
-        await context.push<bool>('/settings/currency');
-        if (!mounted) return;
-        final db = context.read<DatabaseHelper>();
-        final currencyStore = CurrencyPreferencesLocalStore(
-          preferences: UserPreferenceLocalStore(db: db),
-        );
-        final snapshot = await currencyStore.getSnapshot();
-        if (!mounted) return;
-        final allowed = List<String>.from(snapshot.allowedCodes);
-        for (final code in [_sourceCurrency, _destinationCurrency]) {
-          if (!allowed.contains(code)) {
-            allowed.add(code);
-          }
-        }
-        allowed.sort(compareCurrencyCodes);
-        setState(() => _allowedCurrencies = allowed);
-        return;
-      }
-
-      if (selection is String) {
-        setState(() {
-          if (isSource) {
-            _sourceCurrency = selection;
-          } else {
-            _destinationCurrency = selection;
-          }
-        });
+    setState(() {
+      if (isSource) {
+        _sourceCurrency = selection;
+      } else {
+        _destinationCurrency = selection;
       }
     });
   }

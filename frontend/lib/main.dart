@@ -82,6 +82,7 @@ import 'package:pocket_pilot/src/features/notification_capture/data/bank_package
 import 'package:pocket_pilot/src/features/notification_capture/data/bank_package_sync_handler.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/captured_notification_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/captured_notifications_retention_sweeper.dart';
+import 'package:pocket_pilot/src/features/notification_capture/data/capture_repository_factory.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_preferences.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_capture_repository.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/notification_permission_service.dart';
@@ -535,31 +536,10 @@ Future<void> main() async {
   );
   final ncParserRemote = ParserRemoteService();
   final ncPermissionService = NotificationPermissionService();
-  final ncTransactionRepo = TransactionRepository(
-    local: TransactionLocalStore(db: dbHelper),
-    outbox: syncOutbox,
-  );
-  final ncRepository = NotificationCaptureRepository(
-    captured: ncCaptured,
-    pending: ncPending,
-    parsers: ncParsers,
-    accounts: ncAccounts,
-    cardMappings: ncCardMappings,
-    rules: ncRules,
-    feedback: ncFeedback,
-    bankAliases: ncBankAliases,
-    bankPackages: ncBankPackages,
-    transactions: ncTransactionRepo,
-    outbox: syncOutbox,
+  final ncRepository = await buildCaptureRepository(
+    db: dbHelper,
     parserRemote: ncParserRemote,
-    preferences: ncPreferences,
-  );
-  // Seed asset es fire-and-forget; el engine lo recoge en la próxima refresh.
-  unawaited(
-    ncParsers.seedFromAssetIfMissing(
-      bankId: 'bbva_mx',
-      assetPath: 'assets/parsers/bbva_mx.json',
-    ),
+    outbox: syncOutbox,
   );
   final pendingSuggestionsVM = PendingSuggestionsViewModel(
     pending: ncPending,

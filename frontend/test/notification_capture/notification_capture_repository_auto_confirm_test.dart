@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'package:pocket_pilot/src/core/db/database_helper.dart';
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
@@ -16,6 +18,7 @@ import 'package:pocket_pilot/src/features/notification_capture/data/parser_remot
 import 'package:pocket_pilot/src/features/notification_capture/data/pending_transaction_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/data/transaction_rule_local_store.dart';
 import 'package:pocket_pilot/src/features/notification_capture/background/background_capture_runner.dart';
+import 'package:pocket_pilot/src/features/notification_capture/notifications/capture_notification_service.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/account_card_mapping.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/captured_notification.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/notification_parser.dart';
@@ -136,7 +139,11 @@ void main() {
       autoConfirmEnabled: true,
     );
 
-    expect(await BackgroundCaptureRunner.withRepository(repository).run(), 1);
+    final result = await BackgroundCaptureRunner.withRepository(
+      repository,
+    ).run();
+    expect(result.autoConfirmed, 1);
+    expect(result.leftPending, 0);
 
     expect(transactions.created, hasLength(1));
     expect(transactions.created.single['source'], 'auto_notification');
@@ -189,12 +196,54 @@ void main() {
       autoConfirmEnabled: true,
     );
 
-    expect(await BackgroundCaptureRunner.withRepository(repository).run(), 1);
+    final result = await BackgroundCaptureRunner.withRepository(
+      repository,
+    ).run();
+    expect(result.autoConfirmed, 0);
+    expect(result.leftPending, 1);
 
     expect(transactions.created, isEmpty);
     expect(pending.byId.values.single.status, 'pending');
     expect(captured.byId['captured-local']!.status, 'matched_local');
     expect(feedback.models, isEmpty);
+  });
+
+  test('reports auto-confirmed and left-pending matches separately', () async {
+    final captured = _FakeCapturedStore();
+    final pending = _FakePendingStore();
+    final mappings = _FakeCardMappingStore();
+    final rules = _FakeRuleStore();
+    seedResolvedLocalMatch(
+      captured: captured,
+      mappings: mappings,
+      rules: rules,
+    );
+    final now = DateTime.utc(2026, 7, 18, 12, 1);
+    captured.seed(
+      CapturedNotificationModel(
+        id: 'captured-account-charge',
+        packageName: 'com.bancomer.mbanking',
+        title: 'Cargo a tu cuenta',
+        text: 'Cargo a tu cuenta *1234 de \$120.00',
+        postedAt: now,
+        status: 'received',
+        createdAt: now,
+      ),
+    );
+
+    final result = await buildRepository(
+      captured: captured,
+      pending: pending,
+      mappings: mappings,
+      rules: rules,
+      transactions: _FakeTransactionStore(),
+      feedback: _FakeFeedbackStore(),
+      autoConfirmEnabled: true,
+    ).processInbox();
+
+    expect(result.autoConfirmed, 1);
+    expect(result.leftPending, 1);
+    expect(result.totalProcessed, 2);
   });
 
   test('never auto-confirms a fully resolved LLM extraction', () async {
@@ -260,7 +309,10 @@ void main() {
       ),
     );
 
-    expect(await repository.processInbox(), 1);
+    final result = await repository.processInbox();
+    expect(result.autoConfirmed, 0);
+    expect(result.leftPending, 1);
+    expect(result.leftPendingTransactions, hasLength(1));
 
     expect(transactions.created, isEmpty);
     final suggestion = pending.byId.values.single;
@@ -294,7 +346,9 @@ void main() {
       autoConfirmEnabled: false,
     );
 
-    expect(await repository.processInbox(), 1);
+    final result = await repository.processInbox();
+    expect(result.autoConfirmed, 0);
+    expect(result.leftPending, 1);
 
     expect(transactions.created, isEmpty);
     expect(pending.byId.values.single.status, 'pending');
@@ -328,10 +382,157 @@ void main() {
       shareWithLlm: true,
     );
 
-    expect(await BackgroundCaptureRunner.withRepository(repository).run(), 0);
+    final result = await BackgroundCaptureRunner.withRepository(
+      repository,
+    ).run();
+    expect(result.totalProcessed, 0);
     expect(captured.byId['captured-unmatched']!.status, 'unparseable');
     expect(pending.byId, isEmpty);
   });
+
+  test(
+    'notification approval creates one transaction and is idempotent',
+    () async {
+      final pending = _FakePendingStore();
+      final transactions = _FakeTransactionStore();
+      final now = DateTime.utc(2026, 7, 18);
+      pending.byId['pending-action'] = PendingTransactionModel(
+        id: 'pending-action',
+        suggestedAccountId: 'account-1',
+        amountCents: 12000,
+        currencyCode: 'MXN',
+        merchantDescription: 'COMERCIO',
+        transactionType: 'expense',
+        occurredAt: now,
+        source: 'parser_local',
+        parserId: 'bbva_mx/purchase_tdc',
+        status: 'pending',
+        createdAt: now,
+      );
+      final repository = buildRepository(
+        captured: _FakeCapturedStore(),
+        pending: pending,
+        mappings: _FakeCardMappingStore(),
+        rules: _FakeRuleStore(),
+        transactions: transactions,
+        feedback: _FakeFeedbackStore(),
+        autoConfirmEnabled: false,
+      );
+
+      expect(
+        await repository.approvePendingFromNotification(
+          pendingId: 'pending-action',
+          categoryId: 'category-food',
+        ),
+        isTrue,
+      );
+      expect(transactions.created, hasLength(1));
+      expect(transactions.created.single['category_id'], 'category-food');
+      expect(pending.byId['pending-action']!.status, 'approved');
+      expect(
+        await repository.approvePendingFromNotification(
+          pendingId: 'pending-action',
+          categoryId: 'category-food',
+        ),
+        isFalse,
+      );
+      expect(transactions.created, hasLength(1));
+    },
+  );
+
+  test(
+    'background runner posts summary and resolved review actions only',
+    () async {
+      final fakeAndroid = _FakeAndroidNotificationPlugin();
+      FlutterLocalNotificationsPlatform.instance = fakeAndroid;
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final captured = _FakeCapturedStore();
+      final pending = _FakePendingStore();
+      final mappings = _FakeCardMappingStore();
+      final rules = _FakeRuleStore();
+      final transactions = _FakeTransactionStore()
+        ..topCategoryIds.add('category-food');
+      final feedback = _FakeFeedbackStore();
+      seedResolvedLocalMatch(
+        captured: captured,
+        mappings: mappings,
+        rules: rules,
+      );
+      final now = DateTime.utc(2026, 7, 18, 12, 1);
+      mappings.models.add(
+        AccountCardMappingModel(
+          id: 'known-card-digits',
+          bankId: 'bbva_mx',
+          lastDigits: '1234',
+          accountId: 'account-1',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      captured
+        ..seed(
+          CapturedNotificationModel(
+            id: 'resolved-review',
+            packageName: 'com.bancomer.mbanking',
+            title: 'Cargo a tu cuenta',
+            text: 'Cargo a tu cuenta *1234 de \$120.00',
+            postedAt: now,
+            status: 'received',
+            createdAt: now,
+          ),
+        )
+        ..seed(
+          CapturedNotificationModel(
+            id: 'unresolved-review',
+            packageName: 'com.bancomer.mbanking',
+            title: 'Cargo a tu cuenta',
+            text: 'Cargo a tu cuenta *9999 de \$90.00',
+            postedAt: now,
+            status: 'received',
+            createdAt: now,
+          ),
+        );
+      final repository = buildRepository(
+        captured: captured,
+        pending: pending,
+        mappings: mappings,
+        rules: rules,
+        transactions: transactions,
+        feedback: feedback,
+        autoConfirmEnabled: true,
+      );
+      final runner = BackgroundCaptureRunner.withRepository(
+        repository,
+        notifications: CaptureNotificationService(
+          plugin: FlutterLocalNotificationsPlugin(),
+          isAndroid: () => true,
+        ),
+        categoryNameForId: (id) async =>
+            id == 'category-food' ? 'Comida' : null,
+      );
+
+      try {
+        final result = await runner.run();
+
+        expect(result.autoConfirmed, 1);
+        expect(result.leftPending, 2);
+        expect(fakeAndroid.notifications, hasLength(2));
+        expect(
+          fakeAndroid.notifications.first.title,
+          '1 transacción registrada automáticamente',
+        );
+        final actionNotification = fakeAndroid.notifications.last;
+        expect(actionNotification.payload, isNotEmpty);
+        expect(
+          actionNotification.details!.actions!.map((action) => action.id),
+          ['approve:category-food', 'open_review'],
+        );
+        expect(actionNotification.details!.actions!.first.title, 'Comida');
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
 }
 
 class _FakeParserStore extends ParserLocalStore {
@@ -390,6 +591,9 @@ class _FakePendingStore extends PendingTransactionLocalStore {
   @override
   Future<List<PendingTransactionModel>> listPending({int limit = 100}) async =>
       byId.values.where((model) => model.status == 'pending').toList();
+
+  @override
+  Future<PendingTransactionModel?> getById(String id) async => byId[id];
 
   @override
   Future<void> updateStatus(String id, String status) async {
@@ -481,6 +685,7 @@ class _FakeTransactionStore extends TransactionLocalStore {
   _FakeTransactionStore() : super(db: DatabaseHelper());
   final List<Map<String, dynamic>> created = [];
   final List<Map<String, dynamic>> history = [];
+  final List<String> topCategoryIds = [];
 
   @override
   Future<void> upsertRow(Map<String, dynamic> row) async {
@@ -503,6 +708,54 @@ class _FakeTransactionStore extends TransactionLocalStore {
         .whereType<String>()
         .toSet();
     return categories.length >= 2;
+  }
+
+  @override
+  Future<List<String>> queryTopCategoryIds({
+    String? accountId,
+    int limit = 5,
+  }) async => topCategoryIds.take(limit).toList();
+}
+
+class _PostedAndroidNotification {
+  const _PostedAndroidNotification({
+    required this.title,
+    required this.payload,
+    required this.details,
+  });
+
+  final String? title;
+  final String? payload;
+  final AndroidNotificationDetails? details;
+}
+
+class _FakeAndroidNotificationPlugin
+    extends AndroidFlutterLocalNotificationsPlugin {
+  final notifications = <_PostedAndroidNotification>[];
+
+  @override
+  Future<bool> initialize({
+    required AndroidInitializationSettings settings,
+    DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
+    DidReceiveBackgroundNotificationResponseCallback?
+    onDidReceiveBackgroundNotificationResponse,
+  }) async => true;
+
+  @override
+  Future<void> show({
+    required int id,
+    String? title,
+    String? body,
+    AndroidNotificationDetails? notificationDetails,
+    String? payload,
+  }) async {
+    notifications.add(
+      _PostedAndroidNotification(
+        title: title,
+        payload: payload,
+        details: notificationDetails,
+      ),
+    );
   }
 }
 

@@ -23,6 +23,8 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:pocket_pilot/src/core/sync/sync_outbox.dart';
@@ -43,7 +45,22 @@ import 'package:pocket_pilot/src/features/notification_capture/domain/parser_fee
 import 'package:pocket_pilot/src/features/notification_capture/domain/pending_transaction.dart';
 import 'package:pocket_pilot/src/features/notification_capture/domain/transaction_rule.dart';
 import 'package:pocket_pilot/src/features/notification_capture/engine/parser_engine.dart';
+import 'package:pocket_pilot/src/features/notification_capture/notifications/capture_notification_contract.dart';
 import 'package:pocket_pilot/src/features/transactions/data/transaction_repository.dart';
+
+class ProcessInboxResult {
+  const ProcessInboxResult({
+    required this.autoConfirmed,
+    required this.leftPending,
+    this.leftPendingTransactions = const [],
+  });
+
+  final int autoConfirmed;
+  final int leftPending;
+  final List<PendingTransactionModel> leftPendingTransactions;
+
+  int get totalProcessed => autoConfirmed + leftPending;
+}
 
 class NotificationCaptureRepository {
   static const _uuid = Uuid();
@@ -93,14 +110,19 @@ class NotificationCaptureRepository {
        _parserRemote = parserRemote,
        _preferences = preferences;
 
+  @visibleForTesting
+  ParserRemoteService? get parserRemote => _parserRemote;
+
   /// Procesa cada notificación pendiente:
   ///   - intenta match con parsers locales
   ///   - si toggle ON, fallback al LLM server-side (Fase 4)
   ///   - resuelve account_id/category_id desde mappings/rules aprendidos
   ///   - persiste extraction_method/parser_version/pattern_id para trazabilidad
-  Future<int> processInbox() async {
+  Future<ProcessInboxResult> processInbox() async {
     final pending = await _captured.listPendingProcessing();
-    if (pending.isEmpty) return 0;
+    if (pending.isEmpty) {
+      return const ProcessInboxResult(autoConfirmed: 0, leftPending: 0);
+    }
 
     final parsers = await _parsers.listActive();
 
@@ -117,7 +139,9 @@ class NotificationCaptureRepository {
       autoConfirmEnabled = await preferences.autoConfirmEnabled();
     }
 
-    int processed = 0;
+    int autoConfirmed = 0;
+    int leftPending = 0;
+    final leftPendingTransactions = <PendingTransactionModel>[];
     bool quotaExhausted = false;
     final ambiguousByRulePrefix = <String, bool>{};
 
@@ -150,6 +174,7 @@ class NotificationCaptureRepository {
             capturedMatchedPatternId: match.pattern.id,
             capturedExtractionMethod: 'local',
           );
+          autoConfirmed++;
         } else {
           await _captured.updateStatus(
             notification.id,
@@ -159,17 +184,22 @@ class NotificationCaptureRepository {
             matchedPatternId: match.pattern.id,
             extractionMethod: 'local',
           );
+          leftPending++;
+          leftPendingTransactions.add(pendingTx);
         }
-        processed++;
         continue;
       }
 
       // 2. Fallback al LLM si el toggle está ON y no hemos topado cuota
       // en este batch (evitamos N llamadas perdedoras).
       if (llmEnabled && !quotaExhausted) {
-        final llmPending = await _tryLlmFallback(notification, helpImprove);
+        final llmPending = await _tryLlmFallback(
+          notification,
+          helpImprove,
+          matchedPendings: leftPendingTransactions,
+        );
         if (llmPending == _LlmOutcome.matched) {
-          processed++;
+          leftPending++;
           continue;
         }
         if (llmPending == _LlmOutcome.quotaExceeded) {
@@ -180,7 +210,11 @@ class NotificationCaptureRepository {
       // 3. Sin match local ni LLM → unparseable.
       await _captured.updateStatus(notification.id, 'unparseable');
     }
-    return processed;
+    return ProcessInboxResult(
+      autoConfirmed: autoConfirmed,
+      leftPending: leftPending,
+      leftPendingTransactions: leftPendingTransactions,
+    );
   }
 
   Future<PendingTransactionModel> _createPendingFromLocalMatch(
@@ -221,8 +255,9 @@ class NotificationCaptureRepository {
 
   Future<_LlmOutcome> _tryLlmFallback(
     dynamic notification,
-    bool helpImprove,
-  ) async {
+    bool helpImprove, {
+    List<PendingTransactionModel>? matchedPendings,
+  }) async {
     final remote = _parserRemote;
     if (remote == null) return _LlmOutcome.skipped;
 
@@ -281,6 +316,7 @@ class NotificationCaptureRepository {
       );
 
       await _pending.insert(pendingTx);
+      matchedPendings?.add(pendingTx);
       await _captured.updateStatus(
         notification.id,
         'llm_used',
@@ -351,17 +387,44 @@ class NotificationCaptureRepository {
     String? descriptionOverride,
     DateTime? dateOverride,
     bool? wasHelpful,
-  }) => _approve(
-    pending: pending,
-    accountId: accountId,
-    bankId: bankId,
-    categoryId: categoryId,
-    amountCentsOverride: amountCentsOverride,
-    currencyCodeOverride: currencyCodeOverride,
-    descriptionOverride: descriptionOverride,
-    dateOverride: dateOverride,
-    wasHelpful: wasHelpful,
-  );
+  }) async {
+    await _approve(
+      pending: pending,
+      accountId: accountId,
+      bankId: bankId,
+      categoryId: categoryId,
+      amountCentsOverride: amountCentsOverride,
+      currencyCodeOverride: currencyCodeOverride,
+      descriptionOverride: descriptionOverride,
+      dateOverride: dateOverride,
+      wasHelpful: wasHelpful,
+    );
+    await _cancelActionableNotification(pending.id);
+  }
+
+  /// Handles an approval initiated from a capture notification action.
+  ///
+  /// Returns false for missing, already-resolved, or account-unresolved
+  /// suggestions so duplicate and late Android callbacks are harmless.
+  Future<bool> approvePendingFromNotification({
+    required String pendingId,
+    required String categoryId,
+  }) async {
+    final pending = await _pending.getById(pendingId);
+    if (pending == null ||
+        pending.status != 'pending' ||
+        pending.suggestedAccountId == null) {
+      return false;
+    }
+    final (bankId, _) = PendingTransactionModel.splitParserId(pending.parserId);
+    await _approve(
+      pending: pending,
+      accountId: pending.suggestedAccountId!,
+      bankId: bankId,
+      categoryId: categoryId,
+    );
+    return true;
+  }
 
   Future<void> _approve({
     required PendingTransactionModel pending,
@@ -527,6 +590,18 @@ class NotificationCaptureRepository {
       wasDismissed: true,
       wasHelpful: wasHelpful,
     );
+    await _cancelActionableNotification(pending.id);
+  }
+
+  Future<void> _cancelActionableNotification(String pendingId) async {
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    try {
+      await FlutterLocalNotificationsPlugin().cancel(
+        id: captureNotificationIdForPending(pendingId),
+      );
+    } catch (_) {
+      // Best-effort cancellation when no notifications plugin is registered.
+    }
   }
 
   /// Persiste señal de calidad sobre la sugerencia. Push-only vía outbox; el
@@ -615,8 +690,8 @@ class NotificationCaptureRepository {
   Future<({int reopened, int matched})> reprocessUnparseable() async {
     final reopened = await _captured.resetUnparseableToReceived();
     if (reopened == 0) return (reopened: 0, matched: 0);
-    final matched = await processInbox();
-    return (reopened: reopened, matched: matched);
+    final result = await processInbox();
+    return (reopened: reopened, matched: result.totalProcessed);
   }
 
   /// Lee la fila activa más reciente de account_card_mappings.

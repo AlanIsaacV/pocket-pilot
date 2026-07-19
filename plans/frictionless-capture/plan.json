@@ -233,6 +233,11 @@
           "date": "2026-07-18",
           "kind": "note",
           "note": "Re-checked 2026-07-18 evening: dump still has no real ATM-withdrawal notification and no adb device connected; phase 4 remains blocked on the fixture. Starting phase 6 instead per user's standing instruction."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Re-checked 2026-07-18 late evening with device R5CY41EJC9V connected: dump still 325 items, 7 'retiro/cajero' candidates are all BBVA marketing (Efectivo Inmediato offers). No real ATM-withdrawal notification exists yet; phase 4 remains blocked on the fixture."
         }
       ]
     },
@@ -304,9 +309,9 @@
       "name": "background-capture",
       "file": "phase-6-background-capture.md",
       "goal": "Remove the last dependency on opening the app: run the capture pipeline (parse \u2192 resolve \u2192",
-      "status": "in-progress",
+      "status": "completed",
       "started_at": "2026-07-18",
-      "completed_at": null,
+      "completed_at": "2026-07-18",
       "tasks": [
         {
           "id": "6.1",
@@ -337,6 +342,48 @@
           "title": "Tests: runner decision logic (auto-confirm vs stays-pending), pragmas applied on open, existing flutter test suite stays green",
           "status": "done",
           "notes": null
+        },
+        {
+          "id": "6.6",
+          "title": "Extract shared capture composition root: buildCaptureRepository factory (nullable ParserRemoteService) used by main.dart and BackgroundCaptureRunner, including parser asset seeding so the background isolate self-seeds",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "6.7",
+          "title": "processInbox() returns split result (autoConfirmed / leftPending) instead of a single int; update callers (main.dart, BackgroundCaptureRunner)",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "6.8",
+          "title": "POST_NOTIFICATIONS: AndroidManifest entry + runtime request in NotificationSchedulerService.init() for Android 13+",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "6.9",
+          "title": "Capture notification channel + posting: summary notification after background run with >=1 auto-confirmed; actionable suggestion notifications with 2-3 category action buttons (reuse candidateCategoriesFor) + 'Open review' fallback; make FlutterLocalNotificationsPlugin injectable in NotificationSchedulerService",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "6.10",
+          "title": "Background action handler: onDidReceiveBackgroundNotificationResponse @pragma('vm:entry-point') entry point approving the pending with the tapped category via composition root, cancelling the notification; regression/repro test for flutter_local_notifications issue #2148",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "6.11",
+          "title": "Tests: runner decision logic (auto-confirm -> summary, ambiguous -> actionable, unresolved -> none), permission request, full flutter test green",
+          "status": "done",
+          "notes": null
+        },
+        {
+          "id": "6.12",
+          "title": "Real-device validation: empirical PRAGMA journal_mode=WAL with NLS live, periodic task under Doze, concurrency soak (NLS + background + foreground), end-to-end success criteria; includes phase-4 ATM fixture re-check",
+          "status": "done",
+          "notes": null
         }
       ],
       "deviations": [
@@ -354,6 +401,36 @@
           "date": "2026-07-18",
           "kind": "note",
           "note": "Post-verify fixes via Codex: Workmanager initialize/registerPeriodicTask wrapped in try/catch (degrades to foreground-only capture instead of crashing cold start) and busy_timeout pragma moved before journal_mode=WAL. Verify session-A verdict: ready-to-close, 0 CRITICAL. Session A (tasks 6.1-6.5, mechanism + headless runner) complete; phase stays in-progress \u2014 session B scope remains: summary/actionable notifications, NLS one-shot enqueue decision, POST_NOTIFICATIONS permission, real-device validation (WAL journal-mode check, Doze, concurrency soak). Note for session B: parser asset seeding lives only in main(), safe for periodic tasks (main ran at least once) but must be revisited if NLS-triggered enqueue is added; BackgroundCaptureRunner duplicates main()'s wiring (drift risk)."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Tasks 6.6-6.7 implemented via Codex (codex:codex-rescue). Codex sandbox could not run flutter test; orchestrator ran test/notification_capture/ inline (17/17 green) and flutter analyze (1-issue pre-existing baseline). New shared factory lives at frontend/lib/src/features/notification_capture/data/capture_repository_factory.dart; processInbox now returns a split result (autoConfirmed/leftPending)."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Tasks 6.8-6.9 implemented via Codex (resumed session). One test-environment failure round-trip (FlutterLocalNotificationsPlatform.instance late singleton uninitialized in tests) fixed via second resume. Orchestrator ran tests inline: 21/21 green across test/notification_capture/ + test/notifications/; analyzer at 1-issue baseline. Action contract for 6.10: payload=pendingId, actionId='approve:<categoryId>', channel 'pocket_pilot_capture'."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Tasks 6.10-6.11 implemented via Codex (resumed session). Job hung again after writing all edits (33+ min running, zero log activity for 20 min after 'File changes completed'; cancelled) so no COMPLETED_TASKS tail \u2014 orchestrator classified Complete by reconciling the diff and running verification inline: full flutter test 286 tests with only the documented pre-existing statistics failure; analyzer at 1-issue baseline. Risk flagged for verify: TWO plugin initialize() paths now exist (NotificationSchedulerService.init() foreground with tap callback; CaptureNotificationService._ensureInitialized() background with onDidReceiveBackgroundNotificationResponse) \u2014 callback-clobbering between them is exactly issue #2148 territory and must be checked on device."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "Verify needs-rework round-trip resolved via Codex (resumed): CRITICAL fixed (action buttons now show resolved category names via categoryNameForId seam, actionId keeps the UUID, label-asserting test added), plus both SUGGESTIONs (foreground approve/dismiss now cancel the posted actionable notification; leftPendingTransactions asymmetry + cap loop break fixed). Full suite 286 tests with only the documented pre-existing statistics failure; analyzer at 1-issue baseline. WARNING (cold-start open_review navigation) logged as follow-up, to be assessed during 6.12 device validation."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "INCIDENT during 6.12: flutter install uninstalled the previous debug build (signature change), wiping local app data including ~2 months of unsynced transactions. Full-DB temp copy from the dump script was already deleted (mktemp + trap rm on EXIT); no APFS snapshots. User chose NOT to rebuild from the raw captured_raw.json backup (325 notifications preserved) and restarted from last server sync. Follow-ups: postmortem at close-out; harden dump script to keep a permanent DB copy; use 'adb install -r' / back up DB before any reinstall."
+        },
+        {
+          "date": "2026-07-18",
+          "kind": "note",
+          "note": "6.12 real-device validation (SM S938B, user closed phase before full e2e): VALIDATED: WAL empirical (header 0x0202 + live -wal/-shm with NLS connected); periodic 6h job registered; fresh-install parser seeding; POST_NOTIFICATIONS prompt granted; NLS capture of a real BBVA notification; forced background run (cmd jobscheduler run -f -n androidx.work.systemjobscheduler) executed the headless pipeline with app UI closed: received->matched_local, pending created (parser_local, conf 1.0), unresolved-account branch correctly posted nothing; no SQLITE_BUSY/ANR with NLS live. FOUND+FIXED CRITICAL REGRESSION from session A: NotificationDb.kt applied busy_timeout via execSQL (row-returning PRAGMA throws on Android) -> openDatabase returned null -> ALL NLS writes were silent no-ops; fixed to rawQuery().close() mirroring the Dart fix; confirmed capturing after fix. OS gotchas discovered: NLS approved-but-zombie binding after reinstall (remedy: settings toggle off/on); WorkManager jobs need -n namespace for cmd jobscheduler run on Android 14+. NOT VALIDATED (residual follow-ups): actionable-notification OS posting + category-button tap (needs learned mapping + next organic BBVA notification), summary notification on device, Doze/long soak."
         }
       ]
     }
@@ -392,6 +469,16 @@
     {
       "date": "2026-07-18",
       "note": "Phase 6: the background runner skips the LLM parser fallback (no ParserRemoteService in the headless composition root) \u2014 unmatched notifications stay pending and retry on next foreground processInbox. Avoids network + LLM quota burn in background, and sidesteps workmanager's Android 15 background-networking issue (#649).",
+      "adr_candidate": false
+    },
+    {
+      "date": "2026-07-18",
+      "note": "Phase 6 session B: NO NLS-triggered one-shot enqueue in v1 \u2014 periodic 6h task only. Enqueuing from Kotlin would couple to the workmanager plugin's undocumented internal input-Data contract (dev.fluttercommunity.workmanager.BackgroundWorker) and could fire on a cold isolate before main() ever seeded parsers. Phase goal is eventual capture (hours), which the periodic task already meets. The seeding gap is closed anyway: the shared composition root will seed parsers from asset if missing, so the background isolate self-seeds.",
+      "adr_candidate": true
+    },
+    {
+      "date": "2026-07-18",
+      "note": "Phase 6 session B: POST_NOTIFICATIONS (Android 13+) declared in the manifest and requested at app start inside NotificationSchedulerService.init() via AndroidFlutterLocalNotificationsPlugin.requestNotificationsPermission() \u2014 no permission_handler dependency. Also fixes the existing pocket_pilot_reminders notifications, which were silently undelivered on API 33+.",
       "adr_candidate": false
     }
   ],

@@ -202,8 +202,9 @@ class NotificationDb(private val context: Context) {
             openMode or SQLiteDatabase.NO_LOCALIZED_COLLATORS,
         ).also { db ->
             // WAL is set by sqflite and persisted in the DB file. busy_timeout
-            // must be applied to every Kotlin connection independently.
-            db.execSQL("PRAGMA busy_timeout=$SQLITE_BUSY_TIMEOUT_MILLIS")
+            // must be applied to every Kotlin connection independently. It returns
+            // a row, so rawQuery (not execSQL) mirrors database_helper.dart.
+            db.rawQuery("PRAGMA busy_timeout=$SQLITE_BUSY_TIMEOUT_MILLIS", null).close()
         }
     } catch (t: Throwable) {
         Log.w(TAG, "Could not open DB at $dbPath", t)

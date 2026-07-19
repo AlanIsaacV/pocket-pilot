@@ -13,8 +13,7 @@ import 'package:pocket_pilot/src/core/notifications/notification_repository.dart
 /// notification per day, generic message, ID derived from YYYYMMDD.
 class NotificationSchedulerService {
   final NotificationRepository _repository;
-  final FlutterLocalNotificationsPlugin _plugin =
-      FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _plugin;
   final void Function()? onNotificationTap;
 
   bool _permissionGranted = true;
@@ -22,7 +21,9 @@ class NotificationSchedulerService {
   NotificationSchedulerService({
     required NotificationRepository repository,
     this.onNotificationTap,
-  }) : _repository = repository;
+    FlutterLocalNotificationsPlugin? plugin,
+  }) : _repository = repository,
+       _plugin = plugin ?? FlutterLocalNotificationsPlugin();
 
   /// Initializes timezone data and the notification plugin.
   /// Must be called once before [rescheduleAllNotifications].
@@ -52,6 +53,14 @@ class NotificationSchedulerService {
         onNotificationTap?.call();
       },
     );
+
+    // Android 13+ requires this runtime permission before posting either
+    // scheduled reminders or capture notifications.
+    await _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.requestNotificationsPermission();
 
     // 3. Check iOS permissions — graceful degradation.
     final iosImpl = _plugin

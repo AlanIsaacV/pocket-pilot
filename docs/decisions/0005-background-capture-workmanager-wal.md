@@ -49,5 +49,10 @@ per write) and the foreground app — and neither side configured WAL or busy ti
   foreground-only) — accepted for v1.
 - Registration is guarded: a workmanager failure degrades to foreground-only capture instead of
   crashing cold start.
-- Session B (actionable notifications, device validation incl. empirical `PRAGMA journal_mode`
-  check with the NLS live) completes the phase.
+- Session B completed 2026-07-18: actionable notifications + real-device validation (the
+  empirical WAL check with the NLS live came back positive). The NLS one-shot enqueue question
+  this ADR deferred was resolved in [ADR 0006](0006-no-nls-oneshot-enqueue.md) — not doing it
+  in v1. Device validation also caught that the Kotlin `busy_timeout` had shipped via `execSQL`
+  (row-returning PRAGMA → throw → null connection): the WAL contract was inert on the NLS side
+  until fixed to `rawQuery` (see postmortem-adjacent note in
+  features/notification-capture.md § Components).

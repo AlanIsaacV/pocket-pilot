@@ -105,7 +105,7 @@ void main() {
         ),
       );
 
-      expect(await repo.processInbox(), 1);
+      expect((await repo.processInbox()).totalProcessed, 1);
       final firstPendingTx = pending.byId.values.single;
       expect(firstPendingTx.cardLastDigits, isNull);
       expect(firstPendingTx.parserId, 'bbva_mx/purchase_tdc');
@@ -136,7 +136,7 @@ void main() {
         ),
       );
 
-      expect(await repo.processInbox(), 1);
+      expect((await repo.processInbox()).totalProcessed, 1);
       final secondPendingTx = pending.byId.values.firstWhere(
         (tx) => tx.id != firstPendingTx.id,
       );

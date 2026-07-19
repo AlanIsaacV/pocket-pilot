@@ -81,7 +81,7 @@ received ─┬─► matched_local   (parser matched in client, PendingTransact
   2. **Solo si** `sbn.packageName in watchedPackages`: el path original que escribe a `captured_notifications` con title/text/big_text.
   - `onNotificationPosted(sbn)` — every new notification while the listener is bound.
   - `onListenerConnected()` — refresh del cache + backfill from `activeNotifications`. Cubre "user granted permission after notifications already arrived" y "OS restarted the listener". Idempotente thanks to `NotificationDb` dedupe.
-- `NotificationDb.kt` — minimal DB writer. Dedupes via `(package_name, posted_at ± 1 minute, text+title)` query before INSERT. Generates deterministic UUIDs from SHA-256 of the payload as a second-line idempotency defense. **Fase 8** añade dos métodos: `upsertPackageObservation(packageName, postedAtMillis)` (INSERT … ON CONFLICT(package_name) DO UPDATE SET last_seen_at=MAX(...), noti_count+=1) y `getEnabledWatchedPackages(): Set<String>` (SELECT package_name FROM watched_packages WHERE enabled=1). Ambos manejan el caso DB-no-existe / mig-no-corrida devolviendo no-op / set vacío respectivamente.
+- `NotificationDb.kt` — minimal DB writer. Dedupes via `(package_name, posted_at ± 1 minute, text+title)` query before INSERT. Generates deterministic UUIDs from SHA-256 of the payload as a second-line idempotency defense. **Fase 8** añade dos métodos: `upsertPackageObservation(packageName, postedAtMillis)` (INSERT … ON CONFLICT(package_name) DO UPDATE SET last_seen_at=MAX(...), noti_count+=1) y `getEnabledWatchedPackages(): Set<String>` (SELECT package_name FROM watched_packages WHERE enabled=1). Ambos manejan el caso DB-no-existe / mig-no-corrida devolviendo no-op / set vacío respectivamente. **f6 session B device finding**: session A added a per-connection `busy_timeout` via `execSQL`; that PRAGMA returns a row, so Android threw (`Queries can be performed using SQLiteDatabase query or rawQuery methods only`) and `openDatabase()` returned null — ALL NLS writes were silent no-ops (total capture outage). Found live on a real device, fixed to `rawQuery("PRAGMA busy_timeout=…", null).close()` — same rule as conventions.md § PRAGMAs.
 - `BootReceiver.kt` — re-enables the NLS component after `BOOT_COMPLETED` (defense for OEMs that disable it).
 
 `AndroidManifest.xml` declares the `<service>` with `BIND_NOTIFICATION_LISTENER_SERVICE` and the `<receiver>` for boot. Permission flow: user must manually toggle the listener in *Settings → Notification access*. The OS does not allow a runtime permission prompt.
@@ -138,9 +138,11 @@ Tests live in `test/notification_parser_engine_test.dart`. The positive cases co
 
 ### Repository (`NotificationCaptureRepository`)
 
-`processInbox()` — drains `received` notifications (the LLM fallback after a local miss runs only
+`processInbox()` — drains `received` notifications; since f6 session B it returns a split result
+(`autoConfirmed`, `leftPending`, plus the `leftPendingTransactions` themselves) so the background
+runner can post summary/actionable notifications. The LLM fallback after a local miss runs only
 when a `ParserRemoteService` is wired in — i.e. foreground; the background runner omits it, so
-unmatched notifications retry on the next foreground run):
+unmatched notifications retry on the next foreground run:
 1. Tries each active parser in order until one matches.
 2. On match: looks up `account_card_mappings` (latest active by `updated_at` for `bank_id` + `last_digits`) → `suggested_account_id`. When the notification carries no card digits (BBVA `purchase_tdc` is the only such pattern today), falls back to the `(bank_id, pattern_id)` mapping via `findByBankAndPattern` (same latest-active semantics). See `_resolveAccount` in `notification_capture_repository.dart`.
 3. On match: looks up `transaction_rules` (substring of merchant description in `match_text`, ordered by `LENGTH(match_text)` DESC, `priority` DESC, `updated_at` DESC — longest prefix wins) → `suggested_category_id`.
@@ -266,11 +268,11 @@ The notification's currency is preserved in the resulting `Transaction` (per use
 | 10 (frictionless-capture f1) | done (2026-07-18) | Smart resolution: `pattern_id` on `account_card_mappings` (proto field 8, BE mig 019 / FE mig 017 `_version=17`; `last_digits` nullable + CHECK at-least-one via SQLite table rebuild), (`bank_id`, `pattern_id`) account fallback for digit-less notifications + approval-time pattern learning, longest-prefix rule learning/matching (`LENGTH(match_text)` DESC). No uniqueness guard: insert-new-row + latest-active LWW, same as digits mappings. Also fixed latent bug: `account_card_mapping_remote_service.upsertMapping` never forwarded `pattern_id` outbound. |
 | 11 (frictionless-capture f2) | done (2026-07-18) | Fast review: "Aprobar N resueltas" header action (`approveAllResolved()`, continue-on-error, confirm dialog + result snackbar) + quick-pick `ChoiceChip` category row on `_SuggestionTile` for category-only gaps (`candidateCategoriesFor()`: longest-prefix rules then account most-used, cap 3). `parser_feedback` rows still written on batch approvals (`was_helpful` null — quality signal feeds f3's confidence gate). |
 | 12 (frictionless-capture f3) | done (2026-07-18) | Auto-confirm: synced `transactions.source` provenance column (proto field 21, BE mig 020 / FE mig 018 `_version=18`; values `manual`/`auto_notification`, future `import_csv` — see ADR 0004), conservative gate in `processInbox()` (local-regex only, account + rule category resolved, merchant not ambiguous = ≥2 distinct historical categories per rule prefix), auto-approve path (feedback row `was_helpful` null, **no** mapping/rule learning), device-local `auto_confirm_enabled` toggle (default OFF), "Auto" badge on transaction tiles. Verify caught + fixed: `upsertTransaction` initially dropped `source` from the outbound proto (same bug class as f1's `pattern_id`); `updateTransaction` now preserves `source`. 4 gate tests. |
-| 13 (frictionless-capture f6, session A) | in progress (2026-07-18) | Background capture mechanism: workmanager periodic task (~6h) + headless `BackgroundCaptureRunner` (no LLM) + SQLite WAL/busy_timeout concurrency contract (Dart + Kotlin sides). Session B pending: actionable notifications + device validation. |
+| 13 (frictionless-capture f6) | done (2026-07-18) | Background capture, both sessions. **A**: workmanager periodic task (~6h) + headless `BackgroundCaptureRunner` (no LLM) + SQLite WAL/busy_timeout concurrency contract (Dart + Kotlin sides). **B**: capture notifications (summary + actionable with category-name buttons), background action handler (`@pragma('vm:entry-point')`, idempotent), shared composition root (`capture_repository_factory.dart`, self-seeds parsers), `POST_NOTIFICATIONS` (manifest + runtime), real-device validation — which caught and fixed a session-A regression: the Kotlin `busy_timeout` via `execSQL` made all NLS writes silent no-ops. See ADR 0005/0006 + postmortem 0001. |
 
-## Background capture (frictionless-capture f6 — in progress, session A shipped)
+## Background capture (frictionless-capture f6 — done 2026-07-18)
 
-Since frictionless-capture f6 (session A) the pipeline also runs with the app closed, on Android:
+Since frictionless-capture f6 the pipeline also runs with the app closed, on Android:
 
 - **Mechanism**: `workmanager` plugin (fluttercommunity, v0.9.x federated — native WorkManager +
   headless FlutterEngine already wired; see ADR 0005). `main.dart` registers a periodic task
@@ -292,17 +294,39 @@ Since frictionless-capture f6 (session A) the pipeline also runs with the app cl
   transactions short.
 - **Sync caveat**: transactions auto-confirmed in background sync on the next app open
   (`SyncService` is foreground-only). Accepted for v1.
-- **Cold-isolate caveat**: parser asset seeding (`seedFromAssetIfMissing`) runs only in
-  `main()`. Safe for the periodic task (it can only exist after `main()` ran once), but must be
-  revisited if session B adds NLS-triggered one-shot enqueue.
-- **Session B (pending)**: summary + actionable notifications, `POST_NOTIFICATIONS` runtime
-  permission, NLS one-shot enqueue decision, real-device validation (journal mode, Doze,
-  concurrency soak).
+- **Composition root** (session B): `buildCaptureRepository()` in
+  `lib/src/features/notification_capture/data/capture_repository_factory.dart` is the single
+  wiring for foreground (`main.dart`, real `ParserRemoteService`) and background (runner,
+  `parserRemote: null`). It also self-seeds parsers from asset, closing the old cold-isolate
+  caveat — a background isolate can never see an unseeded DB.
+- **Capture notifications** (session B): `CaptureNotificationService`
+  (`lib/src/features/notification_capture/notifications/capture_notification_service.dart`,
+  Android channel `pocket_pilot_capture`, plugin injectable). After a background run: summary
+  notification when `autoConfirmed >= 1`; per-suggestion actionable notifications (cap 5) when
+  the account resolved but the category is ambiguous — up to 3 category buttons labeled with
+  resolved category NAMES (actionId `approve:<categoryId>`, payload `pendingId`, deterministic
+  notification ids from `capture_notification_contract.dart`) + an `open_review` fallback.
+- **Background action handler** (session B): `captureNotificationBackgroundResponse`
+  (`lib/src/features/notification_capture/background/capture_notification_action_handler.dart`,
+  `@pragma('vm:entry-point')`) → idempotent `approvePendingFromNotification` (re-approve,
+  missing pending, or malformed actionId = no-op; regression test for
+  flutter_local_notifications issue #2148) → cancels the notification by its deterministic id.
+  Foreground approve/dismiss also cancel a previously posted actionable notification. The two
+  plugin `initialize()` paths coexist safely: the native side only persists the background
+  callback handle when it is non-null, so the foreground init cannot clobber it.
+- **`POST_NOTIFICATIONS`** (Android 13+, session B): declared in the manifest and requested at
+  app start in `NotificationSchedulerService.init()`.
+- **Known follow-ups**: actionable-notification posting + category-tap e2e on a device (needs a
+  learned mapping + the next organic BBVA notification), summary notification on a device,
+  Doze/long concurrency soak, `open_review` cold-start navigation (no
+  `getNotificationAppLaunchDetails` handling — cold start lands on home, warm start on the
+  notification center).
 
 ## Operational tooling
 
 - **Retention sweepers (Fase 6)** — `CapturedNotificationsRetentionSweeper` (FE) corre al app launch con gating diario; `startCandidateRetentionSweeper` (BE) corre al startup + cada 24h vía `time.NewTicker`. Ambos NULLean texto crudo después de 90 días; los metadatos no-PII (status, parser_version, regex propuesto) se preservan. Para forzar manualmente: setear `notification_capture.last_purge_at = NULL` en `user_preferences` (FE) o llamar `repo.PurgeOldSamples(ctx)` desde un debug RPC (BE).
-- **`scripts/dump_captured_notifications.sh`** — extracts the device's `pocket_pilot.db` via `adb run-as <debugApp> cat`, then `sqlite3 json_group_array(...)` filtered by `package_name LIKE '%bancomer%'` (default; first arg overrides). Output: `frontend/test_data/captured_raw.json` (gitignored — may contain PII). Requires the debug build (`app.pocketpilot.debug`); release builds are not `run-as`-able. Source these dumps into `bbva_mx_real_notifications.json` by hand-curating and adding `expected.{pattern_id, transaction_type, fields}`.
+- **Device gotchas (f6 session B validation, Samsung / Android 14+):** (1) after a reinstall the NLS can be *approved but zombie-bound* — listed in `enabled_notification_listeners` and in `dumpsys notification` yet never receiving callbacks; remedy: toggle notification access OFF→ON in Settings (a programmatic `cmd notification disallow_listener`/`allow_listener` cycle may also work, with delay). (2) Forced WorkManager runs need the namespace flag on Android 14+: `adb shell cmd jobscheduler run -f -n androidx.work.systemjobscheduler app.pocketpilot.debug <jobId>`. (3) With WAL enabled, pulling only `pocket_pilot.db` misses recent commits — always pull the `-wal`/`-shm` sidecars alongside.
+- **`scripts/dump_captured_notifications.sh`** — extracts the device's `pocket_pilot.db` (+ `-wal`/`-shm` sidecars) via `adb run-as <debugApp> cat`, keeping a permanent timestamped backup under `~/.pocket_pilot/db_backups` (post-incident hardening — see postmortem 0001), then `sqlite3 json_group_array(...)` filtered by `package_name LIKE '%bancomer%'` (default; first arg overrides). Output: `frontend/test_data/captured_raw.json` (gitignored — may contain PII). Requires the debug build (`app.pocketpilot.debug`); release builds are not `run-as`-able. Source these dumps into `bbva_mx_real_notifications.json` by hand-curating and adding `expected.{pattern_id, transaction_type, fields}`.
 - **DB push limitation (negative result):** Modifying the device's SQLite locally and pushing it back via `adb exec-in shell run-as cat > databases/pocket_pilot.db` does **not** work reliably even after `am force-stop`. Cause: the `BankNotificationListenerService` is an OS-managed component independent of the Flutter process; it survives `force-stop` (Android keeps NLS bound while the permission is active), holds the DB file handle, and either overwrites the pushed file on its next flush or causes the kernel to silently reject the write. Verify with `shasum -a 256` of local vs `adb run-as cat ... | shasum`. Use the in-app "Reintentar no parseables" button or add a debug-only Dart helper instead of pushing files.
 - **Re-export DB for inspection:** `adb exec-out run-as app.pocketpilot.debug cat databases/pocket_pilot.db > <local-path>`. `exec-out` (not `shell`) preserves binary integrity (no CRLF translation).
 

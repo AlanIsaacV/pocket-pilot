@@ -65,6 +65,16 @@ git-ignored — never commit secrets).
 - **Symptom**: pushing a modified SQLite DB to an Android device fails → **Diagnosis**: the
   notification-listener service keeps a file handle (survives `am force-stop`) → **Resolution**: see
   [features/notification-capture.md](features/notification-capture.md).
+- **Symptom**: reinstalling the debug APK wipes app data → **Diagnosis**: `flutter install`
+  uninstalls on signature change → **Resolution**: always `adb install -r`; see
+  [postmortems/0001](postmortems/0001-flutter-install-data-loss.md).
+- **Symptom**: NLS approved in Settings but captures nothing after a reinstall → **Diagnosis**:
+  zombie binding (listed but never called) → **Resolution**: toggle notification access OFF→ON;
+  see [features/notification-capture.md](features/notification-capture.md) § Operational tooling.
+- **Symptom**: pulled `pocket_pilot.db` looks stale or empty → **Diagnosis**: WAL — recent commits
+  live in the `-wal` sidecar → **Resolution**: pull `.db`, `.db-wal` and `.db-shm` together.
+- **Symptom**: `cmd jobscheduler run` cannot find the WorkManager job → **Diagnosis**: Android 14+
+  puts WorkManager jobs in a namespace → **Resolution**: add `-n androidx.work.systemjobscheduler`.
 
 ## External dependencies
 

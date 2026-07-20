@@ -92,6 +92,32 @@ jobs:
           git push origin "HEAD:${{ github.ref_name }}"
           git push origin "${{ steps.version.outputs.version }}"
 
+      # The generated protobuf Go code (backend/internal/gen/) is gitignored and
+      # never committed, so a clean checkout lacks it and the Docker build's
+      # `go build` fails on the missing package. Regenerate it here, before the
+      # build, so the build context picks it up. Only the Go target is needed
+      # for the backend image (no Dart plugin in CI).
+      - uses: actions/setup-go@v5
+        if: steps.version.outputs.release == 'true'
+        with:
+          go-version-file: backend/go.mod
+
+      - name: Install protoc + Go plugins
+        if: steps.version.outputs.release == 'true'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+          # Pin protoc-gen-go to the google.golang.org/protobuf version in go.mod
+          # so generated code never needs a newer runtime than the module pins.
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Generate Go proto code
+        if: steps.version.outputs.release == 'true'
+        run: ./scripts/gen_proto.sh go
+
       - uses: docker/setup-qemu-action@v4
         if: steps.version.outputs.release == 'true'
       - uses: docker/setup-buildx-action@v4

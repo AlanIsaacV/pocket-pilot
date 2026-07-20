@@ -1,0 +1,57 @@
+# git-cliff configuration — https://git-cliff.org
+# Generates the CHANGELOG and computes the next semver from conventional commits.
+
+[changelog]
+header = """
+# Changelog\n
+All notable changes to this project are documented here.\n
+"""
+# Body template (Tera). Groups commits by their "group" (see [git.commit_parsers]).
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}\
+- {{ commit.message | upper_first }}{% if commit.breaking %} **[BREAKING]**{% endif %}
+{% endfor %}\
+{% endfor %}\n
+"""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = true
+filter_unconventional = true   # commits that don't follow the convention are omitted from the changelog
+split_commits = false
+protect_breaking_commits = true
+filter_commits = false
+# No tag_pattern: git-cliff considers all tags, so it recognizes the previous
+# version whether it has a "v" prefix or not and the next release bump stays
+# consistent.
+topo_order = false
+sort_commits = "oldest"
+
+# Maps each commit type to a changelog section.
+commit_parsers = [
+  { message = "^feat", group = "Features" },
+  { message = "^fix", group = "Bug Fixes" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Refactor" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^test", group = "Testing" },
+  { message = "^build", group = "Build" },
+  { message = "^ci", group = "CI" },
+  { message = "^chore\\(release\\):", skip = true },   # don't list release commits
+  { message = "^chore", group = "Miscellaneous" },
+  { message = "^revert", group = "Revert" },
+  { body = ".*security", group = "Security" },
+]
+
+[bump]
+# feat → minor, fix/others → patch, '!' or BREAKING CHANGE → major.
+features_always_bump_minor = true
+breaking_always_bump_major = true

@@ -1,0 +1,44 @@
+# ── "pocket-pilot" stack on the Raspberry Pi ─────────────────────────────
+# Copy the contents of deploy/ to /opt/stacks/pocket-pilot/ on the Pi.
+# It ships no code and compiles nothing: it only references the image published on ghcr.
+#
+# Deploy:   cd /opt/stacks/pocket-pilot && docker compose pull && docker compose up -d
+# Rollback: pin an older tag in 'image:' and repeat pull && up.
+
+services:
+  pocket-pilot:  # the gRPC server; cloudflared points at it to expose it to the internet
+    image: ghcr.io/alanisaacv/pocket-pilot:latest  # switch to a fixed tag (:vX.Y.Z) for pin/rollback
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Postgres lives on the shared homelab network, reachable by name.
+      DATABASE_URL: "postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable"
+      GRPC_PORT: "50051"
+    mem_limit: 256m  # tune with 'docker stats' under load
+    # Do NOT publish ports: cloudflared reaches it by name inside the homelab
+    # network. This is a gRPC (HTTP/2 cleartext) server, so in the Cloudflare
+    # tunnel the public hostname must map to  h2c://pocket-pilot:50051
+    # (NOT http://). Cloudflare terminates TLS at the edge; the app speaks
+    # plaintext gRPC inside the LAN. Postgres is never exposed.
+    networks:
+      - homelab
+
+  # ── Migrations ────────────────────────────────────────────────────
+  # One-shot under the "tools" profile: applies the embedded SQL migrations and
+  # exits. Does NOT start with 'up'; run it on demand before bringing the server
+  # up whenever a release changes the schema:
+  #   docker compose --profile tools run --rm migrate
+  # It tracks applied versions in schema_migrations, so re-running is a no-op.
+  migrate:
+    image: ghcr.io/alanisaacv/pocket-pilot:latest
+    profiles: [tools]
+    env_file: .env
+    environment:
+      DATABASE_URL: "postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable"
+    entrypoint: ["/usr/local/bin/migrate"]
+    networks:
+      - homelab
+
+networks:
+  homelab:
+    external: true

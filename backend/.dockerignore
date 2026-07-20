@@ -1,0 +1,21 @@
+.git
+.github
+.env
+**/.env
+*.md
+CHANGELOG.md
+RELEASE_NOTES.md
+cliff.toml
+Dockerfile*
+.dockerignore
+.gitignore
+deploy/
+# Go
+/vendor
+# Python
+.venv
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/

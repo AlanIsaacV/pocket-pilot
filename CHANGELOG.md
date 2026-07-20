@@ -19,6 +19,7 @@ All notable changes to this project are documented here.
 - Currency-related issues
 - Include transfers
 - Allow linkage in templates
+- Generate protobuf Go code before the Docker build
 
 ### Documentation
 - Define AppBar form actions design spec
